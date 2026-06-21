@@ -26,6 +26,7 @@ interface BookingMemberRow {
 
 interface BookingRow {
   id: string;
+  date: string;
   time: string;
   service_name: string;
   staff_name: string | null;
