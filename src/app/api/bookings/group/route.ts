@@ -1,0 +1,217 @@
+// src/app/api/bookings/group/route.ts
+// Port de base44/functions/joinGroupBooking/entry.ts
+//
+// Une seule route, multi-actions (comme l'original Base44), pour rester
+// simple à appeler depuis le front. Toutes les actions sont publiques
+// (un invité non connecté doit pouvoir rejoindre un groupe via un lien).
+import { NextRequest, NextResponse } from 'next/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
+import { calcFraisGestion, generateQrCode, normalizePhone } from '@/lib/booking-utils';
+
+const MAX_GROUP_SIZE = 23;
+const INVITE_DELAY_MS = 30 * 60 * 1000; // 30 minutes
+
+export async function POST(req: NextRequest) {
+  const supabase = createServiceRoleClient();
+  const body = await req.json();
+  const { action, bookingId, memberId, memberData, groupRef } = body;
+
+  // Normalise le téléphone dès la réception — voir normalizePhone() pour
+  // le détail du problème que ça résout (comparaisons phone === phone
+  // fragiles sans format unique en base).
+  if (memberData?.phone) {
+    memberData.phone = normalizePhone(memberData.phone);
+  }
+
+  if (!bookingId && action !== 'getBookingsByGroupRef') {
+    return NextResponse.json({ error: 'bookingId requis' }, { status: 400 });
+  }
+
+  try {
+    // ── getBooking ──────────────────────────────────────────────────────────
+    if (action === 'getBooking') {
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('*, booking_members(*), services(max_persons, deposit, price)')
+        .eq('id', bookingId)
+        .maybeSingle();
+      if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });
+      return NextResponse.json({ booking });
+    }
+
+    // ── getBookingsByGroupRef ───────────────────────────────────────────────
+    if (action === 'getBookingsByGroupRef') {
+      if (!groupRef) return NextResponse.json({ error: 'groupRef requis' }, { status: 400 });
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('*, booking_members(*)')
+        .eq('group_ref', groupRef);
+      return NextResponse.json({ bookings: bookings || [] });
+    }
+
+    // ── addMemberAndGetCheckout ──────────────────────────────────────────────
+    // ⚠️ Nom historique de Base44 — cette action NE crée PAS de session Stripe.
+    // Elle insère le membre puis renvoie memberId + fraisGestion ; c'est au
+    // FRONT d'appeler ensuite /api/stripe/checkout avec ces infos (même
+    // pattern que StepPayment.tsx pour une réservation simple).
+    if (action === 'addMemberAndGetCheckout') {
+      if (!memberData) return NextResponse.json({ error: 'memberData requis' }, { status: 400 });
+
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('*, booking_members(*), services(max_persons), businesses(phone)')
+        .eq('id', bookingId)
+        .maybeSingle();
+      if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });
+
+      const members = booking.booking_members || [];
+
+      const existingByPhone = members.find(
+        (m: any) => m.phone && m.phone === memberData.phone && m.status !== 'cancelled'
+      );
+      if (existingByPhone) {
+        return NextResponse.json({ alreadyJoined: true, member: existingByPhone });
+      }
+
+      if (memberData.phone && memberData.phone === booking.businesses?.phone) {
+        return NextResponse.json(
+          { error: "Un établissement ne peut pas rejoindre sa propre réservation." },
+          { status: 400 }
+        );
+      }
+
+      const normalizedName = (memberData.name || '').trim().toLowerCase();
+      const duplicateName = members.find(
+        (m: any) =>
+          m.status !== 'cancelled' &&
+          (m.name || '').trim().toLowerCase() === normalizedName &&
+          m.phone !== memberData.phone
+      );
+      if (duplicateName) {
+        return NextResponse.json(
+          { error: `Un participant nommé "${memberData.name}" est déjà dans ce groupe.`, duplicateName: true },
+          { status: 400 }
+        );
+      }
+
+      const activeMembers = members.filter((m: any) => m.status !== 'cancelled');
+      const hardLimit = booking.services?.max_persons
+        ? Math.min(booking.services.max_persons, MAX_GROUP_SIZE)
+        : MAX_GROUP_SIZE;
+      if (activeMembers.length >= hardLimit) {
+        return NextResponse.json(
+          { error: `Groupe complet (max ${hardLimit} personnes)`, capacityFull: true },
+          { status: 400 }
+        );
+      }
+
+      const inviteExpiry = new Date(Date.now() + INVITE_DELAY_MS).toISOString();
+
+      const { data: newMember, error: insertError } = await supabase
+        .from('booking_members')
+        .insert({
+          booking_id: bookingId,
+          member_ref: memberData.memberRef || memberData.id || null,
+          name: memberData.name,
+          phone: memberData.phone,
+          status: 'invite',
+          deposit: memberData.dep || null,
+          qr_code: generateQrCode(),
+          is_referral: true,
+          invite_expiry: inviteExpiry,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      console.log(
+        `[JoinGroup] Membre ajouté: ${memberData.name} (${memberData.phone}) → booking ${bookingId} | groupe: ${activeMembers.length + 1}/${hardLimit}`
+      );
+
+      const dep = memberData.dep || 0;
+      const fraisGestion = calcFraisGestion(dep);
+
+      return NextResponse.json({
+        success: true,
+        memberId: newMember.id,
+        fraisGestion,
+        groupSize: activeMembers.length + 1,
+        groupCapacity: hardLimit,
+      });
+    }
+
+    // ── removeInvite ─────────────────────────────────────────────────────────
+    if (action === 'removeInvite') {
+      if (!memberId) return NextResponse.json({ error: 'memberId requis' }, { status: 400 });
+
+      const { data: member } = await supabase
+        .from('booking_members')
+        .select('*')
+        .eq('id', memberId)
+        .eq('booking_id', bookingId)
+        .maybeSingle();
+
+      if (!member) return NextResponse.json({ error: 'Membre introuvable' }, { status: 404 });
+      if (member.status !== 'invite') {
+        return NextResponse.json(
+          { error: 'Ce membre a déjà payé, impossible de le retirer' },
+          { status: 400 }
+        );
+      }
+
+      await supabase.from('booking_members').delete().eq('id', memberId);
+
+      console.log(`[JoinGroup] Membre retiré: ${member.name} (${member.phone}) par l'organisateur`);
+      return NextResponse.json({ success: true });
+    }
+
+    // ── cancelExpiredBooking ─────────────────────────────────────────────────
+    if (action === 'cancelExpiredBooking') {
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('*, booking_members(*)')
+        .eq('id', bookingId)
+        .maybeSingle();
+      if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });
+
+      const now = Date.now();
+      const members = booking.booking_members || [];
+      const expiredMembers = members.filter(
+        (m: any) => m.status === 'invite' && m.invite_expiry && new Date(m.invite_expiry).getTime() < now
+      );
+
+      if (expiredMembers.length === 0) {
+        return NextResponse.json({ expired: false });
+      }
+
+      for (const m of expiredMembers) {
+        await supabase.from('booking_members').update({ status: 'cancelled' }).eq('id', m.id);
+      }
+
+      const remainingPaid = members.filter(
+        (m: any) =>
+          !expiredMembers.find((e: any) => e.id === m.id) &&
+          (m.status === 'paid' || m.status === 'arrived')
+      );
+      const newStatus = remainingPaid.length === 0 ? 'cancelled' : 'active';
+
+      await supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId);
+
+      console.log(
+        `[JoinGroup] Booking ${bookingId} — ${expiredMembers.length} invite(s) expirés → status: ${newStatus}`
+      );
+
+      return NextResponse.json({
+        expired: true,
+        cancelled: newStatus === 'cancelled',
+        partialExpiry: newStatus === 'active',
+      });
+    }
+
+    return NextResponse.json({ error: 'Action invalide' }, { status: 400 });
+  } catch (error: any) {
+    console.error('[joinGroupBooking] Erreur:', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
