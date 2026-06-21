@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/check-no-shows",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/cron/send-rdv-reminders",
