@@ -1,5 +1,8 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+
+export const metadata: Metadata = { title: 'Recherche' };
 import { searchBusinesses, CATEGORIES, type SearchFilters } from '@/lib/queries/catalog';
 import type { FlashSlot } from '@/lib/database.types';
 
@@ -118,8 +121,15 @@ export default async function SearchPage({
                     </p>
                   </div>
                   {biz.business_reviews?.rating && (
-                    <span className="flex items-center gap-1 text-sm text-mint-400">
-                      ⭐ {biz.business_reviews.rating.toFixed(1)}
+                    <span
+                      className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold shrink-0 ${
+                        biz.business_reviews.rating >= 4.5 ? 'bg-emerald-500/20 text-emerald-400' :
+                        biz.business_reviews.rating >= 4.0 ? 'bg-mint-500/20 text-mint-400' :
+                        biz.business_reviews.rating >= 3.5 ? 'bg-amber-500/20 text-amber-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}
+                    >
+                      {biz.business_reviews.rating.toFixed(1)}
                     </span>
                   )}
                 </div>

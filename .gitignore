@@ -23,6 +23,10 @@ build/
 debug-*.png
 local-*.png
 verify-*.png
+# Exception : assets publics du projet
+!public/*.jpg
+!public/*.png
+!public/*.ico
 
 # Editor
 .vscode/
