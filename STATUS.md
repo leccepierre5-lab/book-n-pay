@@ -6,7 +6,7 @@
 - **Supabase** (auth + base de données + RLS)
 - **Stripe** (Checkout + Connect + webhooks)
 - **Tailwind CSS** (palette navy/mint custom)
-- **Resend** (emails transactionnels — clé à configurer)
+- **Resend** (emails transactionnels — ✅ clé configurée sur Vercel)
 - **Vercel** (déploiement, crons via vercel.json)
 
 Migration depuis une app **Base44** (no-code). Toute la logique métier a été portée à la main.
@@ -67,6 +67,8 @@ Migration depuis une app **Base44** (no-code). Toute la logique métier a été 
 - `calcDeposit()` — dépôt majoré si score < 60
 - `computeStatut()` — paliers fidélité Standard/Bronze/Argent/Gold
 - `isSlotClosed()` — vérification horaires/jours d'ouverture
+- `parseParisDatetime()` — parse date+heure Paris en UTC correct (DST-aware)
+- `getParisTomorrowStr()` — date de demain en heure Paris (pour les crons)
 
 ### SQL migrations
 - 7 fichiers `.sql` relus et rendus idempotents
@@ -76,14 +78,53 @@ Migration depuis une app **Base44** (no-code). Toute la logique métier a été 
 
 ---
 
+## TESTS EFFECTUÉS (24 juin 2026)
+
+### Build de production
+```
+npm run build  →  ✅ 0 erreurs TypeScript, 40 pages générées
+```
+
+### Parcours de réservation complet (E2E local — verify-local.mjs)
+| Étape | Résultat |
+|---|---|
+| `/recherche` — 45 établissements affichés | ✅ |
+| Page établissement `Surf & Scissors` | ✅ |
+| Sélection service (avec prix) | ✅ |
+| Sélection praticien / Pas de préférence | ✅ |
+| Sélection date (12 jours disponibles) | ✅ |
+| Sélection créneau 09:00 (20 créneaux) | ✅ |
+| Bouton Continuer | ✅ |
+| Auth wall affiché | ✅ |
+| Connexion `testbnp@example.com` | ✅ |
+| Récap paiement (frais + total + bouton) | ✅ |
+| **Redirection Stripe Checkout** | ✅ `checkout.stripe.com/c/pay/cs_test_...` |
+| Pages annexes : /inscription, /tarifs, /cgu, /devenir-partenaire | ✅ |
+
+### Variables d'environnement sur Vercel
+| Variable | Production | Preview | Development |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | ✅ | ✅ |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | ✅ | ✅ |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | ✅ | ✅ |
+| `STRIPE_TEST_SECRET_KEY` | ✅ | ✅ | ✅ |
+| `STRIPE_WEBHOOK_SECRET` | ✅ | ✅ | — |
+| `RESEND_API_KEY` | ✅ | ✅ | ✅ |
+| `CRON_SECRET` | ✅ | ✅ | — |
+| `INTERNAL_API_SECRET` | ✅ | ✅ | — |
+
+### Correctifs timezone
+- Vercel réserve `TZ` → fix code-level avec `parseParisDatetime()` + `getParisTomorrowStr()`
+- Appliqué dans : `check-no-shows/route.ts`, `send-rdv-reminders/route.ts`, `bookings/cancel/route.ts`
+
+---
+
 ## CE QUI RESTE À FAIRE / RISQUES CONNUS
 
-### Avant toute mise en prod (bloquant)
-- [ ] **`npm install && npm run build`** — jamais exécuté dans cet environnement, à lancer et corriger ce qui casse
-- [ ] **`RESEND_API_KEY`** manquante dans `.env.example` — sans elle, tous les emails (confirmation, rappels, no-show) passent silencieusement en no-op
-- [ ] **`INTERNAL_API_SECRET`** — générer avec `openssl rand -hex 32` et ajouter dans `.env.local` + Vercel ; sans elle, la fidélité (RDV honorés, jokers) ne se met plus à jour après check-in
-- [ ] **`CRON_SECRET`** — protège les endpoints `/api/cron/*` contre les appels arbitraires
-- [ ] **Fuseau horaire Vercel** — Vercel exécute en UTC par défaut ; tous les calculs d'heure (`48h avant`, `no-show`, rappels) sont construits sans suffixe de fuseau. Fixer `TZ=Europe/Paris` dans les variables d'env Vercel, ou tester en conditions réelles avant la prod
+### Avant toute mise en prod (non-bloquant en test, bloquant en prod)
+- [ ] **Webhook Stripe post-paiement** — non testé localement (nécessite `stripe listen --forward-to localhost:3000/api/stripe/webhook`). En prod Vercel, le webhook est configuré et le secret est présent
+- [ ] **`INTERNAL_API_SECRET`** — absent de Development local. Sans elle, la fidélité (RDV honorés, jokers) ne se met plus à jour après check-in. Présent sur Prod/Preview Vercel
+- [ ] **`CRON_SECRET`** — absent de Development local. Présent sur Prod/Preview Vercel
 
 ### Fonctionnalités définies mais sans UI
 | Fonctionnalité | Type/table existant | UI/API |
@@ -97,6 +138,7 @@ Migration depuis une app **Base44** (no-code). Toute la logique métier a été 
 - `bookings.status = 'completed'` — jamais assigné nulle part (comportement hérité de Base44) ; une réservation honorée reste `active` au niveau du booking, seul le membre passe à `arrived`
 - Normalisation téléphone — présume des numéros français. Si extension internationale, migrer vers `libphonenumber-js`
 - Le barème des frais de gestion est dupliqué : `calcFraisGestion()` en TS (fallback) + `app_config` en base (source de vérité). Les deux doivent rester synchronisés
+- Utilisateurs créés via API admin Supabase (sans inscription normale) n'ont pas de ligne `app_users` — le trigger PostgreSQL ne tourne pas. Workaround : insérer manuellement ou utiliser l'inscription via l'app
 
 ---
 
@@ -114,7 +156,7 @@ STRIPE_TEST_SECRET_KEY=...
 STRIPE_WEBHOOK_SECRET=...
 
 # Email (Resend)
-RESEND_API_KEY=...              ← MANQUANT dans .env.example
+RESEND_API_KEY=...
 
 # App
 NEXT_PUBLIC_SITE_URL=https://book-n-pay.com
@@ -123,6 +165,11 @@ NEXT_PUBLIC_SITE_URL=https://book-n-pay.com
 CRON_SECRET=...                 ← protège /api/cron/*
 INTERNAL_API_SECRET=...         ← protège /api/loyalty/update-status
 ```
+
+### Piège PowerShell → Vercel
+> ⚠️ Ne jamais utiliser `echo "valeur" | vercel env add ...` depuis PowerShell Windows.
+> PowerShell ajoute un BOM (`﻿`) au début de la valeur, ce qui corrompt les clés API silencieusement.
+> **Utiliser le Bash tool ou `printf 'valeur' | vercel env add ...`** depuis bash/sh.
 
 ---
 
