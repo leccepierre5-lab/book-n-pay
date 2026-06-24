@@ -1,12 +1,25 @@
 // src/app/(public)/mes-reservations/page.tsx
-import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import MyBookingsList from '@/components/booking/MyBookingsList';
 
 export default async function MesReservationsPage() {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
-  if (!authData.user) redirect('/connexion?redirect=/mes-reservations');
+
+  if (!authData.user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-56px)] px-6 text-center">
+        <p className="text-slate-400 mb-6 text-base">Connectez-vous pour voir vos réservations</p>
+        <Link
+          href="/connexion?redirect=/mes-reservations"
+          className="rounded-xl bg-mint-500 px-8 py-3 font-semibold text-navy-950"
+        >
+          Se connecter →
+        </Link>
+      </div>
+    );
+  }
 
   const { data: profile } = await supabase
     .from('app_users')

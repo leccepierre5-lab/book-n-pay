@@ -6,6 +6,17 @@ export const metadata: Metadata = { title: 'Recherche' };
 import { searchBusinesses, CATEGORIES, type SearchFilters } from '@/lib/queries/catalog';
 import type { FlashSlot } from '@/lib/database.types';
 
+const CAT_EMOJI: Record<string, string> = {
+  beaute: '✂️',
+  'bien-etre': '🧖',
+  sport: '🏄',
+  enfants: '👶',
+  food: '🍽️',
+  education: '📚',
+  creatif: '🎨',
+  services: '🔧',
+};
+
 export default async function SearchPage({
   searchParams,
 }: {
@@ -40,13 +51,21 @@ export default async function SearchPage({
     <div className="min-h-screen">
       <div className="max-w-2xl mx-auto px-4 py-6">
         <form className="mb-4 space-y-3" action="/recherche" method="get">
-          <input
-            type="text"
-            name="q"
-            defaultValue={params.q}
-            placeholder="Rechercher un établissement..."
-            className="w-full rounded-lg bg-navy-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-mint-500"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              name="q"
+              defaultValue={params.q}
+              placeholder="Rechercher un établissement..."
+              className="flex-1 rounded-lg bg-navy-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-mint-500"
+            />
+            <button
+              type="button"
+              className="rounded-lg bg-navy-900 px-4 py-3 text-sm text-slate-300 whitespace-nowrap border border-white/5 hover:bg-navy-800 transition-colors"
+            >
+              ≡ Filtres
+            </button>
+          </div>
 
           <div className="flex gap-2 overflow-x-auto pb-1">
             {CATEGORIES.map((cat) => (
@@ -103,26 +122,40 @@ export default async function SearchPage({
 
         <div className="space-y-3">
           {businesses.map((biz) => {
-            const minPrice = Math.min(
-              ...(biz.services ?? []).filter((s) => s.price > 0).map((s) => s.price),
-              Infinity
-            );
+            const prices = (biz.services ?? []).filter((s) => s.price > 0).map((s) => s.price);
+            const minPrice = prices.length ? Math.min(...prices) : null;
+            const serviceCount = biz.services?.length ?? 0;
+            const emoji = CAT_EMOJI[biz.category] || '🏢';
+            const hours =
+              biz.open_time && biz.close_time
+                ? ` · ${biz.open_time.slice(0, 5)}–${biz.close_time.slice(0, 5)}`
+                : '';
+
             return (
               <Link
                 key={biz.id}
                 href={`/etablissement/${biz.slug}`}
                 className="block rounded-xl bg-navy-900 p-4 hover:bg-navy-800 transition-colors"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold text-slate-100">{biz.name}</h3>
-                    <p className="text-sm text-slate-400">
-                      {biz.type} · {biz.city}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-slate-100 truncate">
+                      {emoji} {biz.name}
+                    </h3>
+                    <p className="text-sm text-slate-400 truncate mt-0.5">
+                      {biz.type} · {biz.city}{hours}
                     </p>
+                    {(minPrice !== null || serviceCount > 0) && (
+                      <p className="text-sm text-slate-300 mt-1">
+                        {minPrice !== null && `dès ${minPrice}€`}
+                        {minPrice !== null && serviceCount > 0 && ' · '}
+                        {serviceCount > 0 && `${serviceCount} prestation${serviceCount > 1 ? 's' : ''}`}
+                      </p>
+                    )}
                   </div>
                   {biz.business_reviews?.rating && (
                     <span
-                      className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold shrink-0 ${
+                      className={`shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
                         biz.business_reviews.rating >= 4.5 ? 'bg-emerald-500/20 text-emerald-400' :
                         biz.business_reviews.rating >= 4.0 ? 'bg-mint-500/20 text-mint-400' :
                         biz.business_reviews.rating >= 3.5 ? 'bg-amber-500/20 text-amber-400' :
@@ -133,9 +166,6 @@ export default async function SearchPage({
                     </span>
                   )}
                 </div>
-                {minPrice !== Infinity && (
-                  <p className="mt-2 text-sm text-slate-300">à partir de {minPrice}€</p>
-                )}
               </Link>
             );
           })}
