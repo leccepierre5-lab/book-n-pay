@@ -185,12 +185,17 @@ export default function ProDashboard({
             <h1 className="text-xl font-semibold text-white">{business.name}</h1>
             <p className="text-sm text-white/50">Espace pro</p>
           </div>
-          <Link href="/pro/transactions" className="text-sm text-mint-400">
-            Transactions →
-          </Link>
-          <Link href="/pro/reglages" className="ml-3 text-sm text-white/50 hover:text-white">
-            ⚙️
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/pro/flash-slots" className="text-sm text-mint-400">
+              ⚡ Flash
+            </Link>
+            <Link href="/pro/transactions" className="text-sm text-mint-400">
+              Transactions →
+            </Link>
+            <Link href="/pro/reglages" className="text-sm text-white/50 hover:text-white">
+              ⚙️
+            </Link>
+          </div>
         </header>
 
         <AlertsPanel bookings={bookings} />

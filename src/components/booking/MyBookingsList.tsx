@@ -120,7 +120,12 @@ export default function MyBookingsList({
   return (
     <div className="min-h-screen">
       <div className="mx-auto max-w-lg px-4 py-6">
-        <h1 className="mb-4 text-lg font-semibold text-white">Mes réservations</h1>
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-white">Mes réservations</h1>
+          <Link href="/mes-favoris" className="text-sm text-mint-400">
+            ❤️ Favoris
+          </Link>
+        </div>
 
         {cancelError && (
           <p className="mb-4 rounded-lg bg-red-950/40 px-3 py-2 text-sm text-red-300">{cancelError}</p>

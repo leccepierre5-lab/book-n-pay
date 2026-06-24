@@ -1,9 +1,8 @@
-// src/app/(public)/etablissement/[slug]/page.tsx
-// Port de src/pages/BookingFlow.jsx — la page établissement EST le point
-// d'entrée du parcours de réservation (comme dans l'app actuelle).
 import { notFound } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
 import { getBusinessBySlug } from '@/lib/queries/catalog';
 import BookingFlow from '@/components/booking/BookingFlow';
+import FavoriteButton from '@/components/public/FavoriteButton';
 
 const CATEGORY_ICONS: Record<string, string> = {
   beaute: '✂️',
@@ -26,10 +25,6 @@ export default async function EtablissementPage({
 
   if (!business) notFound();
 
-  // Un établissement gelé reste accessible par lien direct (favori,
-  // ancien lien partagé) même s'il n'apparaît plus dans la recherche —
-  // on l'affiche clairement plutôt que de laisser l'utilisateur découvrir
-  // le blocage seulement au moment de payer.
   if (business.frozen) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4 text-center">
@@ -44,7 +39,27 @@ export default async function EtablissementPage({
     );
   }
 
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+  let isFavorited = false;
+  if (authData.user) {
+    const { data: fav } = await supabase
+      .from('favorites')
+      .select('id')
+      .eq('user_id', authData.user.id)
+      .eq('biz_id', business.id)
+      .maybeSingle();
+    isFavorited = !!fav;
+  }
+
   return (
-    <BookingFlow business={business} icon={CATEGORY_ICONS[business.category] || '🏢'} />
+    <div className="relative">
+      {authData.user && (
+        <div className="absolute top-4 right-4 z-10">
+          <FavoriteButton bizId={business.id} initialFavorited={isFavorited} />
+        </div>
+      )}
+      <BookingFlow business={business} icon={CATEGORY_ICONS[business.category] || '🏢'} />
+    </div>
   );
 }

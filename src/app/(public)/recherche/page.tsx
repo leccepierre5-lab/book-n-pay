@@ -1,7 +1,7 @@
-// src/app/(public)/recherche/page.tsx
-// Port de src/pages/Search.jsx — Server Component avec filtres en query params.
 import Link from 'next/link';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 import { searchBusinesses, CATEGORIES, type SearchFilters } from '@/lib/queries/catalog';
+import type { FlashSlot } from '@/lib/database.types';
 
 export default async function SearchPage({
   searchParams,
@@ -19,7 +19,19 @@ export default async function SearchPage({
     minRating: params.minRating ? Number(params.minRating) : undefined,
   };
 
-  const businesses = await searchBusinesses(filters);
+  const today = new Date().toISOString().split('T')[0];
+  const serviceRole = createServiceRoleClient();
+
+  const [businesses, { data: flashSlots }] = await Promise.all([
+    searchBusinesses(filters),
+    serviceRole
+      .from('flash_slots')
+      .select('*')
+      .eq('active', true)
+      .gte('date', today)
+      .order('date', { ascending: true })
+      .limit(5),
+  ]);
 
   return (
     <div className="min-h-screen">
@@ -49,6 +61,37 @@ export default async function SearchPage({
             ))}
           </div>
         </form>
+
+        {flashSlots && flashSlots.length > 0 && (
+          <div className="mb-5">
+            <h2 className="text-sm font-semibold text-mint-400 mb-2">⚡ Créneaux flash</h2>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {(flashSlots as FlashSlot[]).map((slot) => (
+                <div
+                  key={slot.id}
+                  className="shrink-0 rounded-xl bg-navy-900 border border-mint-500/30 p-3 min-w-[160px]"
+                >
+                  <p className="text-xs text-mint-400 font-semibold">⚡ Flash</p>
+                  <p className="text-sm font-medium text-slate-100 truncate">{slot.biz_name}</p>
+                  {slot.service_name && (
+                    <p className="text-xs text-slate-400 truncate">{slot.service_name}</p>
+                  )}
+                  <p className="text-xs text-slate-300 mt-1">
+                    {slot.date} · {slot.time.slice(0, 5)}
+                  </p>
+                  {slot.flash_deposit != null && (
+                    <p className="text-xs text-mint-400 mt-0.5">
+                      {slot.flash_deposit}€
+                      {slot.original_deposit != null && slot.original_deposit !== slot.flash_deposit && (
+                        <span className="line-through text-slate-500 ml-1">{slot.original_deposit}€</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <p className="mb-3 text-sm text-slate-400">
           {businesses.length} établissement{businesses.length > 1 ? 's' : ''} trouvé
