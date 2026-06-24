@@ -3,7 +3,7 @@
 // donné — équivalent de guestsAtSlot() mais calculé côté serveur avec des
 // données fraîches (pas de risque de désync avec un state client périmé).
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'bizId et date requis' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = createServiceRoleClient();
   const { data: bookings, error } = await supabase
     .from('bookings')
     .select('time, booking_members(status)')

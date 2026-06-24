@@ -53,7 +53,7 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
   let results = (data || []) as unknown as BusinessWithDetails[];
 
   const minServicePrice = (biz: BusinessWithDetails) => {
-    const prices = biz.services.filter((s) => s.price > 0).map((s) => s.price);
+    const prices = (biz.services ?? []).filter((s) => s.price > 0).map((s) => s.price);
     return prices.length ? Math.min(...prices) : Infinity;
   };
 

@@ -58,7 +58,7 @@ export default async function SearchPage({
         <div className="space-y-3">
           {businesses.map((biz) => {
             const minPrice = Math.min(
-              ...biz.services.filter((s) => s.price > 0).map((s) => s.price),
+              ...(biz.services ?? []).filter((s) => s.price > 0).map((s) => s.price),
               Infinity
             );
             return (
