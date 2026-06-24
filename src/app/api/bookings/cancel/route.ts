@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { parseParisDatetime } from '@/lib/booking-utils';
 
 const CANCEL_DEADLINE_HOURS = 48;
 
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const rdvDateTime = new Date(`${booking.date}T${booking.time}`);
+    const rdvDateTime = parseParisDatetime(booking.date, booking.time);
     const hoursUntilRdv = (rdvDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
     const eligibleForRefund = hoursUntilRdv >= CANCEL_DEADLINE_HOURS;
 

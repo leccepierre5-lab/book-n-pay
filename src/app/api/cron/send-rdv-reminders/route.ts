@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
+import { getParisTomorrowStr } from '@/lib/booking-utils';
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -13,9 +14,7 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServiceRoleClient();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  const tomorrowStr = getParisTomorrowStr();
 
   const { data: bookings } = await supabase
     .from('bookings')

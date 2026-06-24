@@ -108,6 +108,25 @@ export function calcTrustScore(
   return { score, total, honored, noShows, level, levelColor, levelIcon };
 }
 
+// ── Timezone helpers (Vercel tourne en UTC, les dates stockées sont heure de Paris) ──
+// Interprète "YYYY-MM-DD" + "HH:MM" comme heure Europe/Paris et renvoie un Date UTC.
+export function parseParisDatetime(date: string, time: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  const utcCandidate = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const parisCandidate = new Date(
+    utcCandidate.toLocaleString('en-US', { timeZone: 'Europe/Paris' })
+  );
+  return new Date(utcCandidate.getTime() + (utcCandidate.getTime() - parisCandidate.getTime()));
+}
+
+// Renvoie la date de demain au format "YYYY-MM-DD" selon l'heure de Paris.
+export function getParisTomorrowStr(): string {
+  const todayParis = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+  const [y, mo, d] = todayParis.split('-').map(Number);
+  return new Date(Date.UTC(y, mo - 1, d + 1)).toISOString().split('T')[0];
+}
+
 // ── Disponibilité ────────────────────────────────────────────────────────────
 export function guestsAtSlot(
   bizId: string,

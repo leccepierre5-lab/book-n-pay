@@ -6,6 +6,7 @@
 // les marque 'no_show', et désactive les FlashSlots expirés.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { parseParisDatetime } from '@/lib/booking-utils';
 
 export async function GET(req: NextRequest) {
   // Protection : seul Vercel Cron (avec le bon secret) peut déclencher ceci.
@@ -28,10 +29,7 @@ export async function GET(req: NextRequest) {
 
   let flashExpired = 0;
   for (const fs of activeFlashSlots || []) {
-    const [fh, fm] = fs.time.split(':').map(Number);
-    const fsDate = new Date(fs.date + 'T00:00:00');
-    fsDate.setHours(fh, fm, 0, 0);
-    if (fsDate.getTime() < nowTs) {
+    if (parseParisDatetime(fs.date, fs.time).getTime() < nowTs) {
       await supabase.from('flash_slots').update({ active: false }).eq('id', fs.id);
       flashExpired++;
     }
@@ -47,9 +45,7 @@ export async function GET(req: NextRequest) {
 
   for (const booking of bookings || []) {
     if (!booking.date || !booking.time) continue;
-    const [h, m] = booking.time.split(':').map(Number);
-    const rdvDate = new Date(booking.date + 'T00:00:00');
-    rdvDate.setHours(h, m, 0, 0);
+    const rdvDate = parseParisDatetime(booking.date, booking.time);
     const diffMin = (nowTs - rdvDate.getTime()) / 60000;
 
     if (diffMin < 15 || diffMin > 180) continue;
