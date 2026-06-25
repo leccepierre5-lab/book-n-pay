@@ -10,6 +10,22 @@ import Stripe from 'stripe';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { calcFraisGestion } from '@/lib/booking-utils';
 
+// Origines autorisées pour successUrl / cancelUrl (open redirect mitigation)
+function isAllowedOrigin(url: string): boolean {
+  try {
+    const { origin } = new URL(url);
+    const allowed = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      process.env.NEXT_PUBLIC_SITE_URL,
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    ].filter(Boolean) as string[];
+    return allowed.some((o) => origin === new URL(o).origin);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = createServiceRoleClient();
@@ -24,6 +40,14 @@ export async function POST(req: NextRequest) {
       groupSize = 1,
     } = body;
 
+    // ── Validation des URLs (open redirect mitigation) ─────────────────────
+    if (!successUrl || !cancelUrl) {
+      return NextResponse.json({ error: 'successUrl et cancelUrl requis' }, { status: 400 });
+    }
+    if (!isAllowedOrigin(successUrl) || !isAllowedOrigin(cancelUrl)) {
+      return NextResponse.json({ error: 'URL de redirection non autorisée' }, { status: 400 });
+    }
+
     if (!amount || amount < 1) {
       return NextResponse.json({ error: 'Montant invalide' }, { status: 400 });
     }
@@ -33,6 +57,48 @@ export async function POST(req: NextRequest) {
         { error: 'Les groupes sont limités à 23 personnes maximum' },
         { status: 400 }
       );
+    }
+
+    // ── Validation du montant contre le prix réel en base (anti-tampering) ─
+    // Empêche de forger une requête avec amount=0.01 pour payer presque rien.
+    if (bookingMeta?.bookingId) {
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('service_id')
+        .eq('id', bookingMeta.bookingId)
+        .maybeSingle();
+
+      if (booking?.service_id) {
+        const { data: service } = await supabase
+          .from('services')
+          .select('deposit')
+          .eq('id', booking.service_id)
+          .maybeSingle();
+
+        if (service && Math.abs(amount - service.deposit) > 0.01) {
+          console.warn(
+            `[Checkout] Montant invalide — attendu ${service.deposit}€, reçu ${amount}€ (booking=${bookingMeta.bookingId})`
+          );
+          return NextResponse.json(
+            { error: 'Montant ne correspond pas au service réservé' },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Vérifie que le memberId appartient bien au bookingId (IDOR mitigation)
+      if (bookingMeta?.memberId) {
+        const { data: member } = await supabase
+          .from('booking_members')
+          .select('id')
+          .eq('id', bookingMeta.memberId)
+          .eq('booking_id', bookingMeta.bookingId)
+          .maybeSingle();
+
+        if (!member) {
+          return NextResponse.json({ error: 'Membre introuvable pour cette réservation' }, { status: 404 });
+        }
+      }
     }
 
     // Mode test/live dynamique — lit app_config (équivalent AppConfig Base44)
