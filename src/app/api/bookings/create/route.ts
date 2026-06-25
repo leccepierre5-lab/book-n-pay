@@ -10,7 +10,13 @@ export async function POST(req: NextRequest) {
     const { data: authData } = await supabase.auth.getUser();
 
     const body = await req.json();
-    const { bizId, bizName, serviceId, serviceName, staffId, staffName, date, time, clientName, clientPhone, clientEmail } = body;
+    const { bizId, bizName, serviceId, serviceName, staffId, staffName, date, time, clientPhone, clientEmail } = body;
+    // Fallback serveur : user_metadata ou email si le profil app_users n'existe pas encore
+    const clientName: string =
+      body.clientName ||
+      (authData.user?.user_metadata as any)?.name ||
+      authData.user?.email ||
+      'Client';
 
     if (!bizId || !serviceId || !date || !time) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 });
