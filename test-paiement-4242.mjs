@@ -5,7 +5,7 @@
  */
 import { chromium } from 'playwright';
 
-const BASE = 'http://localhost:3000';
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const EMAIL = 'testbnp@example.com';
 const PASSWORD = 'TestBnP2024!';
 const SUPABASE_URL = 'https://suyfsuvrbdpnnijxspge.supabase.co';

@@ -10,17 +10,27 @@ import Stripe from 'stripe';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { calcFraisGestion } from '@/lib/booking-utils';
 
-// Origines autorisées pour successUrl / cancelUrl (open redirect mitigation)
-function isAllowedOrigin(url: string): boolean {
+// Origines autorisées pour successUrl / cancelUrl (open redirect mitigation).
+// On valide contre l'origine de la requête entrante (header Origin/Host) pour
+// supporter n'importe quel domaine sans hardcoder les URLs Vercel preview.
+function isAllowedOrigin(url: string, reqOrigin: string | null, reqHost: string | null): boolean {
   try {
     const { origin } = new URL(url);
-    const allowed = [
+
+    // Même origine que l'appelant (frontend → API sur le même domaine)
+    if (reqOrigin && origin === reqOrigin) return true;
+    if (reqHost) {
+      const proto = reqHost.startsWith('localhost') ? 'http' : 'https';
+      if (origin === `${proto}://${reqHost}`) return true;
+    }
+
+    // Origines statiques (env var optionnelle + localhost dev)
+    const staticAllowed = [
       'http://localhost:3000',
       'http://localhost:3001',
       process.env.NEXT_PUBLIC_SITE_URL,
-      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
     ].filter(Boolean) as string[];
-    return allowed.some((o) => origin === new URL(o).origin);
+    return staticAllowed.some((o) => origin === new URL(o).origin);
   } catch {
     return false;
   }
@@ -44,7 +54,9 @@ export async function POST(req: NextRequest) {
     if (!successUrl || !cancelUrl) {
       return NextResponse.json({ error: 'successUrl et cancelUrl requis' }, { status: 400 });
     }
-    if (!isAllowedOrigin(successUrl) || !isAllowedOrigin(cancelUrl)) {
+    const reqOrigin = req.headers.get('origin');
+    const reqHost = req.headers.get('host');
+    if (!isAllowedOrigin(successUrl, reqOrigin, reqHost) || !isAllowedOrigin(cancelUrl, reqOrigin, reqHost)) {
       return NextResponse.json({ error: 'URL de redirection non autorisée' }, { status: 400 });
     }
 
