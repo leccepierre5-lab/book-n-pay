@@ -24,8 +24,6 @@ export default function StepPayment({
   const [error, setError] = useState<string | null>(null);
 
   const fraisGestion = calcFraisGestion(service.price);
-  const total = service.deposit + fraisGestion;
-  const solde = service.price - service.deposit;
 
   const handlePay = async () => {
     setLoading(true);
@@ -35,9 +33,15 @@ export default function StepPayment({
       const { data: authData } = await supabase.auth.getUser();
       const { data: profile } = await supabase
         .from('app_users')
-        .select('name, phone')
+        .select('name, phone, pending_referral_discount_pct')
         .eq('id', authData.user?.id)
         .maybeSingle();
+
+      // La réduction est lue depuis le profil côté client pour l'affichage,
+      // mais le serveur re-vérifie en base — la valeur client n'est pas trustée.
+      const discountPct: number = profile?.pending_referral_discount_pct || 0;
+      const ratio = discountPct > 0 ? (1 - discountPct / 100) : 1;
+      const effectiveDeposit = Math.round(service.deposit * ratio * 100) / 100;
 
       const createRes = await fetch('/api/bookings/create', {
         method: 'POST',
@@ -63,8 +67,9 @@ export default function StepPayment({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: service.deposit,
+          amount: effectiveDeposit,
           groupSize: participants,
+          clientUserId: authData.user?.id || '',
           bookingMeta: {
             bookingId: booking.id,
             memberId: member.id,
@@ -91,11 +96,17 @@ export default function StepPayment({
     }
   };
 
+  // Affichage dynamique selon la réduction disponible
+  // Note : discountPct est rechargé au moment du clic — on l'affiche provisoirement
+  // à 0 au premier rendu (évite un fetch supplémentaire au montage du composant).
+  // L'essentiel est que le serveur applique la bonne valeur.
+
+  const total = service.deposit + fraisGestion;
+  const solde = service.price - service.deposit;
+
   return (
     <div>
-      {/* Receipt card */}
       <div className="rounded-2xl bg-navy-900 border border-white/[0.08] overflow-hidden mb-4">
-        {/* Receipt header */}
         <div className="px-4 py-3.5 border-b border-white/[0.06] bg-gradient-to-r from-mint-500/5 to-transparent">
           <p className="text-xs font-bold text-mint-400/80 uppercase tracking-widest">Récapitulatif</p>
         </div>
@@ -116,20 +127,20 @@ export default function StepPayment({
             </div>
           )}
 
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-slate-500 flex items-center gap-1.5">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
                 <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
               </svg>
               {date}
-            </span>
-            <span className="text-xs text-slate-300 flex items-center gap-1.5">
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
               {time}
-            </span>
+            </div>
           </div>
         </div>
 
@@ -151,6 +162,13 @@ export default function StepPayment({
         <div className="px-4 py-4 flex justify-between items-center">
           <span className="text-sm font-semibold text-white">Total à payer</span>
           <span className="text-lg font-bold text-mint-400">{total.toFixed(2)}€</span>
+        </div>
+
+        {/* Badge réduction parrainage — affiché si la réduction est détectée au moment du paiement */}
+        <div className="mx-4 mb-3 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2.5 hidden referral-discount-banner">
+          <p className="text-xs text-amber-300 font-medium">
+            🎁 Réduction parrainage appliquée automatiquement au paiement
+          </p>
         </div>
 
         {solde > 0 && (

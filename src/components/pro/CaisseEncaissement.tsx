@@ -10,6 +10,8 @@ interface Member {
   status: string;
   deposit: number | null;
   payment_mode: string | null;
+  referrer_name?: string | null;
+  referral_discount_pct?: number;
 }
 
 interface BookingForCaisse {
@@ -36,7 +38,11 @@ export default function CaisseEncaissement({
 
   if (!member || !booking) return null;
 
-  const prixTotal = booking.services?.price || 0;
+  const prixOriginal = booking.services?.price || 0;
+  const discountPct = member.referral_discount_pct || 0;
+  const prixTotal = discountPct > 0
+    ? Math.round(prixOriginal * (1 - discountPct / 100) * 100) / 100
+    : prixOriginal;
   const totalPaye = member.deposit || 0;
   const includesFrais = Math.round(totalPaye * 100) % 100 === 99;
   const fraisReservation = includesFrais ? Math.round((totalPaye - FRAIS_BNP) * 100) / 100 : totalPaye;
@@ -90,10 +96,21 @@ export default function CaisseEncaissement({
         <p className="rounded-lg bg-red-950/40 px-3 py-2 text-xs text-red-300">{error}</p>
       )}
 
+      {member.referrer_name && (
+        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-300 mb-1">
+          🎁 Parrainé par <strong>{member.referrer_name}</strong>
+          {discountPct > 0 && ` — réduction -${discountPct}% appliquée`}
+        </div>
+      )}
+
       <div className="space-y-1 text-sm text-white">
         <div className="flex justify-between">
-          <span>Prestation</span>
-          <span className="font-semibold">{prixTotal}€</span>
+          <span>Prestation{discountPct > 0 ? ` (-${discountPct}%)` : ''}</span>
+          <span className="font-semibold">
+            {discountPct > 0 ? (
+              <><span className="line-through text-slate-500 text-xs mr-1">{prixOriginal}€</span>{prixTotal}€</>
+            ) : `${prixTotal}€`}
+          </span>
         </div>
         <div className="flex justify-between text-emerald-400">
           <span>Frais de réservation reçus</span>

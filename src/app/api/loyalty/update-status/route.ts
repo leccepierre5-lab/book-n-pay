@@ -1,17 +1,4 @@
 // src/app/api/loyalty/update-status/route.ts
-// Port de base44/functions/calculerStatutFidelite/entry.ts
-//
-// Appelé après qu'un membre passe au statut 'arrived' (depuis la route qui
-// gère le check-in pro). Recalcule le statut de fidélité et les jokers.
-//
-// ⚠️ CORRECTIF DE SÉCURITÉ (trouvé en audit) : cette route est appelée
-// serveur-à-serveur (par cloturerPrestation, checkin-by-qr, update-member)
-// mais n'avait aucune protection — n'importe qui connaissant l'URL pouvait
-// l'appeler directement avec un memberPhone arbitraire pour créditer des RDV
-// honorés et des Jokers sans avoir réellement honoré de rendez-vous.
-// Protégée par INTERNAL_API_SECRET, un secret partagé connu uniquement des
-// routes serveur (jamais exposé au navigateur, contrairement à
-// NEXT_PUBLIC_*). Pense à le définir dans .env.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { computeStatut } from '@/lib/booking-utils';
@@ -71,15 +58,10 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', user.id);
 
-    // ── Récompense de parrainage ──────────────────────────────────────────
-    // Déclenchée au PREMIER RDV honoré du parrainé (currentRdv === 1), une
-    // seule fois (referral_reward_granted évite tout double crédit en cas
-    // de rejeu). Récompense : +5 RDV honorés et +1 Joker pour le parrain ET
-    // le parrainé — cohérent avec la promesse affichée dans ParrainageCard
-    // ("vous recevez tous les deux +5 RDV honorés et un Joker bonus").
-    // ⚠️ Cette récompense n'existait dans AUCUNE fonction Base44 d'origine —
-    // le composant promettait une récompense jamais appliquée. Ajoutée ici
-    // pour que la promesse affichée au client soit réellement honorée.
+    // ── Récompense de parrainage ──────────────────────────────────────────────
+    // Déclenchée au PREMIER RDV honoré du parrainé (referral_reward_granted évite
+    // le double crédit pour ce même parrainé). Le parrain peut en revanche recevoir
+    // une nouvelle récompense pour chaque parrainé différent (B, C, D…).
     if (currentRdv === 1 && user.referred_by && !user.referral_reward_granted) {
       const { data: referrer } = await supabase
         .from('app_users')
@@ -91,28 +73,40 @@ export async function POST(req: NextRequest) {
         const REFERRAL_RDV_BONUS = 5;
         const REFERRAL_JOKER_BONUS = 1;
 
+        // +5 RDV honorés et +1 Joker au parrain (inchangés)
         await supabase
           .from('app_users')
           .update({
             rdv_honores: (referrer.rdv_honores || 0) + REFERRAL_RDV_BONUS,
             jokers_disponibles: (referrer.jokers_disponibles || 0) + REFERRAL_JOKER_BONUS,
+            // Parrain : -20% sur sa prochaine prestation
+            // (un nouveau parrainage réussi réécrit la valeur — le parrain cumule la
+            // réduction la plus haute disponible, mais une seule réservation la consume)
+            pending_referral_discount_pct: 20,
           })
           .eq('id', referrer.id);
 
+        // +5 RDV honorés et +1 Joker au parrainé + réduction -10% unique
         await supabase
           .from('app_users')
           .update({
             rdv_honores: currentRdv + REFERRAL_RDV_BONUS,
             jokers_disponibles: jokersDisponibles + REFERRAL_JOKER_BONUS,
             referral_reward_granted: true,
+            pending_referral_discount_pct: 10,
           })
           .eq('id', user.id);
 
-        console.log(`[Parrainage] Récompense créditée — parrain=${referrer.id} parrainé=${user.id}`);
+        // Historique parrainage (1 ligne par parrainage réussi)
+        await supabase.from('referral_events').insert({
+          referrer_id: referrer.id,
+          referred_id: user.id,
+        });
+
+        console.log(`[Parrainage] Récompense créditée — parrain=${referrer.id} parrainé=${user.id} | -20% parrain, -10% parrainé`);
       }
     }
 
-    // Email d'upgrade (branche ton fournisseur email dans sendEmail si besoin)
     if (upgraded) {
       const msg = UPGRADE_MESSAGES[newStatut];
       console.log(`[Fidélité] ${user.name} : ${oldStatut} → ${newStatut} (email à envoyer: ${!!msg})`);

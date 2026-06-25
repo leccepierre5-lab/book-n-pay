@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { AppUser, Booking, BookingMember } from '@/lib/database.types';
+import type { AppUser, Booking, BookingMember, ReferralEvent } from '@/lib/database.types';
 import ParrainageCard from '@/components/loyalty/ParrainageCard';
 import WeekCalendar from './WeekCalendar';
 
@@ -37,9 +37,11 @@ function formatBookingDate(dateStr: string) {
 export default function MyBookingsList({
   bookings,
   profile,
+  referralEvents = [],
 }: {
   bookings: BookingWithMembers[];
   profile: AppUser | null;
+  referralEvents?: ReferralEvent[];
 }) {
   const router = useRouter();
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -149,7 +151,7 @@ export default function MyBookingsList({
         {/* Parrainage */}
         {profile && (
           <div className="mb-5">
-            <ParrainageCard profile={profile} />
+            <ParrainageCard profile={profile} referralEvents={referralEvents} />
           </div>
         )}
 

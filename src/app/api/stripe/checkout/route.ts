@@ -1,30 +1,17 @@
 // src/app/api/stripe/checkout/route.ts
-// Port de base44/functions/stripeCheckout/entry.ts
-//
-// Crée une session Stripe Checkout pour les frais de réservation + frais de
-// gestion. Active le transfert Stripe Connect (application_fee_amount) si le
-// pro a terminé son onboarding. Accessible sans authentification : les
-// invités non connectés doivent pouvoir payer leur place dans une résa de groupe.
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { calcFraisGestion } from '@/lib/booking-utils';
 
-// Origines autorisées pour successUrl / cancelUrl (open redirect mitigation).
-// On valide contre l'origine de la requête entrante (header Origin/Host) pour
-// supporter n'importe quel domaine sans hardcoder les URLs Vercel preview.
 function isAllowedOrigin(url: string, reqOrigin: string | null, reqHost: string | null): boolean {
   try {
     const { origin } = new URL(url);
-
-    // Même origine que l'appelant (frontend → API sur le même domaine)
     if (reqOrigin && origin === reqOrigin) return true;
     if (reqHost) {
       const proto = reqHost.startsWith('localhost') ? 'http' : 'https';
       if (origin === `${proto}://${reqHost}`) return true;
     }
-
-    // Origines statiques (env var optionnelle + localhost dev)
     const staticAllowed = [
       'http://localhost:3000',
       'http://localhost:3001',
@@ -48,9 +35,9 @@ export async function POST(req: NextRequest) {
       cancelUrl,
       fraisGestion: fraisGestionInput,
       groupSize = 1,
+      clientUserId,
     } = body;
 
-    // ── Validation des URLs (open redirect mitigation) ─────────────────────
     if (!successUrl || !cancelUrl) {
       return NextResponse.json({ error: 'successUrl et cancelUrl requis' }, { status: 400 });
     }
@@ -71,8 +58,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Validation du montant contre le prix réel en base (anti-tampering) ─
-    // Empêche de forger une requête avec amount=0.01 pour payer presque rien.
+    // ── Réduction de parrainage — lue côté serveur, jamais depuis le client ──
+    let referralDiscountPct = 0;
+    if (clientUserId) {
+      const { data: userProfile } = await supabase
+        .from('app_users')
+        .select('pending_referral_discount_pct')
+        .eq('id', clientUserId)
+        .maybeSingle();
+      referralDiscountPct = userProfile?.pending_referral_discount_pct || 0;
+    }
+
+    // ── Validation du montant contre le prix réel en base (anti-tampering) ──
+    let serviceDeposit: number | null = null;
     if (bookingMeta?.bookingId) {
       const { data: booking } = await supabase
         .from('bookings')
@@ -83,22 +81,29 @@ export async function POST(req: NextRequest) {
       if (booking?.service_id) {
         const { data: service } = await supabase
           .from('services')
-          .select('deposit')
+          .select('deposit, price')
           .eq('id', booking.service_id)
           .maybeSingle();
 
-        if (service && Math.abs(amount - service.deposit) > 0.01) {
-          console.warn(
-            `[Checkout] Montant invalide — attendu ${service.deposit}€, reçu ${amount}€ (booking=${bookingMeta.bookingId})`
-          );
-          return NextResponse.json(
-            { error: 'Montant ne correspond pas au service réservé' },
-            { status: 400 }
-          );
+        if (service) {
+          serviceDeposit = service.deposit;
+          // Calcul du dépôt effectif après réduction (fait côté serveur)
+          const expectedDeposit = referralDiscountPct > 0
+            ? Math.round(service.deposit * (1 - referralDiscountPct / 100) * 100) / 100
+            : service.deposit;
+
+          if (Math.abs(amount - expectedDeposit) > 0.02) {
+            console.warn(
+              `[Checkout] Montant invalide — attendu ${expectedDeposit}€, reçu ${amount}€ (booking=${bookingMeta.bookingId})`
+            );
+            return NextResponse.json(
+              { error: 'Montant ne correspond pas au service réservé' },
+              { status: 400 }
+            );
+          }
         }
       }
 
-      // Vérifie que le memberId appartient bien au bookingId (IDOR mitigation)
       if (bookingMeta?.memberId) {
         const { data: member } = await supabase
           .from('booking_members')
@@ -113,7 +118,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Mode test/live dynamique — lit app_config (équivalent AppConfig Base44)
+    // ── Calcul du dépôt effectif ──────────────────────────────────────────────
+    // Le ratio s'applique sur le prix total → répercuté sur le dépôt
+    const ratio = referralDiscountPct > 0 ? (1 - referralDiscountPct / 100) : 1;
+    const effectiveDeposit = Math.round(amount * ratio * 100) / 100;
+
+    // ── Mode test/live ────────────────────────────────────────────────────────
     const { data: testModeConfig } = await supabase
       .from('app_config')
       .select('value')
@@ -126,7 +136,7 @@ export async function POST(req: NextRequest) {
       : process.env.STRIPE_SECRET_KEY!;
     const stripe = new Stripe(stripeKey);
 
-    // Barème dynamique des frais de gestion (avec fallback local si AppConfig absent)
+    // ── Barème frais de gestion ───────────────────────────────────────────────
     let fraisGestion = fraisGestionInput;
     if (!fraisGestion || fraisGestion < 1.99 || fraisGestion > 9.99) {
       const { data: configs } = await supabase
@@ -146,7 +156,7 @@ export async function POST(req: NextRequest) {
       else fraisGestion = cfg.frais_gestion_palier_1 ?? calcFraisGestion(amount);
     }
 
-    // Compte Stripe Connect du pro, si onboarding terminé
+    // ── Compte Stripe Connect du pro ──────────────────────────────────────────
     let professionalStripeId: string | null = null;
     if (bookingMeta?.bizId) {
       const { data: settings } = await supabase
@@ -160,32 +170,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Construction de la session Stripe ────────────────────────────────────
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        price_data: {
+          currency,
+          product_data: {
+            name: referralDiscountPct > 0
+              ? `Frais de réservation — ${bookingMeta?.serviceName || "Book'nPay"} (-${referralDiscountPct}% parrainage)`
+              : `Frais de réservation — ${bookingMeta?.serviceName || "Book'nPay"}`,
+            description: `${bookingMeta?.bizName || ''} — ${bookingMeta?.date || ''} à ${bookingMeta?.time || ''}`,
+          },
+          unit_amount: Math.round(effectiveDeposit * 100),
+        },
+        quantity: 1,
+      },
+      {
+        price_data: {
+          currency,
+          product_data: {
+            name: "Frais de gestion Book'nPay",
+            description: 'Frais de réservation sécurisée',
+          },
+          unit_amount: Math.round(fraisGestion * 100),
+        },
+        quantity: 1,
+      },
+    ];
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency,
-            product_data: {
-              name: `Frais de réservation — ${bookingMeta?.serviceName || "Book'nPay"}`,
-              description: `${bookingMeta?.bizName || ''} — ${bookingMeta?.date || ''} à ${bookingMeta?.time || ''}`,
-            },
-            unit_amount: Math.round(amount * 100),
-          },
-          quantity: 1,
-        },
-        {
-          price_data: {
-            currency,
-            product_data: {
-              name: "Frais de gestion Book'nPay",
-              description: 'Frais de réservation sécurisée',
-            },
-            unit_amount: Math.round(fraisGestion * 100),
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       mode: 'payment',
       success_url: successUrl,
       cancel_url: cancelUrl,
@@ -202,12 +217,16 @@ export async function POST(req: NextRequest) {
         clientName: bookingMeta?.clientName || '',
         clientPhone: bookingMeta?.clientPhone || '',
         clientEmail: bookingMeta?.clientEmail || '',
-        depositAmount: String(amount),
+        depositAmount: String(effectiveDeposit),
+        // Pour que le webhook puisse consommer la réduction après paiement confirmé
+        clientUserId: clientUserId || '',
+        referralDiscountPct: String(referralDiscountPct),
       },
     };
 
     if (professionalStripeId) {
       sessionParams.payment_intent_data = {
+        // Book'nPay garde ses frais de gestion ; le pro reçoit effectiveDeposit (réduit)
         application_fee_amount: Math.round(fraisGestion * 100),
         transfer_data: { destination: professionalStripeId },
       };

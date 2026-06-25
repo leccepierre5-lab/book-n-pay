@@ -1,10 +1,7 @@
 // src/app/api/bookings/create/route.ts
-// Crée le booking + son premier booking_member (statut 'invite') avant
-// paiement. Le statut passera à 'paid' via le webhook Stripe une fois le
-// paiement confirmé (cohérent avec le flow Base44 : create booking → checkout
-// → webhook met à jour members[].status).
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode } from '@/lib/booking-utils';
 
 export async function POST(req: NextRequest) {
@@ -19,10 +16,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 });
     }
 
-    // Empêche toute nouvelle réservation chez un établissement gelé par
-    // l'admin — sans ce contrôle, le gel n'aurait d'effet que rétroactif
-    // (annulation des résas existantes) mais n'empêcherait pas d'en créer
-    // de nouvelles juste après.
     const { data: business } = await supabase
       .from('businesses')
       .select('frozen')
@@ -57,6 +50,26 @@ export async function POST(req: NextRequest) {
 
     if (bookingError) throw bookingError;
 
+    // Nom du parrain (si le client a été parrainé) — dénormalisé pour le pro
+    let referrerName: string | null = null;
+    if (authData.user?.id) {
+      const supabaseService = createServiceRoleClient();
+      const { data: clientProfile } = await supabaseService
+        .from('app_users')
+        .select('referred_by')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      if (clientProfile?.referred_by) {
+        const { data: referrer } = await supabaseService
+          .from('app_users')
+          .select('name')
+          .eq('id', clientProfile.referred_by)
+          .maybeSingle();
+        referrerName = referrer?.name || null;
+      }
+    }
+
     const { data: member, error: memberError } = await supabase
       .from('booking_members')
       .insert({
@@ -65,6 +78,7 @@ export async function POST(req: NextRequest) {
         phone: clientPhone,
         status: 'invite',
         qr_code: generateQrCode(),
+        referrer_name: referrerName,
       })
       .select()
       .single();

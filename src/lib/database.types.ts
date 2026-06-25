@@ -23,6 +23,7 @@ export interface AppUser {
   referral_code: string | null;
   referred_by: string | null;
   referral_reward_granted: boolean;
+  pending_referral_discount_pct: number;
   created_at: string;
   updated_at: string;
 }
@@ -108,6 +109,8 @@ export interface BookingMember {
   stripe_checkout_session_id: string | null;
   invite_expiry: string | null;
   payment_mode: 'app' | 'tpe' | 'especes' | null;
+  referrer_name: string | null;
+  referral_discount_pct: number;
   created_at: string;
   updated_at: string;
 }
@@ -192,6 +195,16 @@ export interface AppConfig {
   label: string | null;
   description: string | null;
   updated_at: string;
+}
+
+export interface ReferralEvent {
+  id: string;
+  referrer_id: string;
+  referred_id: string;
+  triggered_at: string;
+  parrain_discount_consumed: boolean;
+  parrain_discount_consumed_at: string | null;
+  created_at: string;
 }
 
 // Vue composée utile côté front : une réservation avec ses membres chargés

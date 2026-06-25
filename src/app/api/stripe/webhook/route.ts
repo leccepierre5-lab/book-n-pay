@@ -70,6 +70,49 @@ export async function POST(req: NextRequest) {
 
       console.log(`[Webhook] ✅ Paiement validé — booking ${bookingId}, membre ${memberId}, ${dep}€`);
 
+      // ── Consommation de la réduction de parrainage ────────────────────────
+      // Déclenché uniquement si le paiement est confirmé (jamais sur session abandonnée)
+      const clientUserId = meta.clientUserId || '';
+      const referralDiscountPct = parseInt(meta.referralDiscountPct || '0', 10);
+      if (clientUserId && referralDiscountPct > 0) {
+        // Stocker le % de réduction dans booking_members pour que la caisse recalcule
+        // le bon solde (prix réduit - dépôt)
+        if (memberId) {
+          await supabase
+            .from('booking_members')
+            .update({ referral_discount_pct: referralDiscountPct })
+            .eq('id', memberId);
+        }
+
+        // Consommer la réduction : remettre à 0
+        await supabase
+          .from('app_users')
+          .update({ pending_referral_discount_pct: 0 })
+          .eq('id', clientUserId);
+
+        // Marquer l'événement de parrainage le plus ancien non-consommé comme utilisé
+        const { data: unconsumedEvent } = await supabase
+          .from('referral_events')
+          .select('id')
+          .eq('referrer_id', clientUserId)
+          .eq('parrain_discount_consumed', false)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (unconsumedEvent) {
+          await supabase
+            .from('referral_events')
+            .update({
+              parrain_discount_consumed: true,
+              parrain_discount_consumed_at: new Date().toISOString(),
+            })
+            .eq('id', unconsumedEvent.id);
+        }
+
+        console.log(`[Parrainage] Réduction -${referralDiscountPct}% consommée pour user=${clientUserId}`);
+      }
+
       // Mode multiSlot : un même participant (member_ref) peut avoir une ligne
       // booking_members distincte dans CHAQUE booking du groupe (un booking par
       // créneau). On les retrouve par member_ref, pas par id (clé primaire

@@ -1,4 +1,3 @@
-// src/app/(public)/mes-reservations/page.tsx
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import MyBookingsList from '@/components/booking/MyBookingsList';
@@ -27,12 +26,24 @@ export default async function MesReservationsPage() {
     .eq('id', authData.user.id)
     .maybeSingle();
 
-  // RLS filtre déjà : créateur OU membre via téléphone OU admin
   const { data: bookings } = await supabase
     .from('bookings')
     .select('*, booking_members(*)')
     .order('date', { ascending: false })
     .order('time', { ascending: false });
 
-  return <MyBookingsList bookings={bookings || []} profile={profile} />;
+  // Historique des parrainages réussis (en tant que parrain)
+  const { data: referralEvents } = await supabase
+    .from('referral_events')
+    .select('*')
+    .eq('referrer_id', authData.user.id)
+    .order('created_at', { ascending: false });
+
+  return (
+    <MyBookingsList
+      bookings={bookings || []}
+      profile={profile}
+      referralEvents={referralEvents || []}
+    />
+  );
 }

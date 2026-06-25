@@ -1,17 +1,22 @@
 'use client';
-// src/components/loyalty/ParrainageCard.tsx
-// Port de src/components/ParrainageCard.jsx — le code n'est plus dérivé
-// côté client (nom+téléphone en clair) mais lu depuis app_users.referral_code,
-// généré par le trigger SQL à l'inscription (plus fiable, garanti unique).
 import { useState } from 'react';
-import type { AppUser } from '@/lib/database.types';
+import type { AppUser, ReferralEvent } from '@/lib/database.types';
 
-export default function ParrainageCard({ profile }: { profile: AppUser }) {
+export default function ParrainageCard({
+  profile,
+  referralEvents = [],
+}: {
+  profile: AppUser;
+  referralEvents?: ReferralEvent[];
+}) {
   const [copied, setCopied] = useState(false);
 
   if (!profile.referral_code) return null;
 
   const referralLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/inscription?ref=${profile.referral_code}`;
+  const discountPct = profile.pending_referral_discount_pct || 0;
+  const totalParrainages = referralEvents.length;
+  const consumed = referralEvents.filter((e) => e.parrain_discount_consumed).length;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(referralLink).catch(() => {});
@@ -20,7 +25,7 @@ export default function ParrainageCard({ profile }: { profile: AppUser }) {
   };
 
   const handleWhatsApp = () => {
-    const text = `🎁 Rejoins Book'nPay avec mon lien de parrainage et bénéficie de +5 RDV honorés offerts dès ton premier rendez-vous !\n👉 ${referralLink}`;
+    const text = `🎁 Rejoins Book'nPay avec mon lien de parrainage ! Tu reçois -10% sur ta prochaine prestation + 5 RDV honorés offerts dès ton premier rendez-vous !\n👉 ${referralLink}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -29,12 +34,29 @@ export default function ParrainageCard({ profile }: { profile: AppUser }) {
       <div className="flex items-center gap-2 border-b border-amber-600/20 px-4 py-3">
         <span>🎁</span>
         <p className="text-[13px] font-semibold text-white">Parrainage Sérénité</p>
+        {totalParrainages > 0 && (
+          <span className="ml-auto text-[11px] text-amber-400 font-medium">
+            {totalParrainages} parrainage{totalParrainages > 1 ? 's' : ''}
+          </span>
+        )}
       </div>
+
       <div className="space-y-3 px-4 py-3">
         <p className="text-xs leading-relaxed text-white/70">
           Parrainez un ami : <strong className="text-amber-300">vous recevez tous les deux +5 RDV
-          honorés</strong> et un Joker bonus dès son premier rendez-vous effectué !
+          honorés, un Joker bonus</strong> et une réduction sur votre prochaine prestation
+          (<strong className="text-amber-300">-20% pour vous, -10% pour lui</strong>) dès son premier rendez-vous !
         </p>
+
+        {/* Réduction en attente */}
+        {discountPct > 0 && (
+          <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-3 py-2.5">
+            <p className="text-xs text-emerald-300 font-semibold">
+              🎉 -{discountPct}% sur votre prochaine réservation
+            </p>
+            <p className="text-[10px] text-emerald-500 mt-0.5">S'applique automatiquement au prochain paiement</p>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <div className="flex-1 rounded-xl bg-black/30 px-3 py-2">
@@ -71,6 +93,30 @@ export default function ParrainageCard({ profile }: { profile: AppUser }) {
             {copied ? 'Copié !' : 'Copier le lien'}
           </button>
         </div>
+
+        {/* Historique */}
+        {totalParrainages > 0 && (
+          <div className="border-t border-white/10 pt-3 space-y-1.5">
+            <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold">Historique</p>
+            {referralEvents.map((ev) => (
+              <div key={ev.id} className="flex items-center justify-between text-xs">
+                <span className="text-white/60">
+                  {new Date(ev.triggered_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+                {ev.parrain_discount_consumed ? (
+                  <span className="text-slate-500">-20% utilisé</span>
+                ) : (
+                  <span className="text-emerald-400 font-medium">-20% en attente</span>
+                )}
+              </div>
+            ))}
+            {consumed > 0 && (
+              <p className="text-[10px] text-white/30 pt-1">
+                {consumed} réduction{consumed > 1 ? 's' : ''} consommée{consumed > 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
