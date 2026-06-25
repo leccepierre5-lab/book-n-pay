@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function AuthWall({ onAuth }: { onAuth: () => void }) {
-  const [mode, setMode] = useState<'login' | 'signup'>('signup');
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
