@@ -282,6 +282,17 @@ export default function CGUPage() {
                 n'est accordé qu'une seule fois par parrain/filleul. Toute tentative de fraude
                 (auto-parrainage, faux comptes) entraîne la suppression des avantages accordés.
               </p>
+              <p>
+                <strong className="text-white">9.4. Réduction financière de parrainage :</strong> En
+                complément du crédit de RDV honorés et du Joker bonus, lorsque le filleul effectue son
+                premier rendez-vous honoré, le parrain bénéficie d'une réduction de{' '}
+                <strong className="text-white">20%</strong> et le filleul d'une réduction de{' '}
+                <strong className="text-white">10%</strong> sur le prix de leur prochaine prestation
+                respective. Cette réduction s'applique automatiquement, est valable une seule fois par
+                parrainage réussi, et ne se cumule pas avec d'autres offres promotionnelles sauf mention
+                contraire. Cette réduction porte sur le prix de la prestation déterminé par le
+                Professionnel et n'affecte pas les frais de gestion dus à Book'nPay.
+              </p>
             </div>
           </section>
 
@@ -310,6 +321,114 @@ export default function CGUPage() {
               par Book'nPay, une solution amiable sera recherchée en priorité. À défaut, les
               tribunaux compétents seront saisis.
             </p>
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-base font-semibold text-white">13. Litiges entre Client et Professionnel</h2>
+            <div className="space-y-3">
+              <p>
+                <strong className="text-white">13.1.</strong> Book'nPay agit exclusivement en qualité
+                d'intermédiaire technique facilitant la mise en relation et le paiement entre Clients et
+                Professionnels. Book'nPay n'est ni partie ni garant du contrat de prestation de service
+                conclu directement entre le Client et le Professionnel.
+              </p>
+              <p>
+                <strong className="text-white">13.2.</strong> En cas de désaccord sur la qualité, le
+                déroulement ou les modalités d'une prestation, le Client et le Professionnel s'engagent
+                à rechercher une solution amiable directement entre eux. Book'nPay peut, à sa discrétion
+                et sans obligation, faciliter cette mise en relation mais ne tranche aucun litige relatif
+                à l'exécution de la prestation elle-même.
+              </p>
+              <p>
+                <strong className="text-white">13.3.</strong> En cas de no-show contesté (le Client
+                affirmant s'être présenté alors que le Professionnel indique le contraire, ou
+                inversement), Book'nPay peut examiner les éléments objectifs disponibles (horodatage de
+                connexion, QR code scanné le cas échéant, historique de fiabilité) mais ne peut garantir
+                une résolution favorable à l'une ou l'autre partie. La décision finale relative aux frais
+                de réservation reste basée sur les statuts enregistrés dans le système au moment du
+                rendez-vous.
+              </p>
+              <p>
+                <strong className="text-white">13.4.</strong> Book'nPay se réserve le droit de suspendre
+                ou de geler le compte d'un Professionnel ou d'un Client en cas de litiges répétés, de
+                signalements multiples, ou de comportement manifestement abusif, sans que cela constitue
+                une reconnaissance de responsabilité de la part de Book'nPay.
+              </p>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-base font-semibold text-white">14. Disponibilité du Service et Limitation de Responsabilité</h2>
+            <div className="space-y-3">
+              <p>
+                <strong className="text-white">14.1.</strong> Book'nPay met en œuvre des moyens
+                raisonnables pour assurer la disponibilité et le bon fonctionnement de la plateforme,
+                sans garantir une disponibilité continue ou sans interruption. Des interruptions peuvent
+                survenir pour maintenance, mise à jour, ou pour des causes indépendantes de la volonté
+                de Book'nPay (panne d'un prestataire technique tiers, incident réseau, etc.).
+              </p>
+              <p>
+                <strong className="text-white">14.2.</strong> Book'nPay ne saurait être tenu responsable
+                des conséquences directes ou indirectes d'une indisponibilité temporaire du service,
+                notamment en cas de réservation manquée, de paiement non traité, ou de notification non
+                reçue, dans la limite de ce qui est permis par la loi applicable.
+              </p>
+              <p>
+                <strong className="text-white">14.3.</strong> En cas de dysfonctionnement avéré et
+                imputable à Book'nPay ayant causé un préjudice financier direct (par exemple, double
+                prélèvement), Book'nPay s'engage à procéder au remboursement du trop-perçu dans un délai
+                raisonnable, sur signalement de l'Utilisateur concerné.
+              </p>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-base font-semibold text-white">15. Utilisation Frauduleuse et Sécurité des Comptes</h2>
+            <div className="space-y-3">
+              <p>
+                <strong className="text-white">15.1.</strong> Toute tentative de fraude est strictement
+                interdite, incluant notamment : la création de comptes multiples par une même personne,
+                l'auto-parrainage, la falsification d'informations d'identité ou de contact, et toute
+                manipulation visant à obtenir indûment des avantages du programme de fidélité ou de
+                parrainage.
+              </p>
+              <p>
+                <strong className="text-white">15.2.</strong> Book'nPay se réserve le droit de vérifier,
+                suspendre ou supprimer tout compte présentant des signes de fraude, sans préavis et sans
+                indemnité, et de retirer rétroactivement tout avantage (Jokers, réductions, statuts)
+                obtenu de manière frauduleuse.
+              </p>
+              <p>
+                <strong className="text-white">15.3.</strong> L'Utilisateur est responsable de la
+                confidentialité de ses identifiants de connexion. Toute action effectuée depuis un compte
+                est présumée avoir été effectuée par son titulaire, sauf preuve contraire d'un accès non
+                autorisé signalé sans délai à Book'nPay.
+              </p>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-base font-semibold text-white">16. Propriété Intellectuelle</h2>
+            <div className="space-y-3">
+              <p>
+                <strong className="text-white">16.1.</strong> La marque "Book'nPay", son logo, son
+                identité visuelle, ainsi que l'ensemble des éléments composant la plateforme (textes,
+                code source, design, base de données, algorithmes de fidélité et de tarification) sont la
+                propriété exclusive de Book'nPay ou de ses concédants, et sont protégés par le droit de
+                la propriété intellectuelle.
+              </p>
+              <p>
+                <strong className="text-white">16.2.</strong> Toute reproduction, représentation,
+                modification, ou exploitation, totale ou partielle, de ces éléments sans autorisation
+                écrite préalable de Book'nPay est strictement interdite et susceptible de poursuites.
+              </p>
+              <p>
+                <strong className="text-white">16.3.</strong> Les contenus publiés par les Professionnels
+                (descriptions, photos, tarifs) restent leur propriété, mais ces derniers concèdent à
+                Book'nPay une licence d'utilisation non exclusive aux seules fins d'affichage et de
+                promotion sur la plateforme, pour la durée de leur inscription.
+              </p>
+            </div>
           </section>
         </div>
       </div>
