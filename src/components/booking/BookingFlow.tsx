@@ -30,6 +30,10 @@ export default function BookingFlow({
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => setIsAuthed(!!data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setIsAuthed(!!session);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleServiceSelect = (srv: Service, stf: Staff | null) => {
@@ -42,7 +46,7 @@ export default function BookingFlow({
     setDate(d);
     setTime(t);
     setParticipants(p);
-    if (!isAuthed) {
+    if (isAuthed !== true) {
       setNeedsAuth(true);
     } else {
       setStep(2);
