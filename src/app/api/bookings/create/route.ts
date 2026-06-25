@@ -28,7 +28,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: booking, error: bookingError } = await supabase
+    const supabaseService = createServiceRoleClient();
+
+    const { data: booking, error: bookingError } = await supabaseService
       .from('bookings')
       .insert({
         biz_id: bizId,
@@ -53,7 +55,6 @@ export async function POST(req: NextRequest) {
     // Nom du parrain (si le client a été parrainé) — dénormalisé pour le pro
     let referrerName: string | null = null;
     if (authData.user?.id) {
-      const supabaseService = createServiceRoleClient();
       const { data: clientProfile } = await supabaseService
         .from('app_users')
         .select('referred_by')
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { data: member, error: memberError } = await supabase
+    const { data: member, error: memberError } = await supabaseService
       .from('booking_members')
       .insert({
         booking_id: booking.id,
