@@ -149,7 +149,7 @@ export default function StepPayment({
         <div className="mx-4 border-t border-white/[0.08]" />
 
         <div className="px-4 py-4 flex justify-between items-center">
-          <span className="text-sm font-semibold text-white">Total maintenant</span>
+          <span className="text-sm font-semibold text-white">Total à payer</span>
           <span className="text-lg font-bold text-mint-400">{total.toFixed(2)}€</span>
         </div>
 
