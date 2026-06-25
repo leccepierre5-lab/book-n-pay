@@ -30,9 +30,13 @@ export default function FavoriteButton({
       onClick={toggle}
       disabled={loading}
       aria-label={favorited ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-      className="rounded-full p-2 bg-navy-900/80 backdrop-blur-sm hover:bg-navy-800 transition-colors disabled:opacity-50"
+      className={`flex items-center justify-center w-10 h-10 rounded-2xl backdrop-blur-md transition-all duration-200 disabled:opacity-50 hover:scale-110 active:scale-95 ${
+        favorited
+          ? 'bg-red-500/20 border border-red-500/35'
+          : 'bg-navy-950/70 border border-white/15 hover:bg-navy-900/80'
+      }`}
     >
-      <span className="text-xl">{favorited ? '❤️' : '🤍'}</span>
+      <span className="text-lg leading-none">{favorited ? '❤️' : '🤍'}</span>
     </button>
   );
 }

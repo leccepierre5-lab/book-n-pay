@@ -1,13 +1,4 @@
 'use client';
-// src/app/(public)/tarifs/page.tsx
-// Port de src/pages/Pricing.jsx — page marketing statique, pas de données
-// dynamiques. ⚠️ Les forfaits décrits ici (abonnement mensuel SaaS du pro
-// à la plateforme : Starter 79€, Business 139€, Scale 299€) sont un AUTRE
-// modèle économique que celui implémenté dans le code de paiement actuel
-// (frais de réservation + frais de gestion fixe par transaction, payés par
-// le CLIENT final). Aucune logique d'abonnement récurrent Stripe pour les
-// pros n'existe encore dans ce repo — cette page est purement informative/
-// marketing pour l'instant, déconnectée de toute facturation réelle.
 import { useState } from 'react';
 import Link from 'next/link';
 
@@ -15,59 +6,68 @@ const PLANS = [
   {
     key: 'starter',
     badge: 'Solo & Freelance',
-    title: 'Forfait STARTER',
-    price: '79€',
-    engagement: 'Engagement 3 mois',
+    title: 'STARTER',
+    price: '79',
+    engagement: '3 mois',
+    accentColor: 'text-blue-400',
+    borderColor: 'border-blue-500/30',
+    glowColor: 'rgba(59,130,246,0.12)',
     features: [
       "Jusqu'à 80 réservations / mois",
-      'Encaissement des frais de réservation en direct',
+      'Encaissement direct des frais',
       'QR code check-in & Trust Score',
       'Apple Pay & Google Pay',
     ],
-    borderColor: 'border-blue-500',
     back: {
-      title: '📊 Exemple de rentabilité',
-      text: "Un professionnel indépendant avec un panier moyen de 35€ qui subit 5 no-shows par mois perd 175€. Avec Book'nPay, ces 5 no-shows sont bloqués par des frais de réservation de 17,50€ — soit 87,50€ encaissés.",
-      bilan: "Bilan : l'abonnement de 79€ est entièrement remboursé par la sécurisation de ces 5 personnes seules.",
+      title: 'Exemple de rentabilité',
+      para1: "Un indépendant avec un panier moyen de 35 €. 5 lapins/mois = 175 € perdus.",
+      para2: "Avec Book'nPay, ces 5 lapins sont bloqués par des frais de 17,50 €. Non-présence = 5 × 17,50 € = 87,50 € encaissés.",
+      bilan: "L'abonnement à 79 € est entièrement remboursé. Net cost = 0 €.",
     },
   },
   {
     key: 'business',
-    badge: '⭐ Le plus populaire',
-    title: 'Forfait BUSINESS',
-    price: '139€',
-    engagement: 'Engagement 6 mois',
+    badge: 'Le Plus Populaire',
+    title: 'BUSINESS',
+    price: '139',
+    engagement: '6 mois',
+    accentColor: 'text-mint-400',
+    borderColor: 'border-mint-500/40',
+    glowColor: 'rgba(52,211,153,0.12)',
+    highlighted: true,
     features: [
       "Jusqu'à 300 réservations / mois",
       'Mode staff multi-praticiens',
       'Stats CA estimé / réalisé',
       'Programme parrainage intégré',
     ],
-    borderColor: 'border-emerald-500',
-    highlighted: true,
     back: {
-      title: '📊 Exemple de rentabilité',
-      text: "Un studio avec 3 salariés, 250 réservations/mois, panier moyen 60€. 10% de no-shows = 25 RDV perdus = 1500€/mois. Les frais de réservation couvrent largement les 139€ de l'abonnement.",
-      bilan: 'Bilan : le studio récupère plus de 1300€ de CA autrefois perdu — un ROI proche de 10×.',
+      title: 'Exemple de rentabilité',
+      para1: 'Studio de bien-être, 3 salariés, 250 RDV/mois, panier 60 €. 10 % no-shows = 1 500 €/mois perdus.',
+      para2: "Business à 139 € sécurise ces créneaux. 5 oublis couvrent largement l'abonnement.",
+      bilan: "+1 300 € de CA récupéré. ROI de 10× le prix de l'abonnement.",
     },
   },
   {
     key: 'scale',
-    badge: 'Grandes structures',
-    title: 'Forfait SCALE',
-    price: '299€',
-    engagement: 'Engagement 12 mois',
+    badge: 'Grandes Structures',
+    title: 'SCALE',
+    price: '299',
+    engagement: '12 mois',
+    accentColor: 'text-purple-400',
+    borderColor: 'border-purple-500/30',
+    glowColor: 'rgba(168,85,247,0.12)',
     features: [
-      'Réservations illimitées',
-      'Multi-personnels & gestion avancée',
-      'Frais de réservation dynamiques (clients risqués)',
+      'Réservations ILLIMITÉES',
+      'Multi-personnels avancé',
+      'Frais dynamiques clients risqués',
       'Support client prioritaire',
     ],
-    borderColor: 'border-purple-500',
     back: {
-      title: '📊 Exemple de rentabilité',
-      text: "Une grosse structure réalise +600 réservations/mois, panier moyen 100€. La moindre faille coûte des milliers d'euros par semaine.",
-      bilan: "Bilan : pour le prix de 3 prestations dans le mois, le centre s'offre une infrastructure blindée.",
+      title: 'Exemple de rentabilité',
+      para1: "+600 réservations/mois, panier 100 €. Chaque faille coûte des milliers d'euros par semaine.",
+      para2: "299 € offre la tranquillité absolue : automatisation complète, zéro faille dans l'agenda.",
+      bilan: "Pour 3 prestations/mois, une infrastructure blindée. Zéro créneaux perdus.",
     },
   },
 ];
@@ -80,77 +80,123 @@ export default function TarifsPage() {
   return (
     <div className="min-h-screen px-4 py-10">
       <div className="mx-auto max-w-5xl">
-        <Link href="/" className="mb-8 inline-block text-white/60 hover:text-white">
-          ← Retour
+        <Link href="/" className="mb-8 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-white transition-colors">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          Retour
         </Link>
 
         <header className="mb-12 text-center">
-          <h1 className="mb-3 text-3xl font-bold text-white">Plans & Tarifs Book'nPay</h1>
-          <p className="text-white/60">Clique sur une carte pour voir l'exemple de rentabilité.</p>
+          <p className="text-xs font-bold tracking-[0.2em] text-mint-500/70 uppercase mb-3">TARIFICATION</p>
+          <h1 className="text-3xl font-bold text-white mb-3">Plans & Tarifs</h1>
+          <p className="text-slate-500 text-sm">Cliquez sur une carte pour voir l'exemple de rentabilité.</p>
         </header>
 
-        <div className="mb-16 grid gap-6 sm:grid-cols-3">
+        <div className="mb-16 grid gap-5 sm:grid-cols-3">
           {PLANS.map((plan) => (
             <button
               key={plan.key}
               onClick={() => toggleFlip(plan.key)}
-              className={`relative h-[420px] rounded-2xl border-2 p-6 text-left transition-all ${
-                plan.highlighted ? plan.borderColor : 'border-white/10'
-              } bg-navy-900`}
+              className={`relative rounded-2xl border ${plan.borderColor} p-6 text-left transition-all duration-300 overflow-hidden group hover:scale-[1.01]`}
+              style={{
+                background: `radial-gradient(ellipse at 0% 0%, ${plan.glowColor} 0%, transparent 70%), #1e293b`,
+                boxShadow: plan.highlighted ? `0 0 32px ${plan.glowColor}` : undefined,
+              }}
             >
+              {plan.highlighted && (
+                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-mint-500/50 to-transparent" />
+              )}
+
               {!flipped[plan.key] ? (
-                <div className="flex h-full flex-col">
-                  <span className="mb-4 inline-block self-start rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/70">
+                <div className="flex h-full flex-col min-h-[380px]">
+                  <span className={`mb-4 inline-flex items-center self-start rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${
+                    plan.highlighted
+                      ? 'bg-mint-500/15 text-mint-400 border border-mint-500/25'
+                      : 'bg-white/8 text-slate-400 border border-white/10'
+                  }`}>
                     {plan.badge}
                   </span>
-                  <h2 className="mb-2 text-xl font-bold text-white">{plan.title}</h2>
-                  <p className="text-3xl font-extrabold text-white">
-                    {plan.price} <span className="text-sm font-normal text-white/50">/ mois HT</span>
-                  </p>
-                  <p className="mb-4 text-xs italic text-white/40">{plan.engagement}</p>
-                  <ul className="flex-1 space-y-2 text-sm text-white/70">
+                  <h2 className={`text-xl font-black mb-1 ${plan.accentColor}`}>{plan.title}</h2>
+                  <div className="mb-1">
+                    <span className="text-4xl font-black text-white">{plan.price}€</span>
+                    <span className="text-sm text-slate-500 ml-1">/ mois HT</span>
+                  </div>
+                  <p className="text-xs text-slate-600 mb-5 italic">Engagement {plan.engagement}</p>
+                  <ul className="flex-1 space-y-2.5">
                     {plan.features.map((f) => (
-                      <li key={f}>✅ {f}</li>
+                      <li key={f} className="flex items-start gap-2 text-sm text-slate-300">
+                        <svg className={`w-4 h-4 shrink-0 mt-0.5 ${plan.accentColor}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        {f}
+                      </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-xs italic text-emerald-400">🔄 Voir la rentabilité</p>
+                  <p className={`mt-4 text-xs ${plan.accentColor} opacity-60`}>
+                    Voir la rentabilité →
+                  </p>
                 </div>
               ) : (
-                <div className="flex h-full flex-col overflow-y-auto">
-                  <h3 className="mb-3 text-base font-bold text-emerald-400">{plan.back.title}</h3>
-                  <p className="mb-3 text-sm leading-relaxed text-white/70">{plan.back.text}</p>
-                  <div className="rounded-lg border border-emerald-600/30 bg-emerald-950/30 p-3 text-sm text-emerald-400">
-                    💡 {plan.back.bilan}
+                <div className="flex h-full flex-col min-h-[380px]">
+                  <div className={`w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mb-4`}>
+                    <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+                    </svg>
                   </div>
-                  <p className="mt-auto text-xs italic text-emerald-400">🔄 Revenir</p>
+                  <h3 className="text-sm font-bold text-emerald-400 mb-3">{plan.back.title}</h3>
+                  <p className="text-xs leading-relaxed text-slate-400 mb-3">{plan.back.para1}</p>
+                  <p className="text-xs leading-relaxed text-slate-400 mb-4">{plan.back.para2}</p>
+                  <div className="rounded-xl border border-emerald-600/25 bg-emerald-950/30 p-3 flex-1">
+                    <p className="text-xs text-emerald-400 leading-relaxed">
+                      <span className="font-bold">Bilan :</span> {plan.back.bilan}
+                    </p>
+                  </div>
+                  <p className="mt-4 text-xs text-slate-600">← Retour</p>
                 </div>
               )}
             </button>
           ))}
         </div>
 
-        <section className="border-t border-white/10 pt-12">
-          <h2 className="mb-2 text-center text-xl font-bold text-white">⚙️ Mécanisme de compensation</h2>
-          <p className="mb-8 text-center text-sm text-white/50">
-            Le modèle tourne en arrière-plan sans risque financier pour toi.
+        <section className="border-t border-white/[0.07] pt-12">
+          <h2 className="mb-2 text-center text-xl font-bold text-white">Le mécanisme de compensation</h2>
+          <p className="mb-8 text-center text-sm text-slate-500">
+            Le modèle tourne en arrière-plan sans vous mettre en danger.
           </p>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="rounded-xl bg-navy-900 p-6">
-              <h3 className="mb-2 font-semibold text-emerald-400">🛡️ La protection Stripe Connect</h3>
-              <p className="text-sm leading-relaxed text-white/60">
-                Le client paie les frais de réservation + frais techniques. Les frais de réservation
-                vont directement sur le compte du professionnel (trésorerie immédiate). Les frais
-                techniques arrivent chez Book'nPay et absorbent la commission Stripe.
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-6">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/12 border border-emerald-500/20 flex items-center justify-center mb-4">
+                <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>
+                </svg>
+              </div>
+              <h3 className="mb-2 font-semibold text-white text-sm">Protection Stripe Connect</h3>
+              <p className="text-xs leading-relaxed text-slate-500">
+                Le client paie les frais + 1,99 € de frais techniques. Les frais vont directement sur le compte du pro (trésorerie immédiate). Les 1,99 € absorbent la commission Stripe.
               </p>
             </div>
-            <div className="rounded-xl bg-navy-900 p-6">
-              <h3 className="mb-2 font-semibold text-amber-400">📈 La régulation par le hors-forfait</h3>
-              <p className="text-sm leading-relaxed text-white/60">
-                Un client Starter dépasse ses 80 réservations ? Le système ne bloque rien — chaque
-                réservation de dépassement est facturée au pro, incitant naturellement à monter de
-                forfait au prochain renouvellement.
+            <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-6">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/12 border border-amber-500/20 flex items-center justify-center mb-4">
+                <svg className="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+                </svg>
+              </div>
+              <h3 className="mb-2 font-semibold text-white text-sm">Régulation par le Hors-Forfait</h3>
+              <p className="text-xs leading-relaxed text-slate-500">
+                Un client Starter dépasse ses 80 réservations ? 1,99 € HT/réservation supplémentaire. Incitation naturelle à monter de plan au renouvellement.
               </p>
             </div>
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link
+              href="/simulator"
+              className="inline-flex items-center gap-2 rounded-2xl py-3.5 px-6 text-sm font-semibold text-navy-950 transition-all hover:scale-[1.01]"
+              style={{ background: 'linear-gradient(135deg, #34d399, #6ee7b7)', boxShadow: '0 4px 20px rgba(52,211,153,0.35)' }}
+            >
+              Simuler mon ROI →
+            </Link>
           </div>
         </section>
       </div>

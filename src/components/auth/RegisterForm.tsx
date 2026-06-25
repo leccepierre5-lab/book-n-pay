@@ -1,8 +1,6 @@
 'use client';
-// src/components/auth/RegisterForm.tsx
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 export default function RegisterForm() {
@@ -36,13 +34,17 @@ export default function RegisterForm() {
     router.refresh();
   };
 
+  const inputClass = "w-full rounded-xl bg-navy-900 border border-white/[0.08] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-mint-500/40 focus:ring-2 focus:ring-mint-500/15 transition-all duration-200";
+
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       {referralCode && (
-        <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-          🎁 Tu rejoins Book'nPay grâce à un parrainage — vous recevrez tous les deux un bonus dès
-          ton premier RDV honoré.
-        </p>
+        <div className="rounded-2xl bg-amber-500/8 border border-amber-500/20 px-4 py-3 flex items-start gap-3">
+          <span className="text-base shrink-0">🎁</span>
+          <p className="text-xs text-amber-300 leading-relaxed">
+            Tu rejoins via un parrainage — vous recevrez tous les deux un bonus dès ton premier RDV honoré.
+          </p>
+        </div>
       )}
       <input
         type="text"
@@ -50,7 +52,7 @@ export default function RegisterForm() {
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
-        className="w-full rounded-lg bg-navy-900 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
+        className={inputClass}
       />
       <input
         type="email"
@@ -58,35 +60,41 @@ export default function RegisterForm() {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
-        className="w-full rounded-lg bg-navy-900 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
+        className={inputClass}
       />
       <input
         type="tel"
         placeholder="Téléphone (rappels SMS)"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
-        className="w-full rounded-lg bg-navy-900 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
+        className={inputClass}
       />
       <input
         type="password"
-        placeholder="Mot de passe"
+        placeholder="Mot de passe (6 caractères min.)"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         required
         minLength={6}
-        className="w-full rounded-lg bg-navy-900 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
+        className={inputClass}
       />
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && (
+        <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
+          <p className="text-xs text-red-400">{error}</p>
+        </div>
+      )}
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-mint-500 py-3 font-medium text-navy-950 disabled:opacity-50"
+        className="w-full rounded-2xl py-4 font-semibold text-navy-950 text-sm transition-all duration-200 disabled:opacity-50 hover:scale-[1.01] active:scale-[0.99]"
+        style={{
+          background: loading ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
+          boxShadow: loading ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
+          color: loading ? '#94a3b8' : undefined,
+        }}
       >
-        {loading ? '...' : "S'inscrire"}
+        {loading ? 'Création...' : "S'inscrire gratuitement"}
       </button>
-      <Link href="/connexion" className="block text-center text-xs text-white/50 hover:text-white">
-        Déjà un compte ? Se connecter
-      </Link>
     </form>
   );
 }

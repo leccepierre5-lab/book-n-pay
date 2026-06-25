@@ -1,14 +1,9 @@
 'use client';
-// src/components/booking/StepDateTime.tsx
-// Port simplifié de src/components/booking/StepDateTime.jsx
 import { useEffect, useMemo, useState } from 'react';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
 import type { Service } from '@/lib/database.types';
 import { isSlotClosed } from '@/lib/booking-utils';
 
-// Créneaux génériques de 30 min entre l'ouverture et la fermeture.
-// (Base44 stockait des `slots[]` en dur par business — à terme, on peut
-// le réintroduire comme colonne business si tu veux des créneaux custom.)
 function generateSlots(open: string | null, close: string | null): string[] {
   if (!open || !close) return [];
   const [oh, om] = open.split(':').map(Number);
@@ -19,22 +14,21 @@ function generateSlots(open: string | null, close: string | null): string[] {
   while (h < ch || (h === ch && m < cm)) {
     slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     m += 30;
-    if (m >= 60) {
-      m -= 60;
-      h += 1;
-    }
+    if (m >= 60) { m -= 60; h += 1; }
   }
   return slots;
 }
 
-function nextDays(n: number): { iso: string; label: string }[] {
+function nextDays(n: number): { iso: string; dayNum: string; dayName: string; monthShort: string }[] {
   const days = [];
   for (let i = 0; i < n; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
     const iso = d.toISOString().split('T')[0];
-    const label = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-    days.push({ iso, label });
+    const dayNum = d.toLocaleDateString('fr-FR', { day: 'numeric' });
+    const dayName = d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '');
+    const monthShort = d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
+    days.push({ iso, dayNum, dayName, monthShort });
   }
   return days;
 }
@@ -68,11 +62,13 @@ export default function StepDateTime({
 
   return (
     <div>
-      <p className="mb-2 text-sm text-white/60">Choisis une date</p>
-      <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+      {/* Date selector */}
+      <p className="mb-3 text-xs font-medium text-slate-500 uppercase tracking-widest">Date</p>
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
         {days.map((d) => {
           const dayOfWeek = new Date(d.iso + 'T12:00:00').getDay();
           const closed = !business.open_days.includes(dayOfWeek);
+          const isSelected = date === d.iso;
           return (
             <button
               key={d.iso}
@@ -81,41 +77,52 @@ export default function StepDateTime({
                 setDate(d.iso);
                 setTime(null);
               }}
-              className={`flex-shrink-0 rounded-xl px-3 py-2 text-xs ${
+              className={`flex-shrink-0 flex flex-col items-center rounded-2xl px-3.5 py-2.5 text-center transition-all duration-200 min-w-[56px] ${
                 closed
-                  ? 'cursor-not-allowed bg-white/5 text-white/20'
-                  : date === d.iso
-                  ? 'bg-mint-500 text-navy-950'
-                  : 'bg-navy-900 text-white/70'
+                  ? 'cursor-not-allowed opacity-25 bg-navy-900 border border-white/5'
+                  : isSelected
+                  ? 'border border-mint-500/40 text-navy-950'
+                  : 'bg-navy-900 border border-white/[0.08] text-slate-400 hover:border-white/15 hover:text-white'
               }`}
+              style={isSelected ? {
+                background: 'linear-gradient(135deg, #34d399, #6ee7b7)',
+                boxShadow: '0 2px 12px rgba(52,211,153,0.35)',
+              } : undefined}
             >
-              {d.label}
+              <span className="text-[10px] font-medium uppercase tracking-wide">{d.dayName}</span>
+              <span className={`text-base font-bold leading-tight ${isSelected ? 'text-navy-950' : ''}`}>{d.dayNum}</span>
+              <span className="text-[10px] opacity-70">{d.monthShort}</span>
             </button>
           );
         })}
       </div>
 
+      {/* Time slots */}
       {date && (
         <>
-          <p className="mb-2 text-sm text-white/60">Choisis une heure</p>
-          <div className="mb-5 grid grid-cols-4 gap-2">
+          <p className="mb-3 text-xs font-medium text-slate-500 uppercase tracking-widest">Heure</p>
+          <div className="mb-6 grid grid-cols-4 gap-2">
             {slots.map((slot) => {
               const closed = isSlotClosed(business, date, slot);
               const maxPersons = service.max_persons || 1;
               const occupied = occupancy[slot] || 0;
               const full = occupied >= maxPersons;
+              const isSelected = time === slot;
               return (
                 <button
                   key={slot}
                   disabled={closed || full}
                   onClick={() => setTime(slot)}
-                  className={`rounded-lg py-2 text-xs ${
+                  className={`rounded-xl py-2.5 text-xs font-medium transition-all duration-200 ${
                     closed || full
-                      ? 'cursor-not-allowed bg-white/5 text-white/20'
-                      : time === slot
-                      ? 'bg-mint-500 text-navy-950'
-                      : 'bg-navy-900 text-white/70'
+                      ? 'cursor-not-allowed opacity-20 bg-navy-900 border border-white/5'
+                      : isSelected
+                      ? 'border border-mint-500/40 text-navy-950 shadow-[0_2px_10px_rgba(52,211,153,0.3)]'
+                      : 'bg-navy-900 border border-white/[0.08] text-slate-400 hover:border-white/15 hover:text-white'
                   }`}
+                  style={isSelected ? {
+                    background: 'linear-gradient(135deg, #34d399, #6ee7b7)',
+                  } : undefined}
                 >
                   {slot}
                 </button>
@@ -125,23 +132,27 @@ export default function StepDateTime({
         </>
       )}
 
+      {/* Participants */}
       {service.max_persons && service.max_persons > 1 && (
-        <div className="mb-5">
-          <p className="mb-2 text-sm text-white/60">Nombre de participants</p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setParticipants((p) => Math.max(1, p - 1))}
-              className="h-8 w-8 rounded-full bg-navy-900 text-white"
-            >
-              −
-            </button>
-            <span className="text-white">{participants}</span>
-            <button
-              onClick={() => setParticipants((p) => Math.min(service.max_persons || 1, p + 1))}
-              className="h-8 w-8 rounded-full bg-navy-900 text-white"
-            >
-              +
-            </button>
+        <div className="mb-6 rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
+          <p className="mb-3 text-xs font-medium text-slate-500 uppercase tracking-widest">Participants</p>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-slate-300">Nombre de personnes</span>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setParticipants((p) => Math.max(1, p - 1))}
+                className="w-9 h-9 rounded-xl bg-navy-800 border border-white/[0.08] text-white font-bold text-lg flex items-center justify-center hover:bg-navy-700 hover:border-white/15 transition-all"
+              >
+                −
+              </button>
+              <span className="text-white font-semibold text-base w-4 text-center">{participants}</span>
+              <button
+                onClick={() => setParticipants((p) => Math.min(service.max_persons || 1, p + 1))}
+                className="w-9 h-9 rounded-xl bg-navy-800 border border-white/[0.08] text-white font-bold text-lg flex items-center justify-center hover:bg-navy-700 hover:border-white/15 transition-all"
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -149,7 +160,11 @@ export default function StepDateTime({
       <button
         disabled={!date || !time}
         onClick={() => date && time && onSelect(date, time, participants)}
-        className="w-full rounded-xl bg-mint-500 py-3 font-medium text-navy-950 disabled:opacity-30"
+        className="w-full rounded-2xl py-4 font-semibold text-navy-950 text-sm transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:scale-100 hover:scale-[1.01] active:scale-[0.99]"
+        style={date && time ? {
+          background: 'linear-gradient(135deg, #34d399, #6ee7b7)',
+          boxShadow: '0 4px 24px rgba(52,211,153,0.4)',
+        } : { background: '#334155' }}
       >
         Continuer
       </button>

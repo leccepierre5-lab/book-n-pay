@@ -1,7 +1,4 @@
 'use client';
-// src/components/booking/AuthWall.tsx
-// Port de src/components/booking/AuthWall.jsx — adapté à l'auth Supabase
-// email + mot de passe (au lieu du téléphone Base44).
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -40,62 +37,57 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
     }
   };
 
+  const inputClass = "w-full rounded-xl bg-navy-800/60 border border-white/[0.08] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-mint-500/40 focus:ring-2 focus:ring-mint-500/15 transition-all duration-200";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      {mode === 'signup' && (
-        <input
-          type="text"
-          placeholder="Nom complet"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          className="w-full rounded-lg bg-navy-900 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
-        />
-      )}
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-        className="w-full rounded-lg bg-navy-900 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
-      />
-      {mode === 'signup' && (
-        <input
-          type="tel"
-          placeholder="Téléphone (pour les rappels SMS)"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="w-full rounded-lg bg-navy-900 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
-        />
-      )}
-      <input
-        type="password"
-        placeholder="Mot de passe"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-        minLength={6}
-        className="w-full rounded-lg bg-navy-900 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
-      />
+    <div>
+      {/* Mode toggle */}
+      <div className="flex gap-1 p-1 bg-navy-900 rounded-xl border border-white/[0.06] mb-4">
+        {(['signup', 'login'] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-all duration-200 ${
+              mode === m
+                ? 'bg-mint-500 text-navy-950 shadow-[0_0_10px_rgba(52,211,153,0.3)]'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            {m === 'signup' ? 'Créer un compte' : 'Se connecter'}
+          </button>
+        ))}
+      </div>
 
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {mode === 'signup' && (
+          <input type="text" placeholder="Nom complet" value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
+        )}
+        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
+        {mode === 'signup' && (
+          <input type="tel" placeholder="Téléphone (rappels SMS)" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+        )}
+        <input type="password" placeholder="Mot de passe (6 min.)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className={inputClass} />
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded-xl bg-mint-500 py-3 font-medium text-navy-950 disabled:opacity-50"
-      >
-        {loading ? '...' : mode === 'signup' ? "S'inscrire et continuer" : 'Se connecter'}
-      </button>
+        {error && (
+          <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
+            <p className="text-xs text-red-400">{error}</p>
+          </div>
+        )}
 
-      <button
-        type="button"
-        onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}
-        className="w-full text-center text-xs text-white/50 hover:text-white"
-      >
-        {mode === 'signup' ? 'Déjà un compte ? Se connecter' : "Pas de compte ? S'inscrire"}
-      </button>
-    </form>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-2xl py-4 font-semibold text-navy-950 text-sm transition-all duration-200 disabled:opacity-50 hover:scale-[1.01] active:scale-[0.99]"
+          style={{
+            background: loading ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
+            boxShadow: loading ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
+            color: loading ? '#94a3b8' : undefined,
+          }}
+        >
+          {loading ? '...' : mode === 'signup' ? "S'inscrire et continuer" : 'Se connecter et continuer'}
+        </button>
+      </form>
+    </div>
   );
 }

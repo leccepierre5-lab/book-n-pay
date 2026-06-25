@@ -1,7 +1,4 @@
 'use client';
-// src/components/booking/BookingFlow.tsx
-// Port de src/pages/BookingFlow.jsx — orchestrateur du parcours en 3 étapes
-// (service → date/heure → paiement), avec mur d'authentification interstitiel.
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
@@ -70,16 +67,23 @@ export default function BookingFlow({
   return (
     <div className="min-h-screen">
       <div className="mx-auto max-w-lg px-4 py-6">
-        <div className="mb-4 flex items-center gap-3">
-          <button onClick={goBack} className="rounded-lg p-1.5 hover:bg-white/10 transition-colors">
-            ←
+
+        {/* Business header */}
+        <div className="mb-6 flex items-center gap-3">
+          <button
+            onClick={goBack}
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/[0.06] border border-white/[0.08] hover:bg-white/10 transition-all duration-200 text-slate-400 hover:text-white shrink-0"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
           </button>
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-lg">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/[0.08] text-lg shrink-0">
             {icon}
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-white">{business.name}</h1>
-            <p className="text-xs text-white/50">
+          <div className="min-w-0">
+            <h1 className="text-base font-semibold text-white truncate">{business.name}</h1>
+            <p className="text-xs text-slate-500 truncate">
               {business.city} · {business.type}
             </p>
           </div>
@@ -89,12 +93,12 @@ export default function BookingFlow({
 
         {needsAuth ? (
           <div>
-            <h2 className="mb-3 text-center text-lg font-semibold text-white">Identification</h2>
+            <h2 className="mb-4 text-center text-lg font-semibold text-white">Identification</h2>
             {date && time && (
-              <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-600/30 bg-emerald-600/10 px-4 py-3">
-                <span className="text-lg">🔒</span>
-                <p className="text-xs leading-snug text-emerald-400">
-                  Votre créneau du <strong>{date} à {time}</strong> pour{' '}
+              <div className="mb-5 flex items-start gap-3 rounded-2xl border border-emerald-600/25 bg-emerald-600/8 px-4 py-3.5">
+                <span className="text-lg shrink-0 mt-0.5">🔒</span>
+                <p className="text-xs leading-relaxed text-emerald-400">
+                  Votre créneau <strong>{date} à {time}</strong> pour{' '}
                   <strong>{service?.name}</strong> vous attend. Identifiez-vous pour le confirmer.
                 </p>
               </div>
@@ -105,19 +109,19 @@ export default function BookingFlow({
           <div>
             {step === 0 && (
               <>
-                <h2 className="mb-4 text-lg font-semibold text-white">Choisir une prestation</h2>
+                <h2 className="mb-4 text-base font-semibold text-white">Choisir une prestation</h2>
                 <StepService business={business} onSelect={handleServiceSelect} />
               </>
             )}
             {step === 1 && service && (
               <>
-                <h2 className="mb-4 text-lg font-semibold text-white">Date et Heure</h2>
+                <h2 className="mb-4 text-base font-semibold text-white">Date et Heure</h2>
                 <StepDateTime business={business} service={service} onSelect={handleDateTimeSelect} />
               </>
             )}
             {step === 2 && service && date && time && (
               <>
-                <h2 className="mb-4 text-lg font-semibold text-white">Paiement</h2>
+                <h2 className="mb-4 text-base font-semibold text-white">Récapitulatif & Paiement</h2>
                 <StepPayment
                   business={business}
                   service={service}
