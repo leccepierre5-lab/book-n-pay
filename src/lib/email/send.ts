@@ -1,7 +1,6 @@
 // src/lib/email/send.ts
-// Centralise l'envoi d'email transactionnel. Remplace l'intégration interne
-// Base44 (integrations.Core.SendEmail) par Resend — branche RESEND_API_KEY
-// dans .env pour activer l'envoi réel. Sans clé, logge en console (no-op).
+import nodemailer from 'nodemailer';
+
 export async function sendEmail({
   to,
   subject,
@@ -13,32 +12,27 @@ export async function sendEmail({
   text?: string;
   html?: string;
 }) {
-  if (!process.env.RESEND_API_KEY) {
-    console.log('[Email] (non envoyé — RESEND_API_KEY absente) →', to, subject);
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (!user || !pass) {
+    console.log('[Email] (non envoyé — GMAIL_USER/GMAIL_APP_PASSWORD absents) →', to, subject);
     return { sent: false };
   }
   try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: "Book'nPay <noreply@book-n-pay.com>",
-        to,
-        subject,
-        text,
-        html,
-      }),
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass },
     });
-    if (!res.ok) {
-      console.warn('[Email] Échec envoi:', await res.text());
-      return { sent: false };
-    }
+    await transporter.sendMail({
+      from: `Book'nPay <${user}>`,
+      to,
+      subject,
+      text,
+      html,
+    });
     return { sent: true };
-  } catch (e) {
-    console.warn('[Email] Erreur envoi:', e);
+  } catch (e: any) {
+    console.warn('[Email] Erreur envoi:', e.message);
     return { sent: false };
   }
 }
