@@ -36,6 +36,16 @@ export async function POST(req: NextRequest) {
 
     const supabaseService = createServiceRoleClient();
 
+    // Upsert app_users pour les comptes existants créés avant le fix du trigger
+    if (authData.user?.id) {
+      await supabaseService.from('app_users').upsert({
+        id: authData.user.id,
+        name: clientName,
+        phone: clientPhone || null,
+        role: 'client',
+      }, { onConflict: 'id', ignoreDuplicates: true });
+    }
+
     const { data: booking, error: bookingError } = await supabaseService
       .from('bookings')
       .insert({
