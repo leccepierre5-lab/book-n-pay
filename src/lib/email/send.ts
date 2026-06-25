@@ -1,6 +1,4 @@
 // src/lib/email/send.ts
-import nodemailer from 'nodemailer';
-
 export async function sendEmail({
   to,
   subject,
@@ -12,24 +10,29 @@ export async function sendEmail({
   text?: string;
   html?: string;
 }) {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-  if (!user || !pass) {
-    console.log('[Email] (non envoyé — GMAIL_USER/GMAIL_APP_PASSWORD absents) →', to, subject);
+  if (!process.env.RESEND_API_KEY) {
+    console.log('[Email] (non envoyé — RESEND_API_KEY absente) →', to, subject);
     return { sent: false };
   }
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user, pass },
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: "Book'nPay <noreply@book-n-pay.com>",
+        to,
+        subject,
+        text,
+        html,
+      }),
     });
-    await transporter.sendMail({
-      from: `Book'nPay <${user}>`,
-      to,
-      subject,
-      text,
-      html,
-    });
+    if (!res.ok) {
+      console.warn('[Email] Échec envoi:', await res.text());
+      return { sent: false };
+    }
     return { sent: true };
   } catch (e: any) {
     console.warn('[Email] Erreur envoi:', e.message);
