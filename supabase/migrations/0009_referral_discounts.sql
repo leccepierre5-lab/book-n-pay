@@ -15,9 +15,21 @@ create index if not exists idx_referral_events_referred on referral_events(refer
 alter table referral_events enable row level security;
 
 -- Le parrain voit ses événements, le parrainé voit le sien
-create policy if not exists "referral_events_own_read"
-  on referral_events for select
-  using (referrer_id = auth.uid() or referred_id = auth.uid());
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename  = 'referral_events'
+      and policyname = 'referral_events_own_read'
+  ) then
+    execute $p$
+      create policy "referral_events_own_read"
+        on referral_events for select
+        using (referrer_id = auth.uid() or referred_id = auth.uid())
+    $p$;
+  end if;
+end $$;
 
 -- Écriture réservée au service role (routes API serveur uniquement)
 
