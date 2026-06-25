@@ -24,11 +24,6 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 bg-navy-950/90 backdrop-blur-xl border-b border-white/[0.06]">
-      <div className="bg-gradient-to-r from-amber-500/10 via-amber-400/10 to-amber-500/10 border-b border-amber-400/15 px-4 py-1.5 text-center">
-        <p className="text-xs text-amber-300/90 font-medium tracking-wide">
-          🧪 MODE DÉMONSTRATION — carte test : 4242 4242 4242 4242
-        </p>
-      </div>
       <div className="flex items-center justify-between px-4 h-14 max-w-2xl mx-auto">
         <Link href="/" className="flex items-center gap-2 shrink-0 group">
           <div className="relative">
