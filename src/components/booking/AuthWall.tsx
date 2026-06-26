@@ -4,9 +4,10 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function AuthWall({ onAuth }: { onAuth: () => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,12 +27,20 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
 
     try {
       if (mode === 'signup') {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+        const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { name, phone, role: 'client' } },
+          options: { data: { name: fullName, phone, role: 'client', first_name: firstName.trim() } },
         });
         if (signUpError) throw signUpError;
+        if (data.user) {
+          await fetch('/api/auth/post-signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: data.user.id, firstName: firstName.trim(), referrerCode: null }),
+          }).catch(() => {});
+        }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
@@ -68,12 +77,15 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
 
       <form onSubmit={handleSubmit} className="space-y-3">
         {mode === 'signup' && (
-          <input type="text" placeholder="Nom complet" value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
+          <input type="text" placeholder="Nom" value={lastName} onChange={(e) => setLastName(e.target.value)} required className={inputClass} />
         )}
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
+        {mode === 'signup' && (
+          <input type="text" placeholder="Prénom" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className={inputClass} />
+        )}
         {mode === 'signup' && (
           <input type="tel" placeholder="Téléphone (rappels SMS)" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
         )}
+        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
         <input type="password" placeholder="Mot de passe (6 min.)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className={inputClass} />
 
         {error && (

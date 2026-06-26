@@ -8,9 +8,10 @@ export default function RegisterForm() {
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref');
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,15 +21,35 @@ export default function RegisterForm() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const { error: signUpError } = await supabase.auth.signUp({
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name, phone, role: 'client', referral_code: referralCode || undefined } },
+      options: {
+        data: {
+          name: fullName,
+          phone,
+          role: 'client',
+          first_name: firstName.trim(),
+          referrer_code: referralCode || undefined,
+        },
+      },
     });
     if (signUpError) {
       setError(signUpError.message);
       setLoading(false);
       return;
+    }
+    if (data.user) {
+      await fetch('/api/auth/post-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: data.user.id,
+          firstName: firstName.trim(),
+          referrerCode: referralCode || null,
+        }),
+      }).catch(() => {});
     }
     router.push('/recherche');
     router.refresh();
@@ -48,17 +69,17 @@ export default function RegisterForm() {
       )}
       <input
         type="text"
-        placeholder="Nom complet"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
+        placeholder="Nom"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
         required
         className={inputClass}
       />
       <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        type="text"
+        placeholder="Prénom"
+        value={firstName}
+        onChange={(e) => setFirstName(e.target.value)}
         required
         className={inputClass}
       />
@@ -67,6 +88,14 @@ export default function RegisterForm() {
         placeholder="Téléphone (rappels SMS)"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
+        className={inputClass}
+      />
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
         className={inputClass}
       />
       <input
