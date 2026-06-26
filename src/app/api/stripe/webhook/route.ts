@@ -56,11 +56,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
+      const memberEmail = session.customer_details?.email || meta.clientEmail || null;
+
       await supabase
         .from('booking_members')
         .update({
           status: 'paid',
           deposit: dep,
+          email: memberEmail,
           stripe_payment_intent_id:
             typeof session.payment_intent === 'string' ? session.payment_intent : null,
           stripe_checkout_session_id: session.id,
@@ -181,6 +184,62 @@ export async function POST(req: NextRequest) {
           .update({ status: 'complete' })
           .eq('id', bookingId);
         console.log(`[Webhook] ✅ Booking ${bookingId} → complete (tous les membres ont payé)`);
+      }
+
+      // ── Complétion de groupe ─────────────────────────────────────────────
+      // Si ce booking appartient à un groupe, vérifier si TOUS les bookings
+      // du groupe sont maintenant complets → email de confirmation à tous
+      const { data: bookingRow } = await supabase
+        .from('bookings')
+        .select('group_ref, biz_name, service_name, date, time')
+        .eq('id', bookingId)
+        .maybeSingle();
+
+      if (bookingRow?.group_ref) {
+        const { data: groupBookings } = await supabase
+          .from('bookings')
+          .select('id, status, client_email, biz_name, service_name, date, time, booking_members(id, name, status, email, deposit, qr_code)')
+          .eq('group_ref', bookingRow.group_ref);
+
+        const allGroupBookings = groupBookings ?? [];
+        const allGroupActive = allGroupBookings.flatMap((b: any) =>
+          (b.booking_members ?? []).filter((m: any) => m.status !== 'cancelled')
+        );
+        const allGroupPaid = allGroupActive.length > 0 && allGroupActive.every((m: any) =>
+          m.status === 'paid' || m.status === 'arrived'
+        );
+
+        if (allGroupPaid) {
+          // Marquer tous les bookings du groupe comme complete
+          const incompleteIds = allGroupBookings
+            .filter((b: any) => b.status !== 'complete' && b.status !== 'cancelled')
+            .map((b: any) => b.id);
+          if (incompleteIds.length > 0) {
+            await supabase.from('bookings').update({ status: 'complete' }).in('id', incompleteIds);
+          }
+
+          // Email de confirmation à chaque participant (via booking_members.email ou booking.client_email)
+          const dateFormatted = new Date(allGroupBookings[0].date + 'T12:00:00').toLocaleDateString('fr-FR', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          });
+          const totalParticipants = allGroupActive.length;
+
+          for (const bk of allGroupBookings) {
+            const emailTargets = new Set<string>();
+            if ((bk as any).client_email) emailTargets.add((bk as any).client_email);
+            for (const m of (bk as any).booking_members ?? []) {
+              if (m.email) emailTargets.add(m.email);
+            }
+            for (const email of emailTargets) {
+              await sendEmail({
+                to: email,
+                subject: `🎉 Groupe complet — ${(bk as any).biz_name}`,
+                text: `Bonne nouvelle !\n\nVotre groupe est complet : ${totalParticipants} participant${totalParticipants > 1 ? 's ont' : ' a'} confirmé.\n\n📍 Établissement : ${(bk as any).biz_name}\n💆 Prestation : ${(bk as any).service_name}\n📅 Date : ${dateFormatted}\n🕐 Créneau : ${(bk as any).time}\n\nVotre place est réservée. À bientôt !\nL'équipe Book'nPay`,
+              }).catch(() => {});
+            }
+          }
+          console.log(`[Webhook] ✅ Groupe ${bookingRow.group_ref} complet — emails envoyés`);
+        }
       }
 
       // Email de confirmation

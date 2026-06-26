@@ -22,6 +22,7 @@ interface Member {
 export default function PayGuestClient({ member, booking }: { member: Member; booking: Booking }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
 
   const deposit = booking.services?.deposit ?? 0;
   const fraisGestion = calcFraisGestion(booking.services?.price ?? 0);
@@ -33,10 +34,23 @@ export default function PayGuestClient({ member, booking }: { member: Member; bo
       weekday: 'long', day: 'numeric', month: 'long',
     });
 
+  const saveEmail = async (val: string) => {
+    if (!val || !val.includes('@')) return;
+    await fetch('/api/bookings/save-member-email', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId: member.id, email: val }),
+    }).catch(() => {});
+  };
+
   const handlePay = async () => {
     setLoading(true);
     setError(null);
     try {
+      // Sauvegarder l'email avant la redirection Stripe (même si le paiement échoue,
+      // on pourra notifier l'invité en cas d'expiration du groupe)
+      if (email) await saveEmail(email);
+
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -151,6 +165,19 @@ export default function PayGuestClient({ member, booking }: { member: Member; bo
               </p>
             </div>
           )}
+        </div>
+
+        {/* Email optionnel — sauvegardé avant le paiement Stripe */}
+        <div className="mb-4">
+          <input
+            type="email"
+            placeholder="Votre email (pour recevoir les notifications)"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => saveEmail(email)}
+            className="w-full rounded-xl bg-navy-900 border border-white/[0.08] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/15 transition-all duration-200"
+          />
+          <p className="text-[10px] text-slate-600 mt-1.5 px-1">Facultatif · Uniquement pour les notifications de groupe</p>
         </div>
 
         {member.name && (

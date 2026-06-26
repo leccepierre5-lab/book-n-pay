@@ -70,28 +70,16 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (referrer) {
-        const REFERRAL_RDV_BONUS = 5;
-        const REFERRAL_JOKER_BONUS = 1;
-
-        // +5 RDV honorés et +1 Joker au parrain (inchangés)
+        // Parrain : -20% sur sa prochaine prestation
         await supabase
           .from('app_users')
-          .update({
-            rdv_honores: (referrer.rdv_honores || 0) + REFERRAL_RDV_BONUS,
-            jokers_disponibles: (referrer.jokers_disponibles || 0) + REFERRAL_JOKER_BONUS,
-            // Parrain : -20% sur sa prochaine prestation
-            // (un nouveau parrainage réussi réécrit la valeur — le parrain cumule la
-            // réduction la plus haute disponible, mais une seule réservation la consume)
-            pending_referral_discount_pct: 20,
-          })
+          .update({ pending_referral_discount_pct: 20 })
           .eq('id', referrer.id);
 
-        // +5 RDV honorés et +1 Joker au parrainé + réduction -10% unique
+        // Parrainé : -10% unique + marqué comme récompensé
         await supabase
           .from('app_users')
           .update({
-            rdv_honores: currentRdv + REFERRAL_RDV_BONUS,
-            jokers_disponibles: jokersDisponibles + REFERRAL_JOKER_BONUS,
             referral_reward_granted: true,
             pending_referral_discount_pct: 10,
           })

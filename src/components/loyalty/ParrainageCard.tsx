@@ -25,7 +25,7 @@ export default function ParrainageCard({
   };
 
   const handleWhatsApp = () => {
-    const text = `🎁 Rejoins Book'nPay avec mon lien de parrainage ! Tu reçois -10% sur ta prochaine prestation + 5 RDV honorés offerts dès ton premier rendez-vous !\n👉 ${referralLink}`;
+    const text = `🎁 Rejoins Book'nPay avec mon lien de parrainage ! Tu reçois -10% sur ta prochaine prestation dès ton premier rendez-vous honoré !\n👉 ${referralLink}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -43,9 +43,8 @@ export default function ParrainageCard({
 
       <div className="space-y-3 px-4 py-3">
         <p className="text-xs leading-relaxed text-white/70">
-          Parrainez un ami : <strong className="text-amber-300">vous recevez tous les deux +5 RDV
-          honorés, un Joker bonus</strong> et une réduction sur votre prochaine prestation
-          (<strong className="text-amber-300">-20% pour vous, -10% pour lui</strong>) dès son premier rendez-vous !
+          Parrainez un ami : vous recevez tous les deux une réduction sur votre prochaine prestation
+          (<strong className="text-amber-300">-20% pour vous, -10% pour lui</strong>) dès son premier rendez-vous honoré !
         </p>
 
         {/* Réduction en attente */}

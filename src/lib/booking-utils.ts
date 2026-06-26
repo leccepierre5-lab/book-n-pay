@@ -26,6 +26,14 @@ export function normalizePhone(raw: string): string {
   return digits;
 }
 
+export function phonesMatch(
+  a: string | null | undefined,
+  b: string | null | undefined
+): boolean {
+  if (!a || !b) return false;
+  return normalizePhone(a) === normalizePhone(b);
+}
+
 export function generateGroupRef(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let r = '';
@@ -55,7 +63,7 @@ export function calcTrustScore(
   phone: string
 ): TrustScore {
   const relevant = bookings.filter((b) =>
-    b.booking_members?.some((m) => m.phone === phone && m.status !== 'cancelled' && m.status !== 'invite')
+    b.booking_members?.some((m) => phonesMatch(m.phone, phone) && m.status !== 'cancelled' && m.status !== 'invite')
   );
   const total = relevant.length;
 
@@ -75,7 +83,7 @@ export function calcTrustScore(
   let noShows = 0;
   relevant.forEach((b) => {
     b.booking_members.forEach((m) => {
-      if (m.phone === phone) {
+      if (phonesMatch(m.phone, phone)) {
         if (m.status === 'arrived') honored++;
         if (m.status === 'no_show') noShows++;
       }

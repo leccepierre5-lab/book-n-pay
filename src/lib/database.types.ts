@@ -84,6 +84,7 @@ export interface Booking {
   time: string;
   status: BookingStatus;
   group_ref: string | null;
+  payment_deadline: string | null;
   client_id: string | null;
   client_phone: string | null;
   client_name: string | null;
@@ -107,6 +108,7 @@ export interface BookingMember {
   montant_rembourse: number | null;
   stripe_payment_intent_id: string | null;
   stripe_checkout_session_id: string | null;
+  email: string | null;
   invite_expiry: string | null;
   payment_mode: 'app' | 'tpe' | 'especes' | null;
   referrer_name: string | null;

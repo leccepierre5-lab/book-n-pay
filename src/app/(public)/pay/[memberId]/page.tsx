@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import PayGuestClient from '@/components/group/PayGuestClient';
+import GroupTimer from '@/components/booking/GroupTimer';
 import Link from 'next/link';
 
 export default async function PayGuestPage({
@@ -25,6 +26,8 @@ export default async function PayGuestPage({
         staff_name,
         date,
         time,
+        group_ref,
+        payment_deadline,
         services(deposit, price)
       )
     `)
@@ -81,11 +84,20 @@ export default async function PayGuestPage({
   }
 
   const booking = (member as any).bookings;
+  const deadline: string | null = booking?.payment_deadline ?? null;
+  const isGroupPending = booking?.group_ref && deadline && new Date(deadline) > new Date();
 
   return (
-    <PayGuestClient
-      member={{ id: member.id, name: member.name, booking_id: member.booking_id }}
-      booking={booking}
-    />
+    <div>
+      {isGroupPending && (
+        <div className="max-w-sm mx-auto px-4 pt-6">
+          <GroupTimer deadline={deadline!} />
+        </div>
+      )}
+      <PayGuestClient
+        member={{ id: member.id, name: member.name, booking_id: member.booking_id }}
+        booking={booking}
+      />
+    </div>
   );
 }

@@ -1,6 +1,10 @@
 import Link from 'next/link';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { normalizePhone } from '@/lib/booking-utils';
 import MyBookingsList from '@/components/booking/MyBookingsList';
+import type { Booking, BookingMember } from '@/lib/database.types';
+
+export type GroupMap = Record<string, (Booking & { booking_members: BookingMember[] })[]>;
 
 export default async function MesReservationsPage() {
   const supabase = await createClient();
@@ -20,7 +24,6 @@ export default async function MesReservationsPage() {
     );
   }
 
-  // Service role pour bypass RLS — l'utilisateur est déjà vérifié ci-dessus
   const supabaseAdmin = createServiceRoleClient();
 
   const { data: profile } = await supabaseAdmin
@@ -29,18 +32,22 @@ export default async function MesReservationsPage() {
     .eq('id', authData.user.id)
     .maybeSingle();
 
-  // Récupérer les IDs des bookings via booking_members (phone) + client_id
-  // Couvre : booking individuel, groupe organisateur, groupe invité,
-  // et anciens bookings où client_id = null (créés avant le fix auth)
+  // Rechercher par téléphone normalisé ET format brut (incohérence historique en base)
   const bookingIdSet = new Set<string>();
 
-  const { data: memberRows } = profile?.phone
-    ? await supabaseAdmin
-        .from('booking_members')
-        .select('booking_id')
-        .eq('phone', profile.phone)
-    : { data: [] as { booking_id: string }[] };
-  (memberRows ?? []).forEach((r) => bookingIdSet.add(r.booking_id));
+  if (profile?.phone) {
+    const rawPhone = profile.phone;
+    const normPhone = normalizePhone(profile.phone);
+    const phonesFilter = rawPhone === normPhone
+      ? `phone.eq.${rawPhone}`
+      : `phone.eq.${rawPhone},phone.eq.${normPhone}`;
+
+    const { data: memberRows } = await supabaseAdmin
+      .from('booking_members')
+      .select('booking_id')
+      .or(phonesFilter);
+    (memberRows ?? []).forEach((r) => bookingIdSet.add(r.booking_id));
+  }
 
   const { data: orgRows } = await supabaseAdmin
     .from('bookings')
@@ -50,16 +57,36 @@ export default async function MesReservationsPage() {
 
   const allIds = [...bookingIdSet];
 
-  const { data: bookings } = allIds.length > 0
+  const { data: userBookings } = allIds.length > 0
     ? await supabaseAdmin
         .from('bookings')
         .select('*, booking_members(*)')
         .in('id', allIds)
         .order('date', { ascending: false })
         .order('time', { ascending: false })
-    : { data: [] as any[] };
+    : { data: [] as (Booking & { booking_members: BookingMember[] })[] };
 
-  // Historique des parrainages réussis (en tant que parrain)
+  const bookings = userBookings ?? [];
+
+  // Pour chaque groupe (group_ref non-null), charger TOUS les bookings du groupe
+  // afin d'afficher la progression et les participants complets
+  const groupRefs = [
+    ...new Set(bookings.filter((b) => b.group_ref).map((b) => b.group_ref as string)),
+  ];
+
+  const groupMap: GroupMap = {};
+  if (groupRefs.length > 0) {
+    const { data: allGroupBookings } = await supabaseAdmin
+      .from('bookings')
+      .select('*, booking_members(*)')
+      .in('group_ref', groupRefs)
+      .order('time', { ascending: true });
+
+    groupRefs.forEach((ref) => {
+      groupMap[ref] = (allGroupBookings ?? []).filter((b) => b.group_ref === ref) as (Booking & { booking_members: BookingMember[] })[];
+    });
+  }
+
   const { data: referralEvents } = await supabaseAdmin
     .from('referral_events')
     .select('*')
@@ -68,9 +95,10 @@ export default async function MesReservationsPage() {
 
   return (
     <MyBookingsList
-      bookings={bookings || []}
+      bookings={bookings}
       profile={profile}
       referralEvents={referralEvents || []}
+      groupMap={groupMap}
     />
   );
 }

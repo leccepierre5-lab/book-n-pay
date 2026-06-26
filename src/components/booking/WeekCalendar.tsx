@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { addWeeks, subWeeks, startOfWeek, addDays, format, isSameDay, isBefore, startOfDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Booking, BookingMember } from '@/lib/database.types';
+import { phonesMatch } from '@/lib/booking-utils';
 
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
@@ -41,7 +42,7 @@ export default function WeekCalendar({
   const bookingsByDate = useMemo(() => {
     const map: Record<string, EnrichedBooking[]> = {};
     bookings.forEach((b) => {
-      const myMember = b.booking_members?.find((m) => m.phone === myPhone);
+      const myMember = b.booking_members?.find((m) => phonesMatch(m.phone, myPhone));
       const enriched: EnrichedBooking = { ...b, _myMember: myMember };
       if (!map[b.date]) map[b.date] = [];
       map[b.date].push(enriched);

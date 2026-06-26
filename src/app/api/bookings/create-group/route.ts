@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     const groupRef = generateGroupRef();
+    const paymentDeadline = new Date(Date.now() + 20 * 60 * 1000).toISOString();
     const created: { bookingId: string; memberId: string; isOrganizer: boolean }[] = [];
 
     for (let i = 0; i < slots.length; i++) {
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
           time: slots[i],
           status: 'active',
           group_ref: groupRef,
+          payment_deadline: paymentDeadline,
           client_id: isOrganizer ? (authData.user?.id || null) : null,
           client_phone: participantPhone,
           client_name: participantName,

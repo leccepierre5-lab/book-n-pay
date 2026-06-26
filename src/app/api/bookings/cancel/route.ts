@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { parseParisDatetime } from '@/lib/booking-utils';
+import { parseParisDatetime, phonesMatch } from '@/lib/booking-utils';
 import { sendEmail } from '@/lib/email/send';
 
 const CANCEL_DEADLINE_HOURS = 48;
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     const isCreator = booking.client_id === authData.user.id;
-    const isTargetMember = callerProfile?.phone && callerProfile.phone === member.phone;
+    const isTargetMember = callerProfile?.phone && phonesMatch(callerProfile.phone, member.phone);
     const isAdmin = callerProfile?.role === 'admin';
 
     if (!isCreator && !isTargetMember && !isAdmin) {
