@@ -113,11 +113,30 @@ export async function POST(req: NextRequest) {
         console.log(`[Parrainage] Réduction -${referralDiscountPct}% consommée pour user=${clientUserId}`);
       }
 
-      // Mode multiSlot : un même participant (member_ref) peut avoir une ligne
-      // booking_members distincte dans CHAQUE booking du groupe (un booking par
-      // créneau). On les retrouve par member_ref, pas par id (clé primaire
-      // propre à chaque ligne).
-      if (groupRef && member?.member_ref) {
+      // Mode A groupe : l'organisateur a payé pour tous — marquer chaque membre
+      const allMemberIds = meta.allMemberIds
+        ? meta.allMemberIds.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : [];
+      if (allMemberIds.length > 1) {
+        const otherIds = allMemberIds.filter((id: string) => id !== memberId);
+        if (otherIds.length > 0) {
+          await supabase
+            .from('booking_members')
+            .update({
+              status: 'paid',
+              deposit: dep,
+              stripe_payment_intent_id:
+                typeof session.payment_intent === 'string' ? session.payment_intent : null,
+              stripe_checkout_session_id: session.id,
+            })
+            .in('id', otherIds)
+            .neq('status', 'paid');
+          console.log(`[Webhook] Mode A — ${otherIds.length} membres supplémentaires marqués paid`);
+        }
+      }
+
+      // member_ref (ancien flow rejoindre) : même participant sur plusieurs bookings
+      if (groupRef && member?.member_ref && allMemberIds.length <= 1) {
         const { data: groupMembers } = await supabase
           .from('booking_members')
           .select('id, booking_id, status')

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { AppUser, Booking, BookingMember, ReferralEvent } from '@/lib/database.types';
 import ParrainageCard from '@/components/loyalty/ParrainageCard';
+import LoyaltyCard from '@/components/loyalty/LoyaltyCard';
 import WeekCalendar from './WeekCalendar';
 
 type BookingWithMembers = Booking & { booking_members: BookingMember[] };
@@ -129,24 +130,7 @@ export default function MyBookingsList({
         )}
 
         {/* Loyalty card */}
-        {profile && loyaltyInfo && (
-          <div className="mb-4 rounded-2xl bg-navy-900 border border-white/[0.08] p-4 overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-mint-500/5 to-transparent pointer-events-none" />
-            <div className="relative flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-widest font-medium mb-1">Statut fidélité</p>
-                <p className={`text-sm font-bold ${loyaltyInfo.color}`}>
-                  {loyaltyInfo.emoji} Statut {profile.statut}
-                </p>
-                <p className="text-xs text-slate-600 mt-0.5">{profile.rdv_honores} RDV honorés</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-mint-400">{profile.jokers_disponibles}</p>
-                <p className="text-xs text-slate-500">Joker{profile.jokers_disponibles > 1 ? 's' : ''}</p>
-              </div>
-            </div>
-          </div>
-        )}
+        {profile && <LoyaltyCard profile={profile} />}
 
         {/* Parrainage */}
         {profile && (

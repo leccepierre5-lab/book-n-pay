@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
       successUrl,
       cancelUrl,
       fraisGestion: fraisGestionInput,
+      quantity = 1,
       groupSize = 1,
       clientUserId,
     } = body;
@@ -51,7 +52,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Montant invalide' }, { status: 400 });
     }
 
-    if (parseInt(groupSize, 10) > 23) {
+    const resolvedQty = Math.max(1, parseInt(String(quantity), 10) || 1);
+    if (resolvedQty > 23 || parseInt(groupSize, 10) > 23) {
       return NextResponse.json(
         { error: 'Les groupes sont limités à 23 personnes maximum' },
         { status: 400 }
@@ -183,7 +185,7 @@ export async function POST(req: NextRequest) {
           },
           unit_amount: Math.round(effectiveDeposit * 100),
         },
-        quantity: 1,
+        quantity: resolvedQty,
       },
       {
         price_data: {
@@ -209,6 +211,10 @@ export async function POST(req: NextRequest) {
         bookingId: bookingMeta?.bookingId || '',
         memberId: bookingMeta?.memberId || '',
         groupRef: bookingMeta?.groupRef || '',
+        // Mode A: tous les membres à marquer payés (séparés par virgule)
+        allMemberIds: bookingMeta?.allMemberIds || '',
+        // Mode B: membres invités (pour affichage liens sur confirmation)
+        guestMemberIds: bookingMeta?.guestMemberIds || '',
         bizId: bookingMeta?.bizId || '',
         bizName: bookingMeta?.bizName || '',
         serviceName: bookingMeta?.serviceName || '',
@@ -218,7 +224,6 @@ export async function POST(req: NextRequest) {
         clientPhone: bookingMeta?.clientPhone || '',
         clientEmail: bookingMeta?.clientEmail || '',
         depositAmount: String(effectiveDeposit),
-        // Pour que le webhook puisse consommer la réduction après paiement confirmé
         clientUserId: clientUserId || '',
         referralDiscountPct: String(referralDiscountPct),
       },

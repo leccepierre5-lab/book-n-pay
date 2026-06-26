@@ -1,20 +1,27 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import ShareGroupLink from '@/components/group/ShareGroupLink';
+import ShareGuestLinks from '@/components/group/ShareGuestLinks';
 
 export default async function ConfirmationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ booking?: string }>;
+  searchParams: Promise<{ booking?: string; mode?: string; guests?: string }>;
 }) {
-  const { booking: bookingId } = await searchParams;
+  const { booking: bookingId, mode, guests: guestsParam } = await searchParams;
   const supabase = await createClient();
 
   const { data: booking } = bookingId
     ? await supabase.from('bookings').select('*, services(max_persons)').eq('id', bookingId).maybeSingle()
     : { data: null };
 
-  const isGroupBooking = (booking as any)?.services?.max_persons && (booking as any).services.max_persons > 1;
+  const isGroupBooking =
+    (booking as any)?.services?.max_persons && (booking as any).services.max_persons > 1;
+
+  const isModeB = mode === 'b' && !!guestsParam;
+  const guestMemberIds = isModeB
+    ? guestsParam!.split(',').filter(Boolean)
+    : [];
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr + 'T12:00:00').toLocaleDateString('fr-FR', {
@@ -77,7 +84,13 @@ export default async function ConfirmationPage({
           </div>
         </div>
 
-        {isGroupBooking && bookingId && (
+        {/* Mode B: share individual payment links */}
+        {isModeB && guestMemberIds.length > 0 && (
+          <ShareGuestLinks guestMemberIds={guestMemberIds} />
+        )}
+
+        {/* Old-style group join link (for rejoindre flow) */}
+        {!isModeB && isGroupBooking && bookingId && (
           <div className="mb-5">
             <ShareGroupLink bookingId={bookingId} />
           </div>

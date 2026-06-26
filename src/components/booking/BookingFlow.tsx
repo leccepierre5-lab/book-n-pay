@@ -22,7 +22,7 @@ export default function BookingFlow({
   const [service, setService] = useState<Service | null>(null);
   const [staff, setStaff] = useState<Staff | null>(null);
   const [date, setDate] = useState<string | null>(null);
-  const [time, setTime] = useState<string | null>(null);
+  const [slots, setSlots] = useState<string[]>([]);   // one per participant
   const [participants, setParticipants] = useState(1);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
@@ -42,11 +42,10 @@ export default function BookingFlow({
     setStep(1);
   };
 
-  const handleDateTimeSelect = async (d: string, t: string, p: number) => {
+  const handleDateTimeSelect = async (d: string, s: string[], p: number) => {
     setDate(d);
-    setTime(t);
+    setSlots(s);
     setParticipants(p);
-    // Fresh session check — never rely on stale isAuthed (null or false from a previous render)
     const { data } = await createClient().auth.getSession();
     if (data.session) {
       setIsAuthed(true);
@@ -63,10 +62,7 @@ export default function BookingFlow({
   };
 
   const goBack = () => {
-    if (needsAuth) {
-      setNeedsAuth(false);
-      return;
-    }
+    if (needsAuth) { setNeedsAuth(false); return; }
     if (step > 0) setStep(step - 1);
     else router.push('/recherche');
   };
@@ -90,9 +86,7 @@ export default function BookingFlow({
           </div>
           <div className="min-w-0">
             <h1 className="text-base font-semibold text-white truncate">{business.name}</h1>
-            <p className="text-xs text-slate-500 truncate">
-              {business.city} · {business.type}
-            </p>
+            <p className="text-xs text-slate-500 truncate">{business.city} · {business.type}</p>
           </div>
         </div>
 
@@ -101,11 +95,11 @@ export default function BookingFlow({
         {needsAuth ? (
           <div>
             <h2 className="mb-4 text-center text-lg font-semibold text-white">Identification</h2>
-            {date && time && (
+            {date && slots.length > 0 && (
               <div className="mb-5 flex items-start gap-3 rounded-2xl border border-emerald-600/25 bg-emerald-600/8 px-4 py-3.5">
                 <span className="text-lg shrink-0 mt-0.5">🔒</span>
                 <p className="text-xs leading-relaxed text-emerald-400">
-                  Votre créneau <strong>{date} à {time}</strong> pour{' '}
+                  Votre créneau <strong>{date} à {slots[0]}</strong> pour{' '}
                   <strong>{service?.name}</strong> vous attend. Identifiez-vous pour le confirmer.
                 </p>
               </div>
@@ -126,15 +120,15 @@ export default function BookingFlow({
                 <StepDateTime business={business} service={service} onSelect={handleDateTimeSelect} />
               </>
             )}
-            {step === 2 && service && date && time && (
+            {step === 2 && service && date && slots.length > 0 && (
               <>
-                <h2 className="mb-4 text-base font-semibold text-white">Récapitulatif & Paiement</h2>
+                <h2 className="mb-4 text-base font-semibold text-white">Paiement</h2>
                 <StepPayment
                   business={business}
                   service={service}
                   staff={staff}
                   date={date}
-                  time={time}
+                  slots={slots}
                   participants={participants}
                 />
               </>
