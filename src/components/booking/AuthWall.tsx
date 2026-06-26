@@ -29,7 +29,10 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { name: fullName.trim(), phone, role: 'client' } },
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: { name: fullName.trim(), phone, role: 'client' },
+          },
         });
         if (signUpError) throw signUpError;
         if (data.user) {
