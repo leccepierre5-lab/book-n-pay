@@ -1,10 +1,42 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
 import type { Service, Staff } from '@/lib/database.types';
 import { calcFraisGestion, normalizePhone } from '@/lib/booking-utils';
 import { createClient } from '@/lib/supabase/client';
+
+// Contact Picker API — Chrome Android 80+, absent sur Safari iOS et desktop.
+type ContactRecord = { name?: string[]; tel?: string[] };
+type ContactsManager = {
+  select(props: string[], opts?: { multiple?: boolean }): Promise<ContactRecord[]>;
+};
+declare global { interface Navigator { contacts?: ContactsManager } }
+
+function useContactPicker() {
+  const [supported, setSupported] = useState(false);
+  useEffect(() => { setSupported('contacts' in navigator); }, []);
+
+  const pick = async (maxCount: number): Promise<ContactRecord[]> => {
+    if (!navigator.contacts) return [];
+    try {
+      const results = await navigator.contacts.select(['name', 'tel'], { multiple: true });
+      // Silently truncate if user selected more contacts than there are participant slots
+      return results.slice(0, maxCount);
+    } catch { return []; }
+  };
+
+  return { supported, pick };
+}
+
+// Icône "carnet de contacts" réutilisée dans les deux modes
+function ContactsIcon() {
+  return (
+    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 0H4v2h16V0zM4 24h16v-2H4v2zM20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 2.75c1.24 0 2.25 1.01 2.25 2.25S13.24 11.25 12 11.25 9.75 10.24 9.75 9s1.01-2.25 2.25-2.25zM17 17H7v-1.5c0-1.67 3.33-2.5 5-2.5s5 .83 5 2.5V17z"/>
+    </svg>
+  );
+}
 
 type PayMode = 'a' | 'b' | null;
 
@@ -130,6 +162,7 @@ function ModeAPayment({
   const [accepted, setAccepted] = useState(false);
   const [guestNames, setGuestNames] = useState<string[]>(Array(participants).fill(''));
   const [showNames, setShowNames] = useState(false);
+  const { supported: contactsSupported, pick: pickContacts } = useContactPicker();
 
   const depositPerPerson = service.deposit;
   const totalDeposit = depositPerPerson * participants;
@@ -231,6 +264,27 @@ function ModeAPayment({
           {slots.length > 1 && <span className="text-slate-500 ml-2">· {slotsLabel}</span>}
         </p>
       </div>
+
+      {/* Contact picker — Mode A (noms seulement, Chrome Android) */}
+      {contactsSupported && (
+        <button
+          type="button"
+          onClick={async () => {
+            const contacts = await pickContacts(participants);
+            if (contacts.length === 0) return;
+            setGuestNames((prev) => {
+              const next = [...prev];
+              contacts.forEach((c, i) => { if (c.name?.[0]) next[i] = c.name[0]; });
+              return next;
+            });
+            setShowNames(true);
+          }}
+          className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 active:scale-[0.98] transition-all mb-4"
+        >
+          <ContactsIcon />
+          Importer depuis mes contacts
+        </button>
+      )}
 
       {/* Optional names accordion */}
       <button
@@ -373,6 +427,7 @@ function ModeBPayment({
   const [guests, setGuests] = useState<GuestInfo[]>(
     Array.from({ length: participants - 1 }, () => ({ name: '', phone: '' }))
   );
+  const { supported: contactsSupported, pick: pickContacts } = useContactPicker();
 
   const fraisGestion = calcFraisGestion(service.price);
   const myTotal = service.deposit + fraisGestion;
@@ -494,6 +549,29 @@ function ModeBPayment({
           Vous payez <strong className="text-white">{service.deposit}€</strong> de frais de réservation maintenant.
         </p>
       </div>
+
+      {/* Contact picker — Mode B (nom + téléphone, Chrome Android) */}
+      {contactsSupported && guests.length > 0 && (
+        <button
+          type="button"
+          onClick={async () => {
+            const contacts = await pickContacts(guests.length);
+            if (contacts.length === 0) return;
+            setGuests((prev) => {
+              const next = [...prev];
+              contacts.forEach((c, i) => {
+                if (c.tel?.[0]) next[i] = { ...next[i], phone: c.tel[0] };
+                if (c.name?.[0] && !next[i].name) next[i] = { ...next[i], name: c.name[0] };
+              });
+              return next;
+            });
+          }}
+          className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 active:scale-[0.98] transition-all mb-3"
+        >
+          <ContactsIcon />
+          Importer depuis mes contacts
+        </button>
+      )}
 
       {/* Guest slots */}
       {guests.map((guest, idx) => (
