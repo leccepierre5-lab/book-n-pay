@@ -9,6 +9,10 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient();
     const { data: authData } = await supabase.auth.getUser();
 
+    if (!authData.user) {
+      console.warn('[create] authData.user is null — booking will have client_id=null');
+    }
+
     const body = await req.json();
     const { bizId, bizName, serviceId, serviceName, staffId, staffName, date, time, clientPhone, clientEmail } = body;
     // Fallback serveur : user_metadata ou email si le profil app_users n'existe pas encore

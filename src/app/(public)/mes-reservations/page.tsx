@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import MyBookingsList from '@/components/booking/MyBookingsList';
 
 export default async function MesReservationsPage() {
@@ -20,20 +20,47 @@ export default async function MesReservationsPage() {
     );
   }
 
-  const { data: profile } = await supabase
+  // Service role pour bypass RLS — l'utilisateur est déjà vérifié ci-dessus
+  const supabaseAdmin = createServiceRoleClient();
+
+  const { data: profile } = await supabaseAdmin
     .from('app_users')
     .select('*')
     .eq('id', authData.user.id)
     .maybeSingle();
 
-  const { data: bookings } = await supabase
+  // Récupérer les IDs des bookings via booking_members (phone) + client_id
+  // Couvre : booking individuel, groupe organisateur, groupe invité,
+  // et anciens bookings où client_id = null (créés avant le fix auth)
+  const bookingIdSet = new Set<string>();
+
+  const { data: memberRows } = profile?.phone
+    ? await supabaseAdmin
+        .from('booking_members')
+        .select('booking_id')
+        .eq('phone', profile.phone)
+    : { data: [] as { booking_id: string }[] };
+  (memberRows ?? []).forEach((r) => bookingIdSet.add(r.booking_id));
+
+  const { data: orgRows } = await supabaseAdmin
     .from('bookings')
-    .select('*, booking_members(*)')
-    .order('date', { ascending: false })
-    .order('time', { ascending: false });
+    .select('id')
+    .eq('client_id', authData.user.id);
+  (orgRows ?? []).forEach((b) => bookingIdSet.add(b.id));
+
+  const allIds = [...bookingIdSet];
+
+  const { data: bookings } = allIds.length > 0
+    ? await supabaseAdmin
+        .from('bookings')
+        .select('*, booking_members(*)')
+        .in('id', allIds)
+        .order('date', { ascending: false })
+        .order('time', { ascending: false })
+    : { data: [] as any[] };
 
   // Historique des parrainages réussis (en tant que parrain)
-  const { data: referralEvents } = await supabase
+  const { data: referralEvents } = await supabaseAdmin
     .from('referral_events')
     .select('*')
     .eq('referrer_id', authData.user.id)
