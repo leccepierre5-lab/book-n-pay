@@ -118,6 +118,21 @@ export async function POST(req: NextRequest) {
         ? meta.allMemberIds.split(',').map((s: string) => s.trim()).filter(Boolean)
         : [];
       if (allMemberIds.length > 1) {
+        // Vérification de cohérence montant : alerte si le total Stripe ne correspond pas
+        // au calcul attendu (N × dépôt + fraisGestion). Non bloquant — le paiement est
+        // déjà encaissé par Stripe ; c'est un filet de sécurité contre nos propres bugs.
+        const metaFrais = parseFloat(meta.fraisGestion || '0');
+        const metaQty = parseInt(meta.groupQuantity || '1', 10);
+        const expectedTotal = Math.round((dep * metaQty + metaFrais) * 100);
+        const actualTotal = session.amount_total || 0;
+        if (metaFrais > 0 && Math.abs(expectedTotal - actualTotal) > 2) {
+          console.error(
+            `[Webhook] ⚠️ MONTANT INATTENDU Mode A — groupRef=${groupRef}` +
+            ` attendu=${expectedTotal / 100}€ (${metaQty}×${dep}+${metaFrais})` +
+            ` reçu=${actualTotal / 100}€ — paiement accepté, investigation requise`
+          );
+        }
+
         const otherIds = allMemberIds.filter((id: string) => id !== memberId);
         if (otherIds.length > 0) {
           await supabase

@@ -224,6 +224,8 @@ export async function POST(req: NextRequest) {
         clientPhone: bookingMeta?.clientPhone || '',
         clientEmail: bookingMeta?.clientEmail || '',
         depositAmount: String(effectiveDeposit),
+        fraisGestion: String(Math.round(fraisGestion * 100) / 100),
+        groupQuantity: String(resolvedQty),
         clientUserId: clientUserId || '',
         referralDiscountPct: String(referralDiscountPct),
       },
