@@ -62,13 +62,18 @@ export async function POST(req: NextRequest) {
 
     // ── Réduction de parrainage — lue côté serveur, jamais depuis le client ──
     let referralDiscountPct = 0;
+    let freeManagementFee = false;
     if (clientUserId) {
       const { data: userProfile } = await supabase
         .from('app_users')
-        .select('pending_referral_discount_pct')
+        .select('referral_discounts_available, pending_referral_discount_pct, free_management_fees_available')
         .eq('id', clientUserId)
         .maybeSingle();
-      referralDiscountPct = userProfile?.pending_referral_discount_pct || 0;
+      // Priorité : stock parrain -20% > filleul -10% (jamais les deux simultanément)
+      referralDiscountPct = (userProfile?.referral_discounts_available || 0) > 0
+        ? 20
+        : (userProfile?.pending_referral_discount_pct || 0);
+      freeManagementFee = (userProfile?.free_management_fees_available || 0) > 0;
     }
 
     // ── Validation du montant contre le prix réel en base (anti-tampering) ──
@@ -158,6 +163,9 @@ export async function POST(req: NextRequest) {
       else fraisGestion = cfg.frais_gestion_palier_1 ?? calcFraisGestion(amount);
     }
 
+    // Frais de gestion offerts (bonus palier parrainage) — s'applique indépendamment du %
+    if (freeManagementFee) fraisGestion = 0;
+
     // ── Compte Stripe Connect du pro ──────────────────────────────────────────
     let professionalStripeId: string | null = null;
     if (bookingMeta?.bizId) {
@@ -191,8 +199,8 @@ export async function POST(req: NextRequest) {
         price_data: {
           currency,
           product_data: {
-            name: "Frais de gestion Book'nPay",
-            description: 'Frais de réservation sécurisée',
+            name: freeManagementFee ? "Frais de gestion Book'nPay — Offerts" : "Frais de gestion Book'nPay",
+            description: freeManagementFee ? 'Bonus palier parrainage — frais offerts' : 'Frais de réservation sécurisée',
           },
           unit_amount: Math.round(fraisGestion * 100),
         },
@@ -228,13 +236,14 @@ export async function POST(req: NextRequest) {
         groupQuantity: String(resolvedQty),
         clientUserId: clientUserId || '',
         referralDiscountPct: String(referralDiscountPct),
+        hasFreeManagementFee: freeManagementFee ? 'true' : 'false',
       },
     };
 
     if (professionalStripeId) {
       sessionParams.payment_intent_data = {
-        // Book'nPay garde ses frais de gestion ; le pro reçoit effectiveDeposit (réduit)
-        application_fee_amount: Math.round(fraisGestion * 100),
+        // Book'nPay garde ses frais de gestion (0 si offert via bonus palier parrainage)
+        application_fee_amount: freeManagementFee ? 0 : Math.round(fraisGestion * 100),
         transfer_data: { destination: professionalStripeId },
       };
     }

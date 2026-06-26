@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { normalizePhone } from '@/lib/booking-utils';
 import MyBookingsList from '@/components/booking/MyBookingsList';
-import type { Booking, BookingMember } from '@/lib/database.types';
+import type { Booking, BookingMember, EnrichedReferralEvent } from '@/lib/database.types';
 
 export type GroupMap = Record<string, (Booking & { booking_members: BookingMember[] })[]>;
 
@@ -89,7 +89,7 @@ export default async function MesReservationsPage() {
 
   const { data: referralEvents } = await supabaseAdmin
     .from('referral_events')
-    .select('*')
+    .select('*, referred:app_users!referred_id(id, name, rdv_honores, referral_reward_granted)')
     .eq('referrer_id', authData.user.id)
     .order('created_at', { ascending: false });
 
@@ -97,7 +97,7 @@ export default async function MesReservationsPage() {
     <MyBookingsList
       bookings={bookings}
       profile={profile}
-      referralEvents={referralEvents || []}
+      referralEvents={(referralEvents || []) as EnrichedReferralEvent[]}
       groupMap={groupMap}
     />
   );

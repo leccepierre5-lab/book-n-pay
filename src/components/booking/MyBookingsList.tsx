@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { AppUser, Booking, BookingMember, ReferralEvent } from '@/lib/database.types';
+import type { AppUser, Booking, BookingMember, EnrichedReferralEvent } from '@/lib/database.types';
 import type { GroupMap } from '@/app/(public)/mes-reservations/page';
 import { phonesMatch } from '@/lib/booking-utils';
 import ParrainageCard from '@/components/loyalty/ParrainageCard';
@@ -267,7 +267,7 @@ export default function MyBookingsList({
 }: {
   bookings: BookingWithMembers[];
   profile: AppUser | null;
-  referralEvents?: ReferralEvent[];
+  referralEvents?: EnrichedReferralEvent[];
   groupMap?: GroupMap;
 }) {
   const router = useRouter();

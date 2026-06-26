@@ -179,7 +179,7 @@ function ModeAPayment({
       const { data: authData } = await supabase.auth.getUser();
       const { data: profile } = await supabase
         .from('app_users')
-        .select('name, phone, pending_referral_discount_pct')
+        .select('name, phone, pending_referral_discount_pct, referral_discounts_available')
         .eq('id', authData.user?.id || '')
         .maybeSingle();
 
@@ -209,7 +209,9 @@ function ModeAPayment({
       const { groupRef, primaryBookingId, primaryMemberId, allMemberIds } = createData;
 
       // Single Stripe checkout for N × deposit + fraisGestion
-      const discountPct: number = profile?.pending_referral_discount_pct || 0;
+      const discountPct: number = (profile?.referral_discounts_available || 0) > 0
+        ? 20
+        : (profile?.pending_referral_discount_pct || 0);
       const ratio = discountPct > 0 ? (1 - discountPct / 100) : 1;
       const effectiveDepositPerPerson = Math.round(depositPerPerson * ratio * 100) / 100;
 
@@ -450,7 +452,7 @@ function ModeBPayment({
       const { data: authData } = await supabase.auth.getUser();
       const { data: profile } = await supabase
         .from('app_users')
-        .select('name, phone, pending_referral_discount_pct')
+        .select('name, phone, pending_referral_discount_pct, referral_discounts_available')
         .eq('id', authData.user?.id || '')
         .maybeSingle();
 
@@ -485,7 +487,9 @@ function ModeBPayment({
       const { groupRef, primaryBookingId, primaryMemberId, guestMemberIds } = createData;
 
       // Stripe checkout for organizer only
-      const discountPct: number = profile?.pending_referral_discount_pct || 0;
+      const discountPct: number = (profile?.referral_discounts_available || 0) > 0
+        ? 20
+        : (profile?.pending_referral_discount_pct || 0);
       const ratio = discountPct > 0 ? (1 - discountPct / 100) : 1;
       const effectiveDeposit = Math.round(service.deposit * ratio * 100) / 100;
 
@@ -704,11 +708,13 @@ function SoloPayment({
       const { data: authData } = await supabase.auth.getUser();
       const { data: profile } = await supabase
         .from('app_users')
-        .select('name, phone, pending_referral_discount_pct')
+        .select('name, phone, pending_referral_discount_pct, referral_discounts_available')
         .eq('id', authData.user?.id || '')
         .maybeSingle();
 
-      const discountPct: number = profile?.pending_referral_discount_pct || 0;
+      const discountPct: number = (profile?.referral_discounts_available || 0) > 0
+        ? 20
+        : (profile?.pending_referral_discount_pct || 0);
       const ratio = discountPct > 0 ? (1 - discountPct / 100) : 1;
       const effectiveDeposit = Math.round(service.deposit * ratio * 100) / 100;
 

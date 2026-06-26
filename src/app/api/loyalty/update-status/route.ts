@@ -65,16 +65,13 @@ export async function POST(req: NextRequest) {
     if (currentRdv === 1 && user.referred_by && !user.referral_reward_granted) {
       const { data: referrer } = await supabase
         .from('app_users')
-        .select('id, rdv_honores, jokers_disponibles')
+        .select('id')
         .eq('id', user.referred_by)
         .maybeSingle();
 
       if (referrer) {
-        // Parrain : -20% sur sa prochaine prestation
-        await supabase
-          .from('app_users')
-          .update({ pending_referral_discount_pct: 20 })
-          .eq('id', referrer.id);
+        // Parrain : +1 réduction -20% dans son stock (atomique, cumulatif)
+        await supabase.rpc('incr_referral_discounts', { uid: referrer.id });
 
         // Parrainé : -10% unique + marqué comme récompensé
         await supabase
@@ -91,7 +88,18 @@ export async function POST(req: NextRequest) {
           referred_id: user.id,
         });
 
-        console.log(`[Parrainage] Récompense créditée — parrain=${referrer.id} parrainé=${user.id} | -20% parrain, -10% parrainé`);
+        // Bonus palier : 1 frais de gestion offert tous les 5 filleuls
+        const { count: referralCount } = await supabase
+          .from('referral_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('referrer_id', referrer.id);
+
+        if (referralCount && referralCount % 5 === 0) {
+          await supabase.rpc('incr_free_management_fees', { uid: referrer.id });
+          console.log(`[Parrainage] Palier atteint — parrain=${referrer.id} reçoit 1 frais de gestion offert (${referralCount} filleuls)`);
+        }
+
+        console.log(`[Parrainage] Récompense créditée — parrain=${referrer.id} parrainé=${user.id} | +1 réduction -20% parrain, -10% parrainé`);
       }
     }
 

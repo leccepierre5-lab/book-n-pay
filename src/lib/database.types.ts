@@ -24,6 +24,8 @@ export interface AppUser {
   referred_by: string | null;
   referral_reward_granted: boolean;
   pending_referral_discount_pct: number;
+  referral_discounts_available: number;
+  free_management_fees_available: number;
   created_at: string;
   updated_at: string;
 }
@@ -207,6 +209,15 @@ export interface ReferralEvent {
   parrain_discount_consumed: boolean;
   parrain_discount_consumed_at: string | null;
   created_at: string;
+}
+
+export interface EnrichedReferralEvent extends ReferralEvent {
+  referred?: {
+    id: string;
+    name: string;
+    rdv_honores: number;
+    referral_reward_granted: boolean;
+  } | null;
 }
 
 // Vue composée utile côté front : une réservation avec ses membres chargés

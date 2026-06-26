@@ -87,33 +87,44 @@ export async function POST(req: NextRequest) {
             .eq('id', memberId);
         }
 
-        // Consommer la réduction : remettre à 0
-        await supabase
-          .from('app_users')
-          .update({ pending_referral_discount_pct: 0 })
-          .eq('id', clientUserId);
+        if (referralDiscountPct === 20) {
+          // Parrain : décrémentation atomique du stock (GREATEST protège contre race condition)
+          await supabase.rpc('decr_referral_discounts', { uid: clientUserId });
 
-        // Marquer l'événement de parrainage le plus ancien non-consommé comme utilisé
-        const { data: unconsumedEvent } = await supabase
-          .from('referral_events')
-          .select('id')
-          .eq('referrer_id', clientUserId)
-          .eq('parrain_discount_consumed', false)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-
-        if (unconsumedEvent) {
-          await supabase
+          // Marquer l'événement le plus ancien non-consommé
+          const { data: unconsumedEvent } = await supabase
             .from('referral_events')
-            .update({
-              parrain_discount_consumed: true,
-              parrain_discount_consumed_at: new Date().toISOString(),
-            })
-            .eq('id', unconsumedEvent.id);
+            .select('id')
+            .eq('referrer_id', clientUserId)
+            .eq('parrain_discount_consumed', false)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (unconsumedEvent) {
+            await supabase
+              .from('referral_events')
+              .update({
+                parrain_discount_consumed: true,
+                parrain_discount_consumed_at: new Date().toISOString(),
+              })
+              .eq('id', unconsumedEvent.id);
+          }
+        } else {
+          // Filleul (-10%) : réduction unique, on remet à 0
+          await supabase
+            .from('app_users')
+            .update({ pending_referral_discount_pct: 0 })
+            .eq('id', clientUserId);
         }
 
         console.log(`[Parrainage] Réduction -${referralDiscountPct}% consommée pour user=${clientUserId}`);
+      }
+
+      // ── Frais de gestion offerts (bonus palier parrainage) ────────────────
+      if (meta.hasFreeManagementFee === 'true' && clientUserId) {
+        await supabase.rpc('decr_free_management_fees', { uid: clientUserId });
+        console.log(`[Parrainage] Frais de gestion offert consommé pour user=${clientUserId}`);
       }
 
       // Mode A groupe : l'organisateur a payé pour tous — marquer chaque membre
