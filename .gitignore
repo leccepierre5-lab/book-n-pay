@@ -42,3 +42,10 @@ npm-debug.log*
 
 # TypeScript
 next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Scripts / artifacts locaux
+scrape-original.mjs
+test-*.cjs
+test-*.mjs
+original-pages/
