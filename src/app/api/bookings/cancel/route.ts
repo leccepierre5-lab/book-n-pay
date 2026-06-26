@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime } from '@/lib/booking-utils';
+import { sendEmail } from '@/lib/email/send';
 
 const CANCEL_DEADLINE_HOURS = 48;
 
@@ -104,6 +105,41 @@ export async function POST(req: NextRequest) {
         ? `Annulation client (>48h) — remboursement ${refundDone ? 'effectué' : 'tenté, à vérifier manuellement'}`
         : 'Annulation client (<48h) — frais de réservation conservés par le professionnel',
     });
+
+    // Email de confirmation d'annulation au client
+    const clientEmail = authData.user.email;
+    if (clientEmail) {
+      const dateFormatted = new Date(booking.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      });
+      const refundLine = eligibleForRefund
+        ? refundDone
+          ? `✅ Remboursement de vos frais de réservation initié — crédit sous 5 à 10 jours ouvrés selon votre banque.`
+          : `⚠️ Remboursement initié mais une vérification manuelle peut être nécessaire — contactez-nous si vous ne le recevez pas.`
+        : `❌ Annulation à moins de 48h du RDV — les frais de réservation sont conservés par le professionnel (CGV Art. 3).`;
+
+      await sendEmail({
+        to: clientEmail,
+        subject: `❌ Réservation annulée — ${booking.biz_name}`,
+        text: `Bonjour ${member.name},
+
+Votre réservation a bien été annulée.
+
+📍 Établissement : ${booking.biz_name}
+💆 Prestation : ${booking.service_name}
+📅 Date : ${dateFormatted}
+🕐 Heure : ${booking.time}
+
+${refundLine}
+
+⚠️ Rappel : les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 3).
+
+Si vous avez des questions : Booknpay.64@gmail.com
+
+À bientôt,
+L'équipe Book'nPay`,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({
       success: true,

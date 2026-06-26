@@ -4,8 +4,7 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function AuthWall({ onAuth }: { onAuth: () => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [lastName, setLastName] = useState('');
-  const [firstName, setFirstName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,18 +26,17 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
 
     try {
       if (mode === 'signup') {
-        const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { name: fullName, phone, role: 'client', first_name: firstName.trim() } },
+          options: { data: { name: fullName.trim(), phone, role: 'client' } },
         });
         if (signUpError) throw signUpError;
         if (data.user) {
           await fetch('/api/auth/post-signup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: data.user.id, firstName: firstName.trim(), referrerCode: null }),
+            body: JSON.stringify({ userId: data.user.id, name: fullName.trim(), referrerCode: null }),
           }).catch(() => {});
         }
       } else {
@@ -77,10 +75,7 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
 
       <form onSubmit={handleSubmit} className="space-y-3">
         {mode === 'signup' && (
-          <input type="text" placeholder="Nom" value={lastName} onChange={(e) => setLastName(e.target.value)} required className={inputClass} />
-        )}
-        {mode === 'signup' && (
-          <input type="text" placeholder="Prénom" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className={inputClass} />
+          <input type="text" placeholder="Nom et prénom" value={fullName} onChange={(e) => setFullName(e.target.value)} required className={inputClass} />
         )}
         {mode === 'signup' && (
           <input type="tel" placeholder="Téléphone (rappels SMS)" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />

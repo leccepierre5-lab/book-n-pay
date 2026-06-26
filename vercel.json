@@ -1,7 +1,4 @@
 {
-  "env": {
-    "TZ": "Europe/Paris"
-  },
   "crons": [
     {
       "path": "/api/cron/check-no-shows",

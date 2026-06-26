@@ -8,29 +8,31 @@ export default function RegisterForm() {
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref');
 
-  const [lastName, setLastName] = useState('');
-  const [firstName, setFirstName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          name: fullName,
+          name: fullName.trim(),
           phone,
           role: 'client',
-          first_name: firstName.trim(),
           referrer_code: referralCode || undefined,
         },
       },
@@ -46,7 +48,7 @@ export default function RegisterForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: data.user.id,
-          firstName: firstName.trim(),
+          name: fullName.trim(),
           referrerCode: referralCode || null,
         }),
       }).catch(() => {});
@@ -69,17 +71,9 @@ export default function RegisterForm() {
       )}
       <input
         type="text"
-        placeholder="Nom"
-        value={lastName}
-        onChange={(e) => setLastName(e.target.value)}
-        required
-        className={inputClass}
-      />
-      <input
-        type="text"
-        placeholder="Prénom"
-        value={firstName}
-        onChange={(e) => setFirstName(e.target.value)}
+        placeholder="Nom et prénom"
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
         required
         className={inputClass}
       />
@@ -105,6 +99,14 @@ export default function RegisterForm() {
         onChange={(e) => setPassword(e.target.value)}
         required
         minLength={6}
+        className={inputClass}
+      />
+      <input
+        type="password"
+        placeholder="Confirmer le mot de passe"
+        value={confirmPassword}
+        onChange={(e) => setConfirmPassword(e.target.value)}
+        required
         className={inputClass}
       />
       {error && (

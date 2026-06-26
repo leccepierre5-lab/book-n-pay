@@ -17,7 +17,7 @@ function buildCode(firstName: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, firstName, referrerCode } = await req.json();
+    const { userId, name, referrerCode } = await req.json();
     if (!userId) return NextResponse.json({ error: 'userId requis' }, { status: 400 });
 
     const supabase = createServiceRoleClient();
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     // Generate unique referral_code (retry up to 5×)
     let code = '';
     for (let i = 0; i < 5; i++) {
-      const candidate = buildCode(firstName || 'USER');
+      const candidate = buildCode(name || 'USER');
       const { data: clash } = await supabase
         .from('app_users')
         .select('id')
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       if (!clash) { code = candidate; break; }
     }
-    if (!code) code = buildCode((firstName || 'USER') + Date.now().toString().slice(-4));
+    if (!code) code = buildCode((name || 'USER') + Date.now().toString().slice(-4));
 
     // Resolve referred_by from the referrer's referral_code
     let referredBy: string | null = null;

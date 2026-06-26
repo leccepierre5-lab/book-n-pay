@@ -168,6 +168,21 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Auto-complete : si tous les membres non-annulés ont payé → booking complete
+      const { data: allMembers } = await supabase
+        .from('booking_members')
+        .select('id, status')
+        .eq('booking_id', bookingId);
+
+      const activeMembers = (allMembers ?? []).filter(m => m.status !== 'cancelled');
+      if (activeMembers.length > 0 && activeMembers.every(m => m.status === 'paid')) {
+        await supabase
+          .from('bookings')
+          .update({ status: 'complete' })
+          .eq('id', bookingId);
+        console.log(`[Webhook] ✅ Booking ${bookingId} → complete (tous les membres ont payé)`);
+      }
+
       // Email de confirmation
       const { data: booking } = await supabase
         .from('bookings')
