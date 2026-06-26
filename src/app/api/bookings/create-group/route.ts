@@ -114,7 +114,6 @@ export async function POST(req: NextRequest) {
           status: 'invite',
           qr_code: generateQrCode(),
           referrer_name: isOrganizer ? referrerName : null,
-          payment_mode: mode,
         })
         .select('id')
         .single();
