@@ -42,14 +42,17 @@ export default function BookingFlow({
     setStep(1);
   };
 
-  const handleDateTimeSelect = (d: string, t: string, p: number) => {
+  const handleDateTimeSelect = async (d: string, t: string, p: number) => {
     setDate(d);
     setTime(t);
     setParticipants(p);
-    if (isAuthed !== true) {
-      setNeedsAuth(true);
-    } else {
+    // Fresh session check — never rely on stale isAuthed (null or false from a previous render)
+    const { data } = await createClient().auth.getSession();
+    if (data.session) {
+      setIsAuthed(true);
       setStep(2);
+    } else {
+      setNeedsAuth(true);
     }
   };
 

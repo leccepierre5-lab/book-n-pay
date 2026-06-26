@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function AuthWall({ onAuth }: { onAuth: () => void }) {
@@ -10,6 +10,13 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Safety net: if the user is already authenticated when this wall mounts, skip it immediately
+  useEffect(() => {
+    createClient().auth.getSession().then(({ data }) => {
+      if (data.session) onAuth();
+    });
+  }, [onAuth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
