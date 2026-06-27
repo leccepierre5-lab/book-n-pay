@@ -65,6 +65,7 @@ export default async function EtablissementPage({
         </div>
       )}
 
+      <div className="max-w-4xl mx-auto">
       {/* Galerie photos horizontale */}
       {photos.length > 0 && (
         <div className="overflow-x-auto flex gap-2 px-4 pt-4 pb-1 scrollbar-hide">
@@ -138,6 +139,7 @@ export default async function EtablissementPage({
         </div>
       )}
 
+      </div>
       <BookingFlow business={business} icon={CATEGORY_ICONS[business.category] || '🏢'} />
     </div>
   );

@@ -60,7 +60,7 @@ export default async function SearchPage({
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-5xl mx-auto px-4 py-6">
 
         {/* Search bar */}
         <form className="mb-5 space-y-3" action="/recherche" method="get">
@@ -143,7 +143,7 @@ export default async function SearchPage({
         </p>
 
         {/* Business cards */}
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {businesses.map((biz) => {
             const prices = (biz.services ?? []).filter((s) => s.price > 0).map((s) => s.price);
             const minPrice = prices.length ? Math.min(...prices) : null;

@@ -22,7 +22,7 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 bg-navy-950/90 backdrop-blur-xl border-b border-white/[0.06]">
-      <div className="flex items-center justify-between px-4 h-14 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between px-4 h-14 max-w-5xl mx-auto">
         <Link href="/" className="flex items-center gap-2 shrink-0 group">
           <div className="relative">
             <Image src="/logo.jpg" alt="Book'nPay" width={34} height={34} className="rounded-full ring-1 ring-white/10 group-hover:ring-mint-500/40 transition-all duration-200" priority />

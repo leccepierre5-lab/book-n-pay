@@ -76,7 +76,7 @@ export default function BookingFlow({
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-lg px-4 py-6">
+      <div className="mx-auto max-w-2xl px-4 py-6">
 
         {/* Business header */}
         <div className="mb-6 flex items-center gap-3">
