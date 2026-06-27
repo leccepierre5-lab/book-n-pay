@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 
 export default function AuthWall({ onAuth }: { onAuth: () => void }) {
@@ -58,6 +59,12 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
 
   return (
     <div>
+      {/* Logo */}
+      <div className="flex items-center justify-center gap-2 mb-5">
+        <Image src="/logo.jpg" alt="Book'nPay" width={36} height={36} className="rounded-xl ring-1 ring-mint-500/20" />
+        <span className="font-bold text-white text-sm tracking-tight">Book'nPay</span>
+      </div>
+
       {/* Mode toggle */}
       <div className="flex gap-1 p-1 bg-navy-900 rounded-xl border border-white/[0.06] mb-4">
         {(['signup', 'login'] as const).map((m) => (
