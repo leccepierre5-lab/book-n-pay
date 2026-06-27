@@ -14,7 +14,6 @@ export default function RegisterForm() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [emailSent, setEmailSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,11 +24,12 @@ export default function RegisterForm() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
+
+    // 1. Créer l'utilisateur (sans emailRedirectTo — la confirmation est gérée server-side)
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
           name: fullName.trim(),
           phone,
@@ -38,54 +38,49 @@ export default function RegisterForm() {
         },
       },
     });
+
     if (signUpError) {
       setError(signUpError.message);
       setLoading(false);
       return;
     }
-    if (data.user) {
-      await fetch('/api/auth/post-signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: data.user.id,
-          name: fullName.trim(),
-          referrerCode: referralCode || null,
-        }),
-      }).catch(() => {});
+
+    if (!data.user) {
+      setError("Erreur lors de la création du compte. Cet email est peut-être déjà utilisé.");
+      setLoading(false);
+      return;
     }
 
-    if (data.session) {
-      // Confirmation email désactivée : session créée directement → on redirige
+    // 2. Côté serveur : auto-confirme l'email + code parrain + email de bienvenue via Resend
+    const postRes = await fetch('/api/auth/post-signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: data.user.id,
+        email,
+        name: fullName.trim(),
+        referrerCode: referralCode || null,
+      }),
+    }).catch(() => null);
+
+    const postData = postRes ? await postRes.json().catch(() => null) : null;
+
+    if (postData?.confirmed) {
+      // 3. Email confirmé côté serveur — on peut se connecter directement
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        setError("Compte créé mais connexion automatique échouée. Connecte-toi manuellement.");
+        setLoading(false);
+        return;
+      }
       window.location.href = '/recherche';
     } else {
-      // Confirmation email activée : l'user doit cliquer le lien dans sa boîte
-      setEmailSent(true);
-      setLoading(false);
+      // Fallback : post-signup a échoué, l'utilisateur doit peut-être confirmer son email manuellement
+      window.location.href = '/connexion?message=compte-cree';
     }
   };
 
   const inputClass = "w-full rounded-xl bg-navy-900 border border-white/[0.08] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-mint-500/40 focus:ring-2 focus:ring-mint-500/15 transition-all duration-200";
-
-  if (emailSent) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-4 text-center">
-        <div className="w-14 h-14 rounded-full bg-mint-500/15 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-mint-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-          </svg>
-        </div>
-        <div>
-          <p className="text-white font-semibold text-sm">Vérifie ta boîte mail</p>
-          <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-            On a envoyé un lien de confirmation à <span className="text-mint-400">{email}</span>.<br />
-            Clique dessus pour activer ton compte et te connecter.
-          </p>
-        </div>
-        <p className="text-slate-600 text-xs">Tu ne vois rien ? Vérifie tes spams.</p>
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
