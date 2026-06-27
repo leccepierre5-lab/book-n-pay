@@ -2,13 +2,14 @@
 // Retrouve un booking_member par son qr_code et le marque 'arrived'.
 // Le pro scanne le QR du client à l'accueil.
 //
-// ⚠️ CORRECTIF DE SÉCURITÉ (trouvé en audit) : la route ne vérifiait que la
-// présence d'une session, jamais que l'appelant était bien un pro/admin —
-// RLS aurait laissé un CLIENT authentifié connaissant son propre QR code
-// s'auto-check-in lui-même (puisque RLS autorise déjà le créateur du
-// booking à lire/modifier ses propres booking_members), déclenchant la
-// récompense fidélité sans s'être réellement présenté. Corrigé en exigeant
-// explicitement le rôle pro ou admin avant toute action.
+// ⚠️ CORRECTIFS DE SÉCURITÉ (audit) :
+// 1. La route ne vérifiait que la présence d'une session, jamais que l'appelant
+//    était bien un pro/admin — un CLIENT pouvait s'auto-check-in avec son propre
+//    QR code, déclenchant la récompense fidélité sans s'être présenté.
+//    Corrigé : rôle pro/admin exigé.
+// 2. Un pro d'un établissement A pouvait checker un client de l'établissement B
+//    s'il connaissait son QR code (UUID non-devinable mais absence de contrôle
+//    explicite). Corrigé : vérification biz_id du pro == biz_id du booking.
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     const { data: callerProfile } = await supabase
       .from('app_users')
-      .select('role')
+      .select('role, biz_id')
       .eq('id', authData.user.id)
       .single();
 
@@ -39,6 +40,12 @@ export async function POST(req: NextRequest) {
 
     if (!member) {
       return NextResponse.json({ error: 'QR code introuvable ou non autorisé' }, { status: 404 });
+    }
+
+    // Un pro ne peut checker que les clients de son propre établissement.
+    const bookingBizId = (member.bookings as any)?.biz_id;
+    if (callerProfile?.role === 'pro' && callerProfile.biz_id !== bookingBizId) {
+      return NextResponse.json({ error: 'QR code introuvable ou non autorisé' }, { status: 403 });
     }
 
     if (member.status === 'arrived') {
