@@ -54,8 +54,7 @@ export default function RegisterForm() {
         }),
       }).catch(() => {});
     }
-    router.push('/recherche');
-    router.refresh();
+    window.location.href = '/recherche';
   };
 
   const inputClass = "w-full rounded-xl bg-navy-900 border border-white/[0.08] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-mint-500/40 focus:ring-2 focus:ring-mint-500/15 transition-all duration-200";

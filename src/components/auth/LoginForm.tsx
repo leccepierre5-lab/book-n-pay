@@ -24,8 +24,9 @@ export default function LoginForm() {
       setLoading(false);
       return;
     }
-    router.push(redirectTo);
-    router.refresh();
+    // Reload complet : le serveur voit les cookies de session immédiatement,
+    // pas de race condition entre router.push et router.refresh.
+    window.location.href = redirectTo;
   };
 
   return (

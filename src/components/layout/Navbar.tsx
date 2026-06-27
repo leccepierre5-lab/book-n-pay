@@ -10,11 +10,9 @@ export default function Navbar() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => {
-      setIsLoggedIn(!!data.session);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // onAuthStateChange fire INITIAL_SESSION immédiatement avec la session courante —
+    // pas besoin d'un getSession() séparé qui peut renvoyer un état désynchronisé.
+    const { data: { subscription } } = createClient().auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session);
     });
     return () => subscription.unsubscribe();

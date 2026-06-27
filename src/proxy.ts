@@ -1,6 +1,6 @@
-// src/middleware.ts
-// Rafraîchit la session Supabase à chaque requête (nécessaire pour que
-// l'auth reste valide côté Server Components / Route Handlers).
+// src/proxy.ts (remplace middleware.ts — convention Next.js 16)
+// Rafraîchit la session Supabase à chaque requête pour que
+// l'auth reste valide côté Server Components / Route Handlers.
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Important : ne pas retirer cet appel, il rafraîchit le token si expiré.
+  // Valide et rafraîchit le token si expiré — ne pas supprimer.
   await supabase.auth.getUser();
 
   return supabaseResponse;
