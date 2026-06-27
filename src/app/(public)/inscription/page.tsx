@@ -5,7 +5,7 @@ import RegisterForm from '@/components/auth/RegisterForm';
 
 export default function InscriptionPage() {
   return (
-    <div className="relative flex min-h-[calc(100vh-56px)] items-center justify-center px-4 py-8">
+    <div className="relative flex min-h-[calc(100vh-56px)] flex-col items-center justify-start px-4 pt-12 pb-8">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.05)_0%,transparent_65%)] pointer-events-none" />
       <div className="relative w-full max-w-sm">
         <div className="flex flex-col items-center mb-6">
