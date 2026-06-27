@@ -46,6 +46,13 @@ export default function BookingFlow({
     setDate(d);
     setSlots(s);
     setParticipants(p);
+    // isAuthed est déjà connu via useEffect — évite un double getSession() qui peut
+    // renvoyer null si la nouvelle instance n'a pas encore rechargé les cookies.
+    if (isAuthed) {
+      setStep(2);
+      return;
+    }
+    // Secours : isAuthed encore null (montage très récent) → vérification fraîche
     const { data } = await createClient().auth.getSession();
     if (data.session) {
       setIsAuthed(true);
