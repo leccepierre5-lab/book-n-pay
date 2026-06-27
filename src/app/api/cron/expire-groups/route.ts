@@ -1,5 +1,5 @@
 // src/app/api/cron/expire-groups/route.ts
-// Déclenché toutes les minutes (vercel.json "* * * * *").
+// Déclenché chaque nuit à 2h UTC (vercel.json "0 2 * * *") — plan Hobby limite à 1x/jour.
 // Pour chaque groupe dont le payment_deadline est dépassé :
 //   - Si tous les membres sont payés → marque complete (cas où le webhook aurait raté)
 //   - Sinon → annule l'ensemble du groupe + remboursement Stripe des membres payés
