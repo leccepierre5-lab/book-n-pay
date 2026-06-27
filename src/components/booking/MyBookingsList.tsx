@@ -59,6 +59,8 @@ function GroupCard({
   onCancel: (booking: BookingWithMembers, member: BookingMember) => void;
   cancellingId: string | null;
 }) {
+  const [payingForId, setPayingForId] = useState<string | null>(null);
+
   const first = groupBookings[0];
   if (!first) return null;
 
@@ -77,6 +79,7 @@ function GroupCard({
   );
   const myMemberEntry = myBooking?.booking_members.find((m) => phonesMatch(m.phone, myPhone));
   const isCancellable = myMemberEntry?.status === 'paid';
+  const canPayForOthers = myMemberEntry?.status === 'paid';
 
   // Payment deadline — use the first booking's deadline (they all share the same)
   const deadline = first.payment_deadline;
@@ -150,26 +153,73 @@ function GroupCard({
         </div>
 
         {/* Participants list */}
-        <div className="space-y-1.5">
-          {allMembers
-            .filter((m) => m.status !== 'cancelled')
-            .map((m) => (
-              <div key={m.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs">{MEMBER_ICONS[m.status] ?? '⏳'}</span>
-                  <span className={`text-xs ${phonesMatch(m.phone, myPhone) ? 'text-white font-medium' : 'text-slate-400'}`}>
-                    {m.name || 'Invité'}
-                    {phonesMatch(m.phone, myPhone) && <span className="text-slate-600 font-normal"> (moi)</span>}
-                  </span>
+        <div className="space-y-2">
+          {activeMembers.map((m) => {
+            const isMe = phonesMatch(m.phone, myPhone);
+            const payerMember = m.paid_by_member_id
+              ? allMembers.find((am) => am.id === m.paid_by_member_id)
+              : null;
+            const paidForAt = m.paid_for_at
+              ? new Date(m.paid_for_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+              : null;
+
+            return (
+              <div key={m.id}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs flex-none">{MEMBER_ICONS[m.status] ?? '⏳'}</span>
+                    <span className={`text-xs truncate ${isMe ? 'text-white font-medium' : 'text-slate-400'}`}>
+                      {m.name || 'Invité'}
+                      {isMe && <span className="text-slate-600 font-normal"> (moi)</span>}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-none ml-2">
+                    {/* Bouton "Payer pour lui" */}
+                    {canPayForOthers && !isMe && m.status === 'invite' && deadlineInFuture && (
+                      <button
+                        disabled={payingForId === m.id}
+                        onClick={async () => {
+                          setPayingForId(m.id);
+                          try {
+                            const res = await fetch('/api/group/pay-for-member', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ targetMemberId: m.id }),
+                            });
+                            const data = await res.json();
+                            if (res.ok && data.checkoutUrl) {
+                              window.location.href = data.checkoutUrl;
+                            } else {
+                              alert(data.error || 'Erreur');
+                              setPayingForId(null);
+                            }
+                          } catch {
+                            alert('Erreur réseau');
+                            setPayingForId(null);
+                          }
+                        }}
+                        className="text-[10px] text-mint-400 hover:text-mint-300 disabled:opacity-50 font-medium transition-colors whitespace-nowrap"
+                      >
+                        {payingForId === m.id ? '...' : `Payer pour ${(m.name || 'lui').split(' ')[0]}`}
+                      </button>
+                    )}
+                    <div className="flex items-center gap-1 text-slate-600 text-[10px]">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                      </svg>
+                      {(m as any)._bookingTime}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-slate-600 text-[10px]">
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                  </svg>
-                  {m._bookingTime}
-                </div>
+                {/* Traçabilité paiement croisé */}
+                {payerMember && paidForAt && (
+                  <p className="text-[10px] text-slate-600 ml-5 mt-0.5">
+                    Payé par {payerMember.name || 'un membre'} · {paidForAt}
+                  </p>
+                )}
               </div>
-            ))}
+            );
+          })}
         </div>
       </div>
 

@@ -2,12 +2,13 @@
 // Requêtes de lecture publique du catalogue (businesses, services, avis).
 // Utilisables depuis Server Components.
 import { createClient } from '@/lib/supabase/server';
-import type { Business, Service, Staff } from '@/lib/database.types';
+import type { Business, BusinessPhoto, Service, Staff } from '@/lib/database.types';
 
 export interface BusinessWithDetails extends Business {
   services: Service[];
   staff: Staff[];
   business_reviews: { rating: number | null; review_count: number } | null;
+  business_photos: BusinessPhoto[];
 }
 
 export interface SearchFilters {
@@ -88,7 +89,7 @@ export async function getBusinessBySlug(slug: string): Promise<BusinessWithDetai
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('businesses')
-    .select('*, services(*), staff(*), business_reviews(rating, review_count)')
+    .select('*, services(*), staff(*), business_reviews(rating, review_count), business_photos(id, url, sort_order, created_at, biz_id)')
     .eq('slug', slug)
     .maybeSingle();
 

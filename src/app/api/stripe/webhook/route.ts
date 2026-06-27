@@ -37,6 +37,9 @@ export async function POST(req: NextRequest) {
       ? parseFloat(meta.depositAmount)
       : Math.max(0, (session.amount_total || 0) / 100 - 1.99);
 
+    const isPaidForMember = meta.mode === 'pay_for_member';
+    const payerMemberId: string | null = meta.payerMemberId || null;
+
     if (!bookingId || !memberId) {
       console.warn('[Webhook] Métadonnées manquantes — bookingId ou memberId absent');
       return NextResponse.json({ received: true });
@@ -67,6 +70,9 @@ export async function POST(req: NextRequest) {
           stripe_payment_intent_id:
             typeof session.payment_intent === 'string' ? session.payment_intent : null,
           stripe_checkout_session_id: session.id,
+          ...(isPaidForMember && payerMemberId
+            ? { paid_by_member_id: payerMemberId, paid_for_at: new Date().toISOString() }
+            : {}),
         })
         .eq('id', memberId)
         .eq('booking_id', bookingId);

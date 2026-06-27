@@ -170,6 +170,15 @@ export default function ProDashboard({
               Transactions
             </Link>
             <Link
+              href="/pro/profil"
+              className="flex items-center justify-center w-8 h-8 rounded-xl bg-navy-900 border border-white/[0.08] text-slate-400 hover:text-white hover:border-white/15 transition-all"
+              title="Mon profil public"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+            </Link>
+            <Link
               href="/pro/reglages"
               className="flex items-center justify-center w-8 h-8 rounded-xl bg-navy-900 border border-white/[0.08] text-slate-400 hover:text-white hover:border-white/15 transition-all"
             >

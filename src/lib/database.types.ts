@@ -38,6 +38,7 @@ export interface Business {
   category: string;
   type: string;
   instagram: string | null;
+  facebook_url: string | null;
   website: string | null;
   phone: string | null;
   google_place_url: string | null;
@@ -51,6 +52,14 @@ export interface Business {
   frozen_reason: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface BusinessPhoto {
+  id: string;
+  biz_id: string;
+  url: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface Staff {
@@ -115,6 +124,8 @@ export interface BookingMember {
   payment_mode: 'app' | 'tpe' | 'especes' | null;
   referrer_name: string | null;
   referral_discount_pct: number;
+  paid_by_member_id: string | null;
+  paid_for_at: string | null;
   created_at: string;
   updated_at: string;
 }
