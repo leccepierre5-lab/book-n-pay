@@ -1,0 +1,129 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
+import { sendEmail, emailTemplate } from '@/lib/email/send';
+
+const COMBINING_MARKS = /[̀-ͯ]/g;
+
+function buildCode(firstName: string): string {
+  const clean =
+    firstName
+      .normalize('NFD')
+      .replace(COMBINING_MARKS, '')
+      .replace(/[^a-zA-Z]/g, '')
+      .toUpperCase()
+      .slice(0, 8) || 'USER';
+  const digits = Math.floor(1000 + Math.random() * 9000);
+  return `BNP-${clean}${digits}`;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { email, password, name, phone, referralCode } = await req.json();
+    if (!email || !password) {
+      return NextResponse.json({ error: 'email et password requis' }, { status: 400 });
+    }
+
+    const supabase = createServiceRoleClient();
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://book-n-pay-next.vercel.app';
+
+    // Crée l'utilisateur et génère le token de confirmation en une seule requête.
+    // Aucun email n'est envoyé par Supabase — on récupère hashed_token pour l'envoyer
+    // nous-mêmes via Resend (domaine vérifié, pas de limite de débit).
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+      type: 'signup',
+      email,
+      password,
+      options: {
+        data: {
+          name: (name || '').trim(),
+          phone: phone || '',
+          role: 'client',
+          referrer_code: referralCode || undefined,
+        },
+        redirectTo: `${siteUrl}/auth/verify`,
+      },
+    });
+
+    if (linkError) {
+      // Si l'email est déjà enregistré et confirmé, on renvoie une erreur claire
+      if (linkError.message?.toLowerCase().includes('already registered')) {
+        return NextResponse.json({ error: 'Cet email est déjà utilisé.' }, { status: 409 });
+      }
+      return NextResponse.json({ error: linkError.message }, { status: 400 });
+    }
+
+    const { hashed_token } = linkData.properties;
+    const userId = linkData.user.id;
+    const confirmUrl = `${siteUrl}/auth/verify?token_hash=${hashed_token}&type=signup`;
+
+    // Code de parrainage
+    const { data: existingUser } = await supabase
+      .from('app_users')
+      .select('id, referral_code')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (existingUser && !existingUser.referral_code) {
+      let code = '';
+      for (let i = 0; i < 5; i++) {
+        const candidate = buildCode((name || 'USER').split(' ')[0]);
+        const { data: clash } = await supabase
+          .from('app_users')
+          .select('id')
+          .eq('referral_code', candidate)
+          .maybeSingle();
+        if (!clash) { code = candidate; break; }
+      }
+      if (!code) code = buildCode('USER' + Date.now().toString().slice(-4));
+
+      let referredBy: string | null = null;
+      if (referralCode) {
+        const { data: referrer } = await supabase
+          .from('app_users')
+          .select('id')
+          .eq('referral_code', referralCode)
+          .maybeSingle();
+        if (referrer) referredBy = referrer.id;
+      }
+
+      await supabase
+        .from('app_users')
+        .update({ referral_code: code, ...(referredBy ? { referred_by: referredBy } : {}) })
+        .eq('id', userId);
+    }
+
+    // Email de confirmation via Resend (domaine book-n-pay.com vérifié, DKIM OK)
+    const firstName = ((name || '').trim().split(' ')[0]) || 'toi';
+    await sendEmail({
+      to: email,
+      subject: "Confirme ton adresse email — Book'nPay",
+      html: emailTemplate(`
+        <h2 style="color: #34d399; font-size: 20px; margin: 0 0 12px;">Bienvenue, ${firstName} !</h2>
+        <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
+          Tu es à un clic de rejoindre Book'nPay. Clique sur le bouton ci-dessous pour confirmer
+          ton adresse email et activer ton compte.
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${confirmUrl}"
+             style="background: linear-gradient(135deg, #34d399, #6ee7b7); color: #0f172a;
+                    text-decoration: none; padding: 14px 36px; border-radius: 12px;
+                    font-weight: 700; font-size: 15px; display: inline-block;
+                    box-shadow: 0 4px 20px rgba(52,211,153,0.35);">
+            Confirmer mon email
+          </a>
+        </div>
+        <p style="color: #475569; font-size: 12px; margin: 20px 0 0; text-align: center;">
+          Ce lien expire dans 24 heures. Si tu n'as pas créé de compte, ignore cet email.
+        </p>
+        <p style="color: #334155; font-size: 11px; margin: 8px 0 0; text-align: center; word-break: break-all;">
+          Lien alternatif : <a href="${confirmUrl}" style="color: #34d399;">${confirmUrl}</a>
+        </p>
+      `),
+    });
+
+    return NextResponse.json({ ok: true, emailSent: true });
+  } catch (err: any) {
+    console.error('[register]', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
