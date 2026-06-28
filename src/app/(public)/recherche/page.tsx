@@ -62,6 +62,11 @@ export default async function SearchPage({
     <div className="min-h-screen">
       <div className="max-w-5xl mx-auto px-4 py-6">
 
+        <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors mb-4">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          Accueil
+        </Link>
+
         {/* Search bar */}
         <form className="mb-5 space-y-3" action="/recherche" method="get">
           <div className="flex gap-2">

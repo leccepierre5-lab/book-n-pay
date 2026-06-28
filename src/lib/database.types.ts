@@ -76,6 +76,7 @@ export interface Service {
   biz_id: string;
   name: string;
   genre: string | null;
+  allow_group: boolean;
   duration_minutes: number;
   deposit: number;
   price: number;

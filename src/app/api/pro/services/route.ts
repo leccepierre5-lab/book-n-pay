@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
 
   const body = await req.json();
-  const { name, genre, duration_minutes, price, deposit, max_persons } = body;
+  const { name, genre, allow_group, duration_minutes, price, deposit, max_persons } = body;
 
   if (!name || !duration_minutes || price == null) {
     return NextResponse.json({ error: 'name, duration_minutes et price requis' }, { status: 400 });
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
       biz_id: bizId,
       name: name.trim(),
       genre: genre || null,
+      allow_group: allow_group !== false,
       duration_minutes: Number(duration_minutes),
       price: Number(price),
       deposit: Number(deposit ?? 0),
@@ -64,7 +65,7 @@ export async function PATCH(req: NextRequest) {
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
 
   const body = await req.json();
-  const { id, name, genre, duration_minutes, price, deposit, max_persons } = body;
+  const { id, name, genre, allow_group, duration_minutes, price, deposit, max_persons } = body;
   if (!id) return NextResponse.json({ error: 'id requis' }, { status: 400 });
 
   const supabase = createServiceRoleClient();
@@ -81,6 +82,7 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name.trim();
   if (genre !== undefined) updates.genre = genre || null;
+  if (allow_group !== undefined) updates.allow_group = allow_group !== false;
   if (duration_minutes !== undefined) updates.duration_minutes = Number(duration_minutes);
   if (price !== undefined) updates.price = Number(price);
   if (deposit !== undefined) updates.deposit = Number(deposit);

@@ -165,6 +165,10 @@ export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
   return (
     <div className="min-h-screen px-4 py-8">
       <div className="mx-auto max-w-md">
+        <a href="/" className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors mb-5">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          Accueil
+        </a>
         <div className="mb-5 text-center">
           <h1 className="text-lg font-semibold text-white">{booking.biz_name}</h1>
           <p className="text-sm text-white/60">

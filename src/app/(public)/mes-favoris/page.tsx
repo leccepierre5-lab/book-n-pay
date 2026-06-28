@@ -31,13 +31,13 @@ export default async function MesFavorisPage() {
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="flex items-center gap-3 mb-6">
           <Link
-            href="/mes-reservations"
+            href="/recherche"
             className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="15 18 9 12 15 6"/>
             </svg>
-            Mes réservations
+            Recherche
           </Link>
         </div>
 

@@ -6,10 +6,15 @@ export async function GET(request: NextRequest) {
   const token_hash = searchParams.get('token_hash');
   const type = searchParams.get('type');
 
-  if (token_hash && type === 'signup') {
-    // Même pattern que /auth/callback : créer la response AVANT le client Supabase
-    // pour que setAll puisse attacher les cookies de session directement dessus.
-    const response = NextResponse.redirect(new URL('/recherche', origin));
+  const ALLOWED_TYPES = ['signup', 'recovery'] as const;
+  type AllowedType = typeof ALLOWED_TYPES[number];
+
+  if (token_hash && type && (ALLOWED_TYPES as readonly string[]).includes(type)) {
+    const redirectDest = type === 'recovery'
+      ? new URL('/mon-compte?reset=1', origin)
+      : new URL('/recherche', origin);
+
+    const response = NextResponse.redirect(redirectDest);
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,10 +34,8 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // verifyOtp avec token_hash est 100% server-side, pas de PKCE requis.
-    // C'est la seule méthode compatible avec les tokens générés par admin.generateLink().
     const { error } = await supabase.auth.verifyOtp({
-      type: 'signup',
+      type: type as AllowedType,
       token_hash,
     });
 

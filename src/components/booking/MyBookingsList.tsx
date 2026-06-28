@@ -5,8 +5,6 @@ import Link from 'next/link';
 import type { AppUser, Booking, BookingMember, EnrichedReferralEvent } from '@/lib/database.types';
 import type { GroupMap } from '@/app/(public)/mes-reservations/page';
 import { phonesMatch } from '@/lib/booking-utils';
-import ParrainageCard from '@/components/loyalty/ParrainageCard';
-import LoyaltyCard from '@/components/loyalty/LoyaltyCard';
 import WeekCalendar from './WeekCalendar';
 import GroupTimer from './GroupTimer';
 
@@ -408,7 +406,12 @@ export default function MyBookingsList({
       <div className="mx-auto max-w-lg px-4 py-6">
 
         <div className="mb-5 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-white">Mes réservations</h1>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </Link>
+            <h1 className="text-lg font-bold text-white">Mes réservations</h1>
+          </div>
           <Link href="/mes-favoris" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-mint-400 transition-colors">
             <span>❤️</span> Favoris
           </Link>
@@ -417,14 +420,6 @@ export default function MyBookingsList({
         {cancelError && (
           <div className="mb-4 rounded-2xl bg-red-950/40 border border-red-500/20 px-4 py-3">
             <p className="text-sm text-red-400">{cancelError}</p>
-          </div>
-        )}
-
-        {profile && <LoyaltyCard profile={profile} />}
-
-        {profile && (
-          <div className="mb-5">
-            <ParrainageCard profile={profile} referralEvents={referralEvents} />
           </div>
         )}
 

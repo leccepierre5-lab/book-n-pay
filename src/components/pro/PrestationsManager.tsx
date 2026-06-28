@@ -32,6 +32,7 @@ const GENRE_LABEL: Record<string, string> = {
 interface FormState {
   name: string;
   genre: GenreValue;
+  allow_group: boolean;
   duration_minutes: string;
   price: string;
   deposit: string;
@@ -41,6 +42,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   name: '',
   genre: '',
+  allow_group: true,
   duration_minutes: '30',
   price: '',
   deposit: '0',
@@ -51,6 +53,7 @@ function serviceToForm(s: Service): FormState {
   return {
     name: s.name,
     genre: (s.genre as GenreValue) || '',
+    allow_group: s.allow_group !== false,
     duration_minutes: String(s.duration_minutes),
     price: String(s.price),
     deposit: String(s.deposit),
@@ -99,6 +102,7 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
       ...(editingId ? { id: editingId } : {}),
       name: form.name.trim(),
       genre: form.genre || null,
+      allow_group: form.allow_group,
       duration_minutes: Number(form.duration_minutes),
       price: Number(form.price),
       deposit: Number(form.deposit || 0),
@@ -251,6 +255,30 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
               <p className="text-[10px] text-slate-600 mt-1">
                 Permet aux clients de filtrer par genre dans l'onglet de réservation.
               </p>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, allow_group: !f.allow_group }))}
+                className={`flex items-center gap-3 w-full rounded-xl border px-3 py-2.5 transition-all duration-150 ${
+                  form.allow_group
+                    ? 'border-mint-500/30 bg-mint-500/8'
+                    : 'border-white/[0.08] bg-navy-950'
+                }`}
+              >
+                <div className={`w-9 h-5 rounded-full relative transition-all duration-200 ${form.allow_group ? 'bg-mint-500' : 'bg-slate-700'}`}>
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${form.allow_group ? 'left-4' : 'left-0.5'}`} />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-white">Mode groupe autorisé</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    {form.allow_group
+                      ? 'Les clients peuvent réserver pour plusieurs personnes'
+                      : 'Réservation individuelle uniquement (soin en cabine, etc.)'}
+                  </p>
+                </div>
+              </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

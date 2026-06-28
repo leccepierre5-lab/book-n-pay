@@ -81,19 +81,19 @@ const SLIDES = [
   },
 ];
 
-/* ── Header logo commun (sticky, tout en haut) ── */
-function LogoTopBar() {
+/* ── Logo centré inline (au-dessus du contenu) ── */
+function InlineLogo() {
   return (
-    <div className="sticky top-0 z-50 flex items-center justify-center gap-4 py-5 px-6 bg-navy-950/95 backdrop-blur-xl border-b border-white/[0.05]">
+    <div className="flex flex-col items-center gap-2 mb-2">
       <Image
         src="/logo.jpg"
         alt="Book'nPay"
         width={56}
         height={56}
-        className="rounded-full ring-2 ring-yellow-500/30 shadow-[0_0_20px_rgba(234,179,8,0.15)]"
+        className="rounded-2xl ring-2 ring-mint-500/20 shadow-[0_0_24px_rgba(52,211,153,0.2)]"
         priority
       />
-      <span className="text-2xl font-bold text-white tracking-tight">Book'nPay</span>
+      <span className="text-base font-bold text-white tracking-tight">Book'nPay</span>
     </div>
   );
 }
@@ -166,11 +166,11 @@ export default function HomePage() {
   if (slide === 4) {
     return (
       <div className="flex flex-col min-h-screen">
-        <LogoTopBar />
-        <div className="relative flex flex-col items-center justify-center flex-1 px-6">
+        <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <div className="w-full max-w-xs space-y-3 mt-8">
+          <InlineLogo />
+          <div className="w-full max-w-sm space-y-3 mt-4">
             <button
               onClick={() => router.push('/inscription')}
               className="w-full rounded-2xl py-4 font-semibold text-[#0a1224] text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
@@ -201,11 +201,11 @@ export default function HomePage() {
   if (slide === 5) {
     return (
       <div className="flex flex-col min-h-screen">
-        <LogoTopBar />
-        <div className="relative flex flex-col items-center justify-center flex-1 px-6">
+        <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <div className="w-full max-w-xs space-y-3 mt-8">
+          <InlineLogo />
+          <div className="w-full max-w-sm space-y-3 mt-4">
             <button
               onClick={() => router.push('/devenir-partenaire')}
               className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 py-4 font-semibold text-white text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
@@ -236,11 +236,11 @@ export default function HomePage() {
   if (slide === 3) {
     return (
       <div className="flex flex-col min-h-screen">
-        <LogoTopBar />
-        <div className="relative flex flex-col items-center justify-center flex-1 px-6">
+        <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
-          <p className="text-slate-500 text-xs mb-5 tracking-widest uppercase font-semibold">Vous êtes…</p>
-          <div className="w-full max-w-xs space-y-3">
+          <InlineLogo />
+          <p className="text-slate-500 text-xs mb-5 mt-6 tracking-widest uppercase font-semibold">Vous êtes…</p>
+          <div className="w-full max-w-sm space-y-3">
             <button
               onClick={() => setSlide(4)}
               className="w-full flex items-center gap-4 rounded-2xl bg-navy-900 border border-white/[0.08] p-5 text-left hover:bg-navy-800/80 hover:border-white/15 transition-all duration-200 group"
@@ -289,12 +289,11 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen overflow-hidden">
-      <LogoTopBar />
-
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(52,211,153,0.07)_0%,transparent_65%)] pointer-events-none" />
 
       {/* Contenu central */}
-      <div className="flex flex-col items-center text-center flex-1 justify-center gap-7 max-w-xs mx-auto w-full px-6 relative z-10">
+      <div className="flex flex-col items-center text-center flex-1 justify-center gap-7 max-w-sm mx-auto w-full px-4 relative z-10">
+        <InlineLogo />
         {current.icon}
 
         <div className="space-y-3">
@@ -323,7 +322,7 @@ export default function HomePage() {
       </div>
 
       {/* Bas de page */}
-      <div className="px-6 pb-8 max-w-xs mx-auto w-full space-y-3 relative z-10">
+      <div className="px-4 pb-8 max-w-sm mx-auto w-full space-y-3 relative z-10">
         <button
           onClick={handleNext}
           className="w-full rounded-2xl py-4 font-bold text-[#0a1224] text-base flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"

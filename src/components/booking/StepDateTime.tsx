@@ -132,7 +132,7 @@ export default function StepDateTime({
   service: Service;
   onSelect: (date: string, slots: string[], participants: number) => void;
 }) {
-  const maxPersons = service.max_persons || 1;
+  const maxPersons = service.allow_group !== false ? (service.max_persons || 8) : 1;
 
   const now = new Date();
   const [calYear, setCalYear] = useState(now.getFullYear());
