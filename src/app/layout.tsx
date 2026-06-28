@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import PageTransition from '@/components/PageTransition';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -21,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr" className={inter.variable}>
       <body className="bg-navy-950 text-slate-100 antialiased font-[var(--font-inter)]">
-        {children}
+        <PageTransition>{children}</PageTransition>
       </body>
     </html>
   );

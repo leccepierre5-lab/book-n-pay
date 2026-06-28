@@ -27,7 +27,22 @@
   }
 }
 
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @layer utilities {
+  .animate-page-in {
+    animation: pageFadeIn 0.22s ease both;
+  }
+  .animate-slide-in {
+    animation: slideFadeIn 0.18s ease both;
+  }
   .text-gradient {
     background: linear-gradient(135deg, #34d399, #6ee7b7);
     -webkit-background-clip: text;

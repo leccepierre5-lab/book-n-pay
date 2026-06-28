@@ -84,16 +84,16 @@ const SLIDES = [
 /* ── Logo centré inline (au-dessus du contenu) ── */
 function InlineLogo() {
   return (
-    <div className="flex flex-col items-center gap-2 mb-2">
+    <div className="flex flex-col items-center gap-2.5 mb-2">
       <Image
         src="/logo.jpg"
         alt="Book'nPay"
-        width={56}
-        height={56}
-        className="rounded-2xl ring-2 ring-mint-500/20 shadow-[0_0_24px_rgba(52,211,153,0.2)]"
+        width={80}
+        height={80}
+        className="rounded-2xl ring-2 ring-mint-500/20 shadow-[0_0_32px_rgba(52,211,153,0.25)]"
         priority
       />
-      <span className="text-base font-bold text-white tracking-tight">Book'nPay</span>
+      <span className="text-lg font-bold text-white tracking-tight">Book'nPay</span>
     </div>
   );
 }
@@ -291,8 +291,11 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(52,211,153,0.07)_0%,transparent_65%)] pointer-events-none" />
 
+      {/* Bouton retour (slides 1 et 2) */}
+      {slide > 0 && <BackButton onBack={() => setSlide(slide - 1)} />}
+
       {/* Contenu central */}
-      <div className="flex flex-col items-center text-center flex-1 justify-center gap-7 max-w-sm mx-auto w-full px-4 relative z-10">
+      <div key={slide} className="animate-slide-in flex flex-col items-center text-center flex-1 justify-center gap-7 max-w-sm mx-auto w-full px-4 relative z-10">
         <InlineLogo />
         {current.icon}
 
@@ -334,14 +337,16 @@ export default function HomePage() {
           {current.btn} <span className="text-lg">›</span>
         </button>
 
-        {current.showPasser && (
-          <button
-            onClick={() => setSlide(3)}
-            className="w-full text-sm text-slate-500 py-2 hover:text-slate-300 transition-colors"
-          >
-            Passer →
-          </button>
-        )}
+        <button
+          onClick={() => setSlide(3)}
+          className={`w-full text-sm py-2 transition-colors ${
+            current.showPasser
+              ? 'text-slate-500 hover:text-slate-300'
+              : 'invisible'
+          }`}
+        >
+          Passer →
+        </button>
 
         <CGULine />
 
