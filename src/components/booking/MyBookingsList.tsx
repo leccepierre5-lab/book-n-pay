@@ -322,7 +322,13 @@ export default function MyBookingsList({
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [localBookings, setLocalBookings] = useState(bookings);
   const [view, setView] = useState<'list' | 'calendar'>('list');
+  const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
   const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const filteredBookings = localBookings.filter((b) =>
+    period === 'upcoming' ? b.date >= today : b.date < today
+  );
 
   const myPhone = profile?.phone ?? null;
 
@@ -390,7 +396,7 @@ export default function MyBookingsList({
 
   const listItems: ListItem[] = [];
 
-  for (const booking of localBookings) {
+  for (const booking of filteredBookings) {
     if (booking.group_ref && groupMap[booking.group_ref]) {
       if (!renderedGroupRefs.has(booking.group_ref)) {
         renderedGroupRefs.add(booking.group_ref);
@@ -423,6 +429,22 @@ export default function MyBookingsList({
           </div>
         )}
 
+        <div className="mb-3 flex gap-1.5 p-1 bg-navy-900 rounded-xl border border-white/[0.06]">
+          {(['upcoming', 'past'] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-all duration-200 ${
+                period === p
+                  ? 'bg-mint-500 text-navy-950 shadow-[0_0_10px_rgba(52,211,153,0.3)]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {p === 'upcoming' ? 'À venir' : 'Passés'}
+            </button>
+          ))}
+        </div>
+
         <div className="mb-4 flex gap-1.5 p-1 bg-navy-900 rounded-xl border border-white/[0.06]">
           {(['list', 'calendar'] as const).map((v) => (
             <button
@@ -441,7 +463,7 @@ export default function MyBookingsList({
 
         {view === 'calendar' ? (
           <WeekCalendar
-            bookings={localBookings}
+            bookings={filteredBookings}
             myPhone={myPhone}
             onSelectBooking={(id) => router.push(`/mes-reservations/${id}`)}
           />
@@ -470,7 +492,11 @@ export default function MyBookingsList({
             {listItems.length === 0 && (
               <div className="py-16 text-center">
                 <p className="text-4xl mb-4">📅</p>
-                <p className="text-slate-400 text-sm mb-4">Aucune réservation pour l'instant.</p>
+                <p className="text-slate-400 text-sm mb-4">
+                  {period === 'upcoming'
+                    ? 'Aucun rendez-vous à venir.'
+                    : 'Aucun rendez-vous passé.'}
+                </p>
                 <Link
                   href="/recherche"
                   className="inline-flex items-center gap-2 rounded-2xl py-3 px-6 text-sm font-semibold text-navy-950 transition-all"
