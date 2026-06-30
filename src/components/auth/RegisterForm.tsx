@@ -1,8 +1,10 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 
 export default function RegisterForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref');
 
@@ -39,6 +41,12 @@ export default function RegisterForm() {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+      if (res.status === 409) {
+        setError('Cet email est déjà associé à un compte.');
+        setLoading(false);
+        setTimeout(() => router.push(`/connexion?email=${encodeURIComponent(email)}`), 1800);
+        return;
+      }
       setError(data.error || "Une erreur est survenue. Réessaie.");
       setLoading(false);
       return;

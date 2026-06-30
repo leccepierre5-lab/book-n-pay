@@ -10,7 +10,7 @@ export default function LoginForm() {
   const redirectTo = searchParams.get('redirect') || '/recherche';
 
   const [view, setView] = useState<View>('login');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(searchParams.get('email') || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
