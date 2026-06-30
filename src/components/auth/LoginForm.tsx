@@ -28,13 +28,27 @@ export default function LoginForm() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (signInError) {
       setError(signInError.message);
       setLoading(false);
       return;
     }
-    window.location.href = redirectTo;
+    // Si un redirect explicite est fourni (ex: tunnel de réservation), on l'honore.
+    // Sinon, on route selon le rôle.
+    const hasExplicitRedirect = new URLSearchParams(window.location.search).get('redirect');
+    if (hasExplicitRedirect) {
+      window.location.href = hasExplicitRedirect;
+      return;
+    }
+    const { data: appUser } = await supabase
+      .from('app_users')
+      .select('role')
+      .eq('id', signInData.user.id)
+      .single();
+    if (appUser?.role === 'admin') window.location.href = '/admin';
+    else if (appUser?.role === 'pro') window.location.href = '/pro';
+    else window.location.href = '/recherche';
   };
 
   const handleForgot = async (e: React.FormEvent) => {
