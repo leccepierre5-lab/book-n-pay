@@ -11,6 +11,7 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
 
   // Safety net: if the user is already authenticated when this wall mounts, skip it immediately
   useEffect(() => {
@@ -27,22 +28,24 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
 
     try {
       if (mode === 'signup') {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-            data: { name: fullName.trim(), phone, role: 'client' },
-          },
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name: fullName.trim(), phone }),
         });
-        if (signUpError) throw signUpError;
-        if (data.user) {
-          await fetch('/api/auth/post-signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: data.user.id, name: fullName.trim(), referrerCode: null }),
-          }).catch(() => {});
+        const body = await res.json();
+        if (!res.ok) {
+          if (res.status === 409) {
+            setError('Cet email est déjà associé à un compte.');
+            setMode('login');
+            setPassword('');
+          } else {
+            setError(body.error || 'Une erreur est survenue.');
+          }
+          return;
         }
+        setEmailSent(true);
+        return; // onAuth() n'est pas appelé pour un signup
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
@@ -56,6 +59,31 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
   };
 
   const inputClass = "w-full rounded-xl bg-navy-800/60 border border-white/[0.08] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-mint-500/40 focus:ring-2 focus:ring-mint-500/15 transition-all duration-200";
+
+  if (emailSent) {
+    return (
+      <div className="text-center py-4">
+        <div className="flex items-center justify-center gap-2 mb-5">
+          <Image src="/logo.jpg" alt="Book'nPay" width={36} height={36} className="rounded-xl ring-1 ring-mint-500/20" />
+          <span className="font-bold text-white text-sm tracking-tight">Book'nPay</span>
+        </div>
+        <div className="rounded-xl bg-mint-500/10 border border-mint-500/20 px-4 py-5 mb-4">
+          <p className="text-mint-400 font-semibold text-sm mb-1">Vérifie ta boîte mail</p>
+          <p className="text-slate-400 text-xs leading-relaxed">
+            Un lien de confirmation a été envoyé à <span className="text-white">{email}</span>.
+            Clique dessus pour activer ton compte, puis reviens ici pour te connecter.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setEmailSent(false); setMode('login'); setPassword(''); }}
+          className="text-xs text-mint-400 hover:text-mint-300 transition-colors"
+        >
+          J'ai confirmé mon email → Se connecter
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
