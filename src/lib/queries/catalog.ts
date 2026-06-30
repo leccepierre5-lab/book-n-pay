@@ -46,8 +46,8 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
     queryBuilder = queryBuilder.or(`name.ilike.%${q}%,city.ilike.%${q}%,type.ilike.%${q}%`);
   }
 
-  // Exclut les établissements gelés par l'admin et les non-publiés (onboarding incomplet)
-  queryBuilder = queryBuilder.eq('frozen', false).eq('is_published', true);
+  // Exclut uniquement les établissements gelés par l'admin
+  queryBuilder = queryBuilder.eq('frozen', false);
 
   const { data, error } = await queryBuilder;
   if (error) {
