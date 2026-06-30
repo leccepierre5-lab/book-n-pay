@@ -81,7 +81,9 @@ function GroupCard({
 
   // Payment deadline — use the first booking's deadline (they all share the same)
   const deadline = first.payment_deadline;
-  const deadlineInFuture = deadline && new Date(deadline) > new Date();
+  const now = new Date();
+  const deadlineInFuture = deadline && new Date(deadline) > now;
+  const isExpired = !allPaid && deadline && new Date(deadline) <= now;
 
   const dateLabel = formatBookingDate(first.date);
   const timeRange = groupBookings.length > 1
@@ -105,10 +107,12 @@ function GroupCard({
           <span className={`shrink-0 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
             allPaid
               ? 'bg-emerald-500/12 text-emerald-400 border-emerald-500/25'
+              : isExpired
+              ? 'bg-red-500/12 text-red-400 border-red-500/25'
               : 'bg-amber-500/12 text-amber-300 border-amber-500/25'
           }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${allPaid ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            {allPaid ? 'Complet' : 'En cours'}
+            <span className={`w-1.5 h-1.5 rounded-full ${allPaid ? 'bg-emerald-400' : isExpired ? 'bg-red-400' : 'bg-amber-400'}`} />
+            {allPaid ? 'Complet' : isExpired ? 'Expiré' : 'En cours'}
           </span>
         </div>
 
