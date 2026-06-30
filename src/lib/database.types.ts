@@ -50,6 +50,7 @@ export interface Business {
   owner_id: string | null;
   frozen: boolean;
   frozen_reason: string | null;
+  is_published: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +69,18 @@ export interface Staff {
   name: string;
   role: string | null;
   emoji: string | null;
+  is_active: boolean;
+  deactivated_at: string | null;
+  created_at: string;
+}
+
+export interface StaffSchedule {
+  id: string;
+  staff_id: string;
+  biz_id: string;
+  day_of_week: number; // 0=Dim, 1=Lun…6=Sam (JS getDay() convention)
+  open_time: string;
+  close_time: string;
   created_at: string;
 }
 
@@ -145,6 +158,18 @@ export interface BusinessSettings {
   stripe_onboarding_url: string | null;
   notification_prefs: Record<string, boolean>;
   updated_at: string;
+  // Migration 0015 — facturation abonnements pro
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  plan_key: 'starter' | 'business' | 'scale';
+  payment_method_type: 'card' | 'sepa_debit' | null;
+  stripe_payment_method_id: string | null;
+  subscription_status: 'pending' | 'active' | 'past_due' | 'cancelled';
+  subscription_start_date: string | null;
+  engagement_end_date: string | null;
+  next_billing_date: string | null;
+  monthly_bookings_count: number;
+  bookings_count_reset_at: string;
 }
 
 export interface BusinessReview {
@@ -203,6 +228,12 @@ export interface PartnerApplication {
   status: ApplicationStatus;
   admin_note: string | null;
   created_at: string;
+  // Migration 0016
+  category: 'beaute' | 'bien-etre' | 'sport' | 'autre';
+  category_label: string | null;
+  type: string | null;
+  monthly_bookings_estimate: '0-80' | '81-300' | '300+';
+  approved_at: string | null;
 }
 
 export interface AppConfig {

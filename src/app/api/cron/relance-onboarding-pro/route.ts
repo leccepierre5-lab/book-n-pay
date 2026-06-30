@@ -1,7 +1,7 @@
 // src/app/api/cron/relance-onboarding-pro/route.ts
-// Port de base44/functions/relanceOnboardingPro/entry.ts
-// Relance les candidatures pro en attente depuis 24-48h, avec une checklist
-// de ce qui manque pour finaliser (Stripe, Google Maps, créneaux).
+// Rappel quotidien (0 8 * * *) pour les pros dont l'établissement n'est pas
+// encore publié — onboarding abandonné en cours de route.
+// Cible : businesses.is_published = false, créés depuis 24 à 48h.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
@@ -13,53 +13,87 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServiceRoleClient();
-  const { data: applications } = await supabase
-    .from('partner_applications')
-    .select('*')
-    .eq('status', 'pending');
 
-  const now = Date.now();
-  const H24 = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const h24ago = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const h48ago = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
 
-  const toRemind = (applications || []).filter((app) => {
-    const updatedAt = new Date(app.created_at).getTime();
-    const age = now - updatedAt;
-    return age >= H24 && age < H24 * 2;
-  });
+  // Pros dont l'établissement a été créé entre 24h et 48h, pas encore publié
+  const { data: businesses } = await supabase
+    .from('businesses')
+    .select('id, name, owner_id, open_time, close_time, open_days')
+    .eq('is_published', false)
+    .eq('frozen', false)
+    .gte('created_at', h48ago)
+    .lte('created_at', h24ago);
+
+  if (!businesses || businesses.length === 0) {
+    return NextResponse.json({ ok: true, processed: 0, sent: 0 });
+  }
+
+  const bizIds = businesses.map((b) => b.id);
+
+  // Récupère en parallèle : emails des owners, comptes de services, statuts Stripe
+  const [{ data: owners }, { data: serviceCounts }, { data: stripeSettings }] = await Promise.all([
+    supabase.from('app_users').select('id, name').in('id', businesses.map((b) => b.owner_id).filter(Boolean) as string[]),
+    supabase.from('services').select('biz_id').in('biz_id', bizIds),
+    supabase.from('business_settings').select('biz_id, stripe_onboarding_complete').in('biz_id', bizIds),
+  ]);
+
+  // Récupère les emails des owners via auth.users (service role nécessaire)
+  const ownerIds = businesses.map((b) => b.owner_id).filter(Boolean) as string[];
+  const emailMap: Record<string, string> = {};
+  for (const uid of ownerIds) {
+    try {
+      const { data: { user } } = await supabase.auth.admin.getUserById(uid);
+      if (user?.email) emailMap[uid] = user.email;
+    } catch { /* ignore */ }
+  }
+
+  const servicesPerBiz = new Set((serviceCounts ?? []).map((s) => s.biz_id));
+  const stripePerBiz: Record<string, boolean> = {};
+  for (const s of stripeSettings ?? []) {
+    stripePerBiz[s.biz_id] = !!s.stripe_onboarding_complete;
+  }
+  const ownerNameMap: Record<string, string> = {};
+  for (const o of owners ?? []) {
+    ownerNameMap[o.id] = o.name;
+  }
 
   const results = { sent: 0, skipped: 0, errors: 0 };
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app';
 
-  for (const app of toRemind) {
-    if (!app.email) {
-      results.skipped++;
-      continue;
-    }
+  for (const biz of businesses) {
+    const email = biz.owner_id ? emailMap[biz.owner_id] : null;
+    if (!email) { results.skipped++; continue; }
 
-    const missingItems: string[] = [];
-    if (!app.stripe_connected) missingItems.push('• Connexion Stripe (obligatoire pour encaisser)');
-    if (!app.google_maps_url) missingItems.push('• Lien Google Maps');
-    if (!app.creneaux || (app.creneaux as any[]).length === 0) missingItems.push('• Vos disponibilités');
+    const step1Done = !!(biz.open_time && biz.close_time && biz.open_days?.length > 0);
+    const step2Done = servicesPerBiz.has(biz.id);
+    const step3Done = stripePerBiz[biz.id] ?? false;
 
-    const text =
-      missingItems.length > 0
-        ? `Bonjour ${app.gerant || 'Partenaire'},\n\nVous avez commencé votre inscription sur Book'nPay pour "${app.etablissement}" mais il vous reste quelques étapes à finaliser :\n\n${missingItems.join('\n')}\n\nReprenez votre inscription en 2 minutes :\n👉 ${process.env.NEXT_PUBLIC_SITE_URL}/devenir-partenaire\n\nÀ bientôt,\nL'équipe Book'nPay`
-        : `Bonjour ${app.gerant || 'Partenaire'},\n\nVotre dossier pour "${app.etablissement}" est en cours de validation par notre équipe.\n\nNous vous contacterons dans les 48h ouvrées à cette adresse.\n\nÀ bientôt,\nL'équipe Book'nPay`;
+    const missing: string[] = [];
+    if (!step1Done) missing.push('• Vos horaires d\'ouverture');
+    if (!step2Done) missing.push('• Au moins une prestation (prix, durée)');
+    if (!step3Done) missing.push('• Connexion Stripe pour recevoir les paiements');
+
+    const ownerName = biz.owner_id ? (ownerNameMap[biz.owner_id] ?? 'Partenaire') : 'Partenaire';
+
+    const text = missing.length > 0
+      ? `Bonjour ${ownerName},\n\nVous avez commencé votre inscription sur Book'nPay pour "${biz.name}" mais il vous reste ${missing.length} étape(s) à finaliser :\n\n${missing.join('\n')}\n\nReprenez là où vous vous étiez arrêté :\n👉 ${siteUrl}/pro/onboarding\n\nDès que c'est fait, votre établissement sera visible et réservable par vos clients.\n\nÀ bientôt,\nL'équipe Book'nPay`
+      : `Bonjour ${ownerName},\n\nToutes vos étapes sont complètes ! Connectez-vous pour publier "${biz.name}" :\n👉 ${siteUrl}/pro/onboarding\n\nÀ bientôt,\nL'équipe Book'nPay`;
+
+    const subject = missing.length > 0
+      ? `⏳ "${biz.name}" — encore ${missing.length} étape(s) pour publier sur Book'nPay`
+      : `✅ "${biz.name}" — prêt à publier sur Book'nPay !`;
 
     try {
-      await sendEmail({
-        to: app.email,
-        subject:
-          missingItems.length > 0
-            ? `⏳ Finalisez votre inscription Book'nPay — il vous reste ${missingItems.length} étape(s)`
-            : '✅ Votre dossier est en cours de traitement',
-        text,
-      });
+      await sendEmail({ to: email, subject, text });
       results.sent++;
     } catch (e: any) {
-      console.error(`Erreur email pour ${app.email}:`, e.message);
+      console.error(`[cron/relance-onboarding-pro] Erreur email ${email}:`, e.message);
       results.errors++;
     }
   }
 
-  return NextResponse.json({ ok: true, processed: toRemind.length, ...results });
+  return NextResponse.json({ ok: true, processed: businesses.length, ...results });
 }

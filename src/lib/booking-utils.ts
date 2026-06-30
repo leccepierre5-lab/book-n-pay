@@ -1,4 +1,5 @@
 // src/lib/booking-utils.ts
+import { BNP_PLANS, OVERAGE_GRACE, type PlanKey } from './plans-config';
 // Port direct de src/lib/bookingUtils.js (Base44) — logique métier pure,
 // sans dépendance au client de persistance. Les fonctions Base44.entities.*
 // sont remplacées par de vraies requêtes Supabase dans src/lib/queries/*.
@@ -195,6 +196,33 @@ export function calcDeposit(baseDeposit: number, price: number, trustScore: Trus
     };
   }
   return { amount: baseDeposit, reason: null };
+}
+
+// ── Hors-forfait pro ─────────────────────────────────────────────────────────
+export type OverageStatus = 'included' | 'grace_period' | 'overage';
+
+export interface OverageResult {
+  status: OverageStatus;
+  overageCount: number;
+  currentPlanLabel: string;
+  nextPlanLabel: string | null;
+}
+
+export function getOverageStatus(bookingCountThisMonth: number, planKey: PlanKey | string): OverageResult {
+  const plan = BNP_PLANS.find((p) => p.key === planKey);
+  const currentPlanLabel = plan?.label ?? planKey;
+
+  if (!plan || plan.quota === null) {
+    return { status: 'included', overageCount: 0, currentPlanLabel, nextPlanLabel: null };
+  }
+
+  const nextPlan = plan.nextPlan ? BNP_PLANS.find((p) => p.key === plan.nextPlan) : null;
+  const nextPlanLabel = nextPlan?.label ?? null;
+  const overage = bookingCountThisMonth - plan.quota;
+
+  if (overage <= 0) return { status: 'included', overageCount: 0, currentPlanLabel, nextPlanLabel };
+  if (overage <= OVERAGE_GRACE) return { status: 'grace_period', overageCount: overage, currentPlanLabel, nextPlanLabel };
+  return { status: 'overage', overageCount: overage, currentPlanLabel, nextPlanLabel };
 }
 
 // ── Fidélité "Sérénité" — paliers et jokers ──────────────────────────────────

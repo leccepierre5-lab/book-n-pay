@@ -28,7 +28,15 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
     .select('*, services(*), staff(*), business_reviews(rating, review_count)');
 
   if (filters.category && filters.category !== 'all') {
-    queryBuilder = queryBuilder.eq('category', filters.category);
+    if (filters.category === 'autre') {
+      // "Autre" = tout ce qui n'est pas l'un des 3 secteurs principaux
+      queryBuilder = queryBuilder
+        .neq('category', 'beaute')
+        .neq('category', 'bien-etre')
+        .neq('category', 'sport');
+    } else {
+      queryBuilder = queryBuilder.eq('category', filters.category);
+    }
   }
   if (filters.city) {
     queryBuilder = queryBuilder.ilike('city', filters.city);
@@ -38,12 +46,8 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
     queryBuilder = queryBuilder.or(`name.ilike.%${q}%,city.ilike.%${q}%,type.ilike.%${q}%`);
   }
 
-  // Exclut les établissements gelés par l'admin — sans ce filtre, ils
-  // apparaissaient normalement dans la recherche et n'étaient bloqués
-  // qu'au moment du paiement (trouvé par trace bout-en-bout : le gel
-  // empêchait bien la réservation, mais l'UX laissait découvrir le
-  // problème trop tard dans le parcours).
-  queryBuilder = queryBuilder.eq('frozen', false);
+  // Exclut les établissements gelés par l'admin et les non-publiés (onboarding incomplet)
+  queryBuilder = queryBuilder.eq('frozen', false).eq('is_published', true);
 
   const { data, error } = await queryBuilder;
   if (error) {
@@ -51,7 +55,11 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
     return [];
   }
 
-  let results = (data || []) as unknown as BusinessWithDetails[];
+  let results = ((data || []) as unknown as BusinessWithDetails[]).map((b) => ({
+    ...b,
+    // N'expose que les praticiens actifs aux clients (inactifs = ex-employés)
+    staff: (b.staff ?? []).filter((s) => s.is_active !== false),
+  }));
 
   const minServicePrice = (biz: BusinessWithDetails) => {
     const prices = (biz.services ?? []).filter((s) => s.price > 0).map((s) => s.price);
@@ -91,13 +99,19 @@ export async function getBusinessBySlug(slug: string): Promise<BusinessWithDetai
     .from('businesses')
     .select('*, services(*), staff(*), business_reviews(rating, review_count), business_photos(id, url, sort_order, created_at, biz_id)')
     .eq('slug', slug)
+    .eq('is_published', true)
     .maybeSingle();
 
   if (error) {
     console.error('[getBusinessBySlug]', error.message);
     return null;
   }
-  return data as unknown as BusinessWithDetails | null;
+  if (!data) return null;
+  const biz = data as unknown as BusinessWithDetails;
+  return {
+    ...biz,
+    staff: (biz.staff ?? []).filter((s) => s.is_active !== false),
+  };
 }
 
 export const CATEGORIES = [
@@ -105,11 +119,7 @@ export const CATEGORIES = [
   { id: 'beaute', label: 'Beauté' },
   { id: 'bien-etre', label: 'Bien Être' },
   { id: 'sport', label: 'Sport' },
-  { id: 'enfants', label: '👶 Enfants' },
-  { id: 'food', label: 'Food' },
-  { id: 'education', label: 'Éducation' },
-  { id: 'creatif', label: 'Créatif' },
-  { id: 'services', label: 'Services' },
+  { id: 'autre', label: 'Autre' },
 ];
 
 export const BAB_CITIES = [

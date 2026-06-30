@@ -1,6 +1,15 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import { calcFraisGestion } from '@/lib/booking-utils';
+import { BNP_PLANS, OVERAGE_GRACE, OVERAGE_FEE_HT } from '@/lib/plans-config';
+
+const FEE_BRACKETS = [
+  { label: '≤ 50 €', fee: calcFraisGestion(30) },
+  { label: '50,01 € – 80 €', fee: calcFraisGestion(60) },
+  { label: '80,01 € – 100 €', fee: calcFraisGestion(90) },
+  { label: '> 100 €', fee: calcFraisGestion(150) },
+];
 
 const PLANS = [
   {
@@ -165,6 +174,7 @@ export default function TarifsPage() {
             Le modèle tourne en arrière-plan sans vous mettre en danger.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
+            {/* Carte Protection Stripe Connect */}
             <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-6">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/12 border border-emerald-500/20 flex items-center justify-center mb-4">
                 <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -172,10 +182,32 @@ export default function TarifsPage() {
                 </svg>
               </div>
               <h3 className="mb-2 font-semibold text-white text-sm">Protection Stripe Connect</h3>
-              <p className="text-xs leading-relaxed text-slate-500">
-                Le client paie les frais + 1,99 € de frais techniques. Les frais vont directement sur le compte du pro (trésorerie immédiate). Les 1,99 € absorbent la commission Stripe.
+              <p className="text-xs leading-relaxed text-slate-500 mb-3">
+                Le client paie les frais de gestion + le prix de la prestation. Le montant des frais varie selon le prix de la prestation réservée.
               </p>
+              <div className="rounded-xl border border-white/[0.07] overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-white/[0.07]">
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Prix prestation</th>
+                      <th className="px-3 py-2 text-right text-slate-500 font-medium">Frais TTC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {FEE_BRACKETS.map((b, i) => (
+                      <tr key={i} className={i < FEE_BRACKETS.length - 1 ? 'border-b border-white/[0.05]' : ''}>
+                        <td className="px-3 py-2 text-slate-400">{b.label}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-emerald-400">
+                          {b.fee.toFixed(2).replace('.', ',')} €
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* Carte Hors-Forfait */}
             <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-6">
               <div className="w-10 h-10 rounded-xl bg-amber-500/12 border border-amber-500/20 flex items-center justify-center mb-4">
                 <svg className="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -183,9 +215,31 @@ export default function TarifsPage() {
                 </svg>
               </div>
               <h3 className="mb-2 font-semibold text-white text-sm">Régulation par le Hors-Forfait</h3>
-              <p className="text-xs leading-relaxed text-slate-500">
-                Un client Starter dépasse ses 80 réservations ? 1,99 € HT/réservation supplémentaire. Incitation naturelle à monter de plan au renouvellement.
+              <p className="text-xs leading-relaxed text-slate-500 mb-3">
+                Chaque plan inclut un quota mensuel de réservations. Au-delà, un droit à l'erreur s'applique avant tout surcoût.
               </p>
+              <div className="space-y-2 mb-3">
+                {BNP_PLANS.filter((p) => p.quota !== null).map((p) => (
+                  <div key={p.key} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500 capitalize">{p.label}</span>
+                    <span className="text-slate-400">{p.quota} réservations incluses</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">Scale</span>
+                  <span className="text-emerald-400 font-medium">Illimité</span>
+                </div>
+              </div>
+              <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 px-3 py-3 space-y-1.5 text-xs text-slate-400">
+                <p>
+                  <span className="text-white font-medium">Droit à l'erreur :</span>{' '}
+                  les {OVERAGE_GRACE} réservations au-delà du quota sont gratuites.
+                </p>
+                <p>
+                  <span className="text-white font-medium">Au-delà :</span>{' '}
+                  {OVERAGE_FEE_HT.toFixed(2).replace('.', ',')} € HT / réservation supplémentaire, prélevés immédiatement + proposition de montée de plan.
+                </p>
+              </div>
             </div>
           </div>
 

@@ -1,8 +1,9 @@
 'use client';
 // src/components/admin/AdminDashboard.tsx
-// Port condensé de src/pages/AdminDashboard.jsx + ConfigPanel.jsx.
 import { useState } from 'react';
 import type { AppConfig, PartnerApplication } from '@/lib/database.types';
+import { BNP_PLANS } from '@/lib/plans-config';
+import type { PlanKey } from '@/lib/plans-config';
 import { createClient } from '@/lib/supabase/client';
 
 interface BusinessRow {
@@ -12,6 +13,12 @@ interface BusinessRow {
   frozen: boolean;
   frozen_reason: string | null;
 }
+
+const PLAN_FROM_ESTIMATE: Record<string, PlanKey> = {
+  '0-80': 'starter',
+  '81-300': 'business',
+  '300+': 'scale',
+};
 
 export default function AdminDashboard({
   configs,
@@ -29,6 +36,12 @@ export default function AdminDashboard({
   const [saving, setSaving] = useState<string | null>(null);
   const [freezing, setFreezing] = useState<string | null>(null);
 
+  // Approval flow state
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PlanKey>('starter');
+  const [approving, setApproving] = useState(false);
+  const [approvalError, setApprovalError] = useState('');
+
   const updateConfig = async (key: string, value: string) => {
     setSaving(key);
     const supabase = createClient();
@@ -37,14 +50,39 @@ export default function AdminDashboard({
     setSaving(null);
   };
 
-  const reviewApplication = async (id: string, status: 'approved' | 'rejected') => {
+  const startApproval = (app: PartnerApplication) => {
+    const suggested = PLAN_FROM_ESTIMATE[app.monthly_bookings_estimate] ?? 'starter';
+    setSelectedPlan(suggested);
+    setApprovalError('');
+    setApprovingId(app.id);
+  };
+
+  const confirmApproval = async (applicationId: string) => {
+    setApproving(true);
+    setApprovalError('');
     const res = await fetch('/api/admin/applications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ applicationId: id, status }),
+      body: JSON.stringify({ applicationId, status: 'approved', planKey: selectedPlan }),
     });
     if (res.ok) {
-      setLocalApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+      setLocalApplications((prev) => prev.map((a) => (a.id === applicationId ? { ...a, status: 'approved' } : a)));
+      setApprovingId(null);
+    } else {
+      const d = await res.json();
+      setApprovalError(d.error ?? 'Erreur serveur');
+    }
+    setApproving(false);
+  };
+
+  const rejectApplication = async (id: string) => {
+    const res = await fetch('/api/admin/applications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applicationId: id, status: 'rejected' }),
+    });
+    if (res.ok) {
+      setLocalApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'rejected' } : a)));
     }
   };
 
@@ -135,6 +173,12 @@ export default function AdminDashboard({
                     <p className="text-xs text-white/50">
                       {app.gerant} · {app.email}
                     </p>
+                    <p className="text-xs text-white/30 mt-0.5">
+                      {app.category}
+                      {app.category_label && ` — ${app.category_label}`}
+                      {app.type && ` (${app.type})`}
+                      {' '}· {app.monthly_bookings_estimate} rés/mois
+                    </p>
                   </div>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[11px] ${
@@ -148,20 +192,80 @@ export default function AdminDashboard({
                     {app.status}
                   </span>
                 </div>
-                {app.status === 'pending' && (
+
+                {app.status === 'pending' && approvingId !== app.id && (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => reviewApplication(app.id, 'approved')}
+                      onClick={() => startApproval(app)}
                       className="rounded-lg bg-mint-500 px-3 py-1.5 text-xs font-medium text-navy-950"
                     >
                       Approuver
                     </button>
                     <button
-                      onClick={() => reviewApplication(app.id, 'rejected')}
+                      onClick={() => rejectApplication(app.id)}
                       className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs text-red-300"
                     >
                       Rejeter
                     </button>
+                  </div>
+                )}
+
+                {/* Panneau de confirmation d'approbation */}
+                {approvingId === app.id && (
+                  <div className="mt-3 rounded-xl border border-mint-500/20 bg-mint-500/5 p-4 space-y-3">
+                    <p className="text-xs font-semibold text-mint-400 uppercase tracking-widest">
+                      Confirmer l'approbation
+                    </p>
+
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-400">
+                        Plan suggéré : <span className="text-white font-medium">{PLAN_FROM_ESTIMATE[app.monthly_bookings_estimate] ?? 'starter'}</span>
+                        {' '}(basé sur {app.monthly_bookings_estimate} rés/mois)
+                      </p>
+                      <div className="space-y-1.5">
+                        {BNP_PLANS.map((plan) => (
+                          <label key={plan.key} className={`flex items-center justify-between rounded-lg border px-3 py-2 cursor-pointer transition-all ${
+                            selectedPlan === plan.key
+                              ? 'border-mint-500/50 bg-mint-500/10'
+                              : 'border-white/[0.06] hover:border-white/15'
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name={`plan-${app.id}`}
+                                value={plan.key}
+                                checked={selectedPlan === plan.key}
+                                onChange={() => setSelectedPlan(plan.key)}
+                                className="accent-mint-500"
+                              />
+                              <span className="text-sm text-white font-medium">{plan.label}</span>
+                            </div>
+                            <span className="text-xs text-slate-400">{plan.priceHT} € HT/mois · {plan.engagementMonths} mois</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {approvalError && (
+                      <p className="text-xs text-red-400">{approvalError}</p>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => confirmApproval(app.id)}
+                        disabled={approving}
+                        className="rounded-lg bg-mint-500 px-4 py-1.5 text-xs font-semibold text-navy-950 disabled:opacity-50"
+                      >
+                        {approving ? 'Création du compte...' : 'Confirmer →'}
+                      </button>
+                      <button
+                        onClick={() => { setApprovingId(null); setApprovalError(''); }}
+                        disabled={approving}
+                        className="rounded-lg bg-white/[0.06] px-3 py-1.5 text-xs text-slate-400"
+                      >
+                        Annuler
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

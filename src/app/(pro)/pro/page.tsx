@@ -1,7 +1,7 @@
 // src/app/(pro)/pro/page.tsx
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getProBookings, getProStats, getBusinessSettings } from '@/lib/queries/pro';
 import ProDashboard from '@/components/pro/ProDashboard';
 
@@ -18,6 +18,21 @@ export default async function ProPage() {
 
   if (!profile || (profile.role !== 'pro' && profile.role !== 'admin') || !profile.biz_id) {
     redirect('/');
+  }
+
+  // Billing non configuré → setup
+  const admin = createServiceRoleClient();
+  const { data: billingCheck } = await admin
+    .from('business_settings')
+    .select('subscription_status')
+    .eq('biz_id', profile.biz_id!)
+    .maybeSingle();
+  if (billingCheck?.subscription_status === 'pending') redirect('/pro/setup-billing');
+
+  // Redirige vers l'onboarding si l'établissement n'est pas encore publié
+  const biz = profile.businesses as { is_published?: boolean } | null;
+  if (biz && biz.is_published === false) {
+    redirect('/pro/onboarding');
   }
 
   const today = new Date().toISOString().split('T')[0];

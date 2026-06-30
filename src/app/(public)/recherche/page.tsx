@@ -10,6 +10,8 @@ const CAT_EMOJI: Record<string, string> = {
   beaute: '✂️',
   'bien-etre': '🧖',
   sport: '🏄',
+  autre: '🔮',
+  // Catégories héritées — affichées sur les cartes si présentes en DB
   enfants: '👶',
   food: '🍽️',
   education: '📚',
@@ -21,6 +23,8 @@ const CAT_COLOR: Record<string, string> = {
   beaute: 'from-pink-500/20 to-rose-500/10',
   'bien-etre': 'from-violet-500/20 to-purple-500/10',
   sport: 'from-blue-500/20 to-cyan-500/10',
+  autre: 'from-slate-500/20 to-gray-500/10',
+  // Catégories héritées
   enfants: 'from-yellow-500/20 to-amber-500/10',
   food: 'from-orange-500/20 to-red-500/10',
   education: 'from-indigo-500/20 to-blue-500/10',

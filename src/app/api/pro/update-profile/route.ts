@@ -17,19 +17,30 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const allowed = ['instagram', 'facebook_url', 'website'];
-  const updates: Record<string, string | null> = {};
+  if (!body) return NextResponse.json({ error: 'Corps invalide' }, { status: 400 });
 
-  for (const key of allowed) {
+  const updates: Record<string, unknown> = {};
+
+  // Champs texte simples
+  for (const key of ['instagram', 'facebook_url', 'website']) {
     if (key in body) {
-      const val = typeof body[key] === 'string' ? body[key].trim() || null : null;
-      updates[key] = val;
+      updates[key] = typeof body[key] === 'string' ? body[key].trim() || null : null;
     }
   }
 
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ ok: true });
+  // Horaires
+  if ('open_time' in body) {
+    updates.open_time = typeof body.open_time === 'string' && body.open_time ? body.open_time : null;
   }
+  if ('close_time' in body) {
+    updates.close_time = typeof body.close_time === 'string' && body.close_time ? body.close_time : null;
+  }
+  if ('open_days' in body) {
+    const days = body.open_days;
+    updates.open_days = Array.isArray(days) ? days.filter((d: unknown) => typeof d === 'number' && d >= 0 && d <= 6) : [];
+  }
+
+  if (Object.keys(updates).length === 0) return NextResponse.json({ ok: true });
 
   const supabaseAdmin = createServiceRoleClient();
   const { error } = await supabaseAdmin

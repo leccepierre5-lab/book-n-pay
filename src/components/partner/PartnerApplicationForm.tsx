@@ -2,6 +2,19 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
+const CATEGORIES = [
+  { value: 'beaute', label: 'Beauté', sub: 'Coiffure, esthétique, barber, onglerie…' },
+  { value: 'bien-etre', label: 'Bien-être', sub: 'Massage, yoga, ostéo, méditation…' },
+  { value: 'sport', label: 'Sport & fitness', sub: 'Coaching, gym, natation, arts martiaux…' },
+  { value: 'autre', label: 'Autre', sub: 'Photographie, tatouage, vétérinaire, alimentation…' },
+] as const;
+
+const BOOKINGS_ESTIMATES = [
+  { value: '0-80', label: 'Moins de 80 / mois', hint: 'Plan Starter — 79 € HT' },
+  { value: '81-300', label: '81 à 300 / mois', hint: 'Plan Business — 139 € HT' },
+  { value: '300+', label: 'Plus de 300 / mois', hint: 'Plan Scale — 299 € HT' },
+] as const;
+
 export default function PartnerApplicationForm() {
   const [form, setForm] = useState({
     etablissement: '',
@@ -12,12 +25,22 @@ export default function PartnerApplicationForm() {
     instagram: '',
     website: '',
   });
+  const [category, setCategory] = useState<'beaute' | 'bien-etre' | 'sport' | 'autre' | ''>('');
+  const [categoryLabel, setCategoryLabel] = useState('');
+  const [bizType, setBizType] = useState('');
+  const [bookingsEstimate, setBookingsEstimate] = useState<'0-80' | '81-300' | '300+' | ''>('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!category) { setError('Sélectionnez votre catégorie d\'activité.'); return; }
+    if (category === 'autre' && !categoryLabel.trim()) {
+      setError('Décrivez votre secteur d\'activité.');
+      return;
+    }
+    if (!bookingsEstimate) { setError('Sélectionnez votre volume estimé de réservations.'); return; }
     setLoading(true);
     setError(null);
     const supabase = createClient();
@@ -29,6 +52,10 @@ export default function PartnerApplicationForm() {
       google_maps_url: form.googleMapsUrl || null,
       instagram: form.instagram || null,
       website: form.website || null,
+      category,
+      category_label: category === 'autre' ? (categoryLabel.trim() || null) : null,
+      type: bizType.trim() || null,
+      monthly_bookings_estimate: bookingsEstimate,
     });
     if (insertError) {
       setError(insertError.message);
@@ -87,6 +114,88 @@ export default function PartnerApplicationForm() {
         <input placeholder="Nom du gérant *" value={form.gerant} onChange={(e) => setForm({ ...form, gerant: e.target.value })} required className={inputClass} />
         <input type="email" placeholder="Email professionnel *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required className={inputClass} />
         <input type="tel" placeholder="Téléphone *" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required className={inputClass} />
+      </section>
+
+      {/* Catégorie — obligatoire */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+          Votre activité <span className="text-red-400">*</span>
+        </h2>
+        <div className="space-y-2">
+          {CATEGORIES.map(({ value, label, sub }) => (
+            <label
+              key={value}
+              className={`flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all ${
+                category === value
+                  ? 'border-mint-500/50 bg-mint-500/10'
+                  : 'border-white/[0.08] bg-white/[0.02] hover:border-white/15'
+              }`}
+            >
+              <input
+                type="radio"
+                name="category"
+                value={value}
+                checked={category === value}
+                onChange={() => setCategory(value)}
+                className="mt-0.5 accent-mint-500"
+              />
+              <div>
+                <p className="text-sm font-medium text-white">{label}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">{sub}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        {/* Champs supplémentaires pour la catégorie "Autre" */}
+        {category === 'autre' && (
+          <div className="space-y-2 pt-1">
+            <input
+              placeholder="Votre secteur d'activité * (ex : Photographie, Tatouage…)"
+              value={categoryLabel}
+              onChange={(e) => setCategoryLabel(e.target.value)}
+              className={inputClass}
+            />
+            <input
+              placeholder="Type d'établissement (ex : Studio, Indépendant…)"
+              value={bizType}
+              onChange={(e) => setBizType(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+        )}
+      </section>
+
+      {/* Volume estimé — obligatoire */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+          Volume de réservations estimé <span className="text-red-400">*</span>
+        </h2>
+        <div className="space-y-2">
+          {BOOKINGS_ESTIMATES.map(({ value, label, hint }) => (
+            <label
+              key={value}
+              className={`flex items-center justify-between rounded-xl border px-4 py-3 cursor-pointer transition-all ${
+                bookingsEstimate === value
+                  ? 'border-mint-500/50 bg-mint-500/10'
+                  : 'border-white/[0.08] bg-white/[0.02] hover:border-white/15'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="bookings_estimate"
+                  value={value}
+                  checked={bookingsEstimate === value}
+                  onChange={() => setBookingsEstimate(value)}
+                  className="accent-mint-500"
+                />
+                <span className="text-sm text-white">{label}</span>
+              </div>
+              <span className="text-[11px] text-slate-500">{hint}</span>
+            </label>
+          ))}
+        </div>
       </section>
 
       <section className="space-y-3">

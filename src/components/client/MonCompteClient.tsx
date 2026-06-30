@@ -41,6 +41,17 @@ export default function MonCompteClient({
     if (newPw !== confirmPw) { setPwError('Les mots de passe ne correspondent pas.'); return; }
     if (newPw.length < 6) { setPwError('6 caractères minimum.'); return; }
     setPwLoading(true); setPwError(null);
+
+    if (initialReset) {
+      // Session recovery déjà établie par verifyOtp — updateUser direct, sans re-auth
+      const { error } = await createClient().auth.updateUser({ password: newPw });
+      setPwLoading(false);
+      if (error) { setPwError(error.message); return; }
+      setPwSuccess(true);
+      setNewPw(''); setConfirmPw('');
+      return;
+    }
+
     const res = await fetch('/api/auth/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -159,14 +170,16 @@ export default function MonCompteClient({
               </div>
             ) : (
               <form onSubmit={handleChangePassword} className="space-y-3">
-                <input
-                  type="password"
-                  placeholder="Mot de passe actuel"
-                  value={currentPw}
-                  onChange={(e) => setCurrentPw(e.target.value)}
-                  required
-                  className={inputClass}
-                />
+                {!initialReset && (
+                  <input
+                    type="password"
+                    placeholder="Mot de passe actuel"
+                    value={currentPw}
+                    onChange={(e) => setCurrentPw(e.target.value)}
+                    required
+                    className={inputClass}
+                  />
+                )}
                 <input
                   type="password"
                   placeholder="Nouveau mot de passe (6 min.)"
