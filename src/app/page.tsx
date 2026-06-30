@@ -159,8 +159,17 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    createClient().auth.getSession().then(({ data }) => {
-      if (data.session) router.replace('/recherche');
+    const supabase = createClient();
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) return;
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('role')
+        .eq('id', data.session.user.id)
+        .single();
+      if (appUser?.role === 'admin') router.replace('/admin');
+      else if (appUser?.role === 'pro') router.replace('/pro');
+      else router.replace('/recherche');
     });
   }, [router]);
 
