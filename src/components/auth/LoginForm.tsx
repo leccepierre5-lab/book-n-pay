@@ -34,21 +34,22 @@ export default function LoginForm() {
       setLoading(false);
       return;
     }
-    // Si un redirect explicite est fourni (ex: tunnel de réservation), on l'honore.
-    // Sinon, on route selon le rôle.
-    const hasExplicitRedirect = new URLSearchParams(window.location.search).get('redirect');
-    if (hasExplicitRedirect) {
-      window.location.href = hasExplicitRedirect;
-      return;
-    }
     const { data: appUser } = await supabase
       .from('app_users')
       .select('role')
       .eq('id', signInData.user.id)
       .single();
-    if (appUser?.role === 'admin') window.location.href = '/admin';
-    else if (appUser?.role === 'pro') window.location.href = '/pro';
-    else window.location.href = '/recherche';
+    const role = appUser?.role;
+    const explicitRedirect = new URLSearchParams(window.location.search).get('redirect');
+    // Admin et pro : le rôle prime sur tout redirect explicite venant de la homepage.
+    // Client : on honore le redirect explicite (tunnel de réservation, mes-reservations…).
+    if (role === 'admin') {
+      window.location.href = '/admin';
+    } else if (role === 'pro') {
+      window.location.href = explicitRedirect?.startsWith('/pro') ? explicitRedirect : '/pro';
+    } else {
+      window.location.href = explicitRedirect || '/recherche';
+    }
   };
 
   const handleForgot = async (e: React.FormEvent) => {
