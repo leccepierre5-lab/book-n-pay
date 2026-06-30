@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 /* ── Icônes slides ── */
 function GhostIcon() {
@@ -156,6 +157,12 @@ function CGULine() {
 export default function HomePage() {
   const [slide, setSlide] = useState(0);
   const router = useRouter();
+
+  useEffect(() => {
+    createClient().auth.getSession().then(({ data }) => {
+      if (data.session) router.replace('/recherche');
+    });
+  }, [router]);
 
   const handleNext = () => {
     if (slide < 2) setSlide(slide + 1);
