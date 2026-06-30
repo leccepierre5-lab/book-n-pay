@@ -1,8 +1,7 @@
 // src/app/api/cron/check-no-shows/route.ts
-// Port de base44/functions/checkNoShows/entry.ts
 //
-// Déclenché par Vercel Cron (voir vercel.json) toutes les 15 minutes.
-// Détecte les no-shows (15 à 180 min après le RDV, membre encore 'paid'),
+// Déclenché par Vercel Cron (voir vercel.json) tous les jours à 8h UTC.
+// Détecte les no-shows (15 min+ après le RDV, membre encore 'paid'),
 // les marque 'no_show', et désactive les FlashSlots expirés.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
@@ -35,11 +34,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 1. Récupérer les bookings actifs avec leurs membres
+  // 1. Récupérer les bookings actifs des 7 derniers jours avec leurs membres
+  const sevenDaysAgo = new Date(now);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
+  const todayStr = now.toISOString().slice(0, 10);
+
   const { data: bookings } = await supabase
     .from('bookings')
     .select('id, biz_name, date, time, booking_members(id, status)')
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .gte('date', sevenDaysAgoStr)
+    .lte('date', todayStr);
 
   let processed = 0;
 
@@ -48,7 +54,8 @@ export async function GET(req: NextRequest) {
     const rdvDate = parseParisDatetime(booking.date, booking.time);
     const diffMin = (nowTs - rdvDate.getTime()) / 60000;
 
-    if (diffMin < 15 || diffMin > 180) continue;
+    // Grâce période 15 min — ignore les RDV futurs ou trop récents
+    if (diffMin < 15) continue;
 
     const paidMembers = (booking.booking_members || []).filter((mb: any) => mb.status === 'paid');
     if (paidMembers.length === 0) continue;
