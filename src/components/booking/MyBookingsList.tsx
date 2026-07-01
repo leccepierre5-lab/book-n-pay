@@ -58,6 +58,7 @@ function GroupCard({
   cancellingId: string | null;
 }) {
   const [payingForId, setPayingForId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const first = groupBookings[0];
   if (!first) return null;
@@ -92,9 +93,13 @@ function GroupCard({
 
   return (
     <div className="rounded-2xl bg-navy-900 border border-white/[0.08] overflow-hidden">
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-3">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full p-4 text-left"
+      >
+        {/* Header — toujours visible, sert de bannière compacte */}
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Groupe</span>
@@ -104,18 +109,29 @@ function GroupCard({
             <p className="text-sm font-semibold text-white truncate">{first.biz_name}</p>
             <p className="text-xs text-slate-500 mt-0.5 truncate">{first.service_name}</p>
           </div>
-          <span className={`shrink-0 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
-            allPaid
-              ? 'bg-emerald-500/12 text-emerald-400 border-emerald-500/25'
-              : isExpired
-              ? 'bg-red-500/12 text-red-400 border-red-500/25'
-              : 'bg-amber-500/12 text-amber-300 border-amber-500/25'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${allPaid ? 'bg-emerald-400' : isExpired ? 'bg-red-400' : 'bg-amber-400'}`} />
-            {allPaid ? 'Complet' : isExpired ? 'Expiré' : 'En cours'}
-          </span>
+          <div className="shrink-0 flex items-center gap-2">
+            <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+              allPaid
+                ? 'bg-emerald-500/12 text-emerald-400 border-emerald-500/25'
+                : isExpired
+                ? 'bg-red-500/12 text-red-400 border-red-500/25'
+                : 'bg-amber-500/12 text-amber-300 border-amber-500/25'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${allPaid ? 'bg-emerald-400' : isExpired ? 'bg-red-400' : 'bg-amber-400'}`} />
+              {allPaid ? 'Complet' : isExpired ? 'Expiré' : 'En cours'}
+            </span>
+            <svg
+              className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            >
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
         </div>
+      </button>
 
+      {expanded && (
+      <div className="px-4 pb-4">
         {/* Date / time */}
         <div className="flex items-center gap-4 mb-3">
           <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -224,12 +240,16 @@ function GroupCard({
           })}
         </div>
       </div>
+      )}
 
-      {isCancellable && myBooking && myMemberEntry && (
+      {expanded && isCancellable && myBooking && myMemberEntry && (
         <div className="border-t border-white/[0.05] px-4 py-2.5 flex items-center justify-between">
           <p className="text-[10px] text-slate-600">Remboursé si annulé 48h avant</p>
           <button
-            onClick={() => onCancel(myBooking, myMemberEntry)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancel(myBooking, myMemberEntry);
+            }}
             disabled={cancellingId === myBooking.id}
             className="text-xs text-red-500/70 hover:text-red-400 disabled:opacity-50 transition-colors font-medium"
           >
