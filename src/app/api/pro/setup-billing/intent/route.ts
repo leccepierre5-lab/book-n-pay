@@ -18,7 +18,19 @@ export async function GET() {
   }
 
   const admin = createServiceRoleClient();
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+  // ⚠️ CORRECTIF : cette route utilisait toujours STRIPE_SECRET_KEY (live),
+  // sans jamais respecter mode_test_paiement comme stripe/checkout/route.ts.
+  // Les Price objects Starter/Business/Scale (STRIPE_PRICE_*) n'existent
+  // aujourd'hui qu'en mode test — indispensable tant qu'aucun equivalent
+  // live n'a ete cree dans Stripe.
+  const { data: testModeConfig } = await admin
+    .from('app_config')
+    .select('value')
+    .eq('key', 'mode_test_paiement')
+    .maybeSingle();
+  const isTestMode = testModeConfig?.value === 'true';
+  const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
 
   const { data: settings } = await admin
     .from('business_settings')

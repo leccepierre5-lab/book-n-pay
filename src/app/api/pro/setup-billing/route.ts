@@ -60,7 +60,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  // ⚠️ CORRECTIF : cette route utilisait toujours STRIPE_SECRET_KEY (live),
+  // sans jamais respecter mode_test_paiement comme stripe/checkout/route.ts.
+  // Indispensable tant que STRIPE_PRICE_STARTER/BUSINESS/SCALE ne pointent
+  // que vers des Price objects en mode test (aucun equivalent live cree).
+  const { data: testModeConfig } = await admin
+    .from('app_config')
+    .select('value')
+    .eq('key', 'mode_test_paiement')
+    .maybeSingle();
+  const isTestMode = testModeConfig?.value === 'true';
+  const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
 
   try {
     // Attacher le PM au Customer et le définir par défaut
