@@ -9,6 +9,20 @@ import Stripe from 'stripe';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 
+// ⚠️ CORRECTIF (test E2E billing) : sur ce compte Stripe (version d'API
+// 2026-05-27.dahlia), invoice.subscription n'est plus peuplé — confirmé en
+// inspectant le payload brut d'un evenement invoice.payment_succeeded reel.
+// La reference vit desormais sous invoice.parent.subscription_details.subscription.
+// Le SDK stripe installe (v17.7.0) ne declare ni `parent` sur Invoice, ni
+// `subscription` sur SubscriptionDetails — d'ou le cast local ici plutot
+// qu'un acces type par type partout ou c'est utilise.
+function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | undefined {
+  const parent = (invoice as unknown as {
+    parent?: { subscription_details?: { subscription?: string } } | null;
+  }).parent;
+  return parent?.subscription_details?.subscription;
+}
+
 export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const body = await req.text();
@@ -360,13 +374,7 @@ L'équipe Book'nPay`,
   // qui fait passer subscription_status à 'active'.
   if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object as Stripe.Invoice;
-    // ⚠️ CORRECTIF (test E2E) : invoice.subscription n'est plus peuplé dans la
-    // version d'API de ce compte (2026-05-27.dahlia) — confirmé en inspectant
-    // le payload brut de l'evenement, la reference vit desormais sous
-    // subscription_details.subscription.
-    // Cast local — le SDK stripe (v17.7.0) ne declare que `metadata` sur
-    // SubscriptionDetails, ce champ existe pourtant bien dans le payload reel.
-    const subscriptionId = (invoice.subscription_details as { subscription?: string } | null)?.subscription;
+    const subscriptionId = getInvoiceSubscriptionId(invoice);
 
     if (subscriptionId) {
       const { data: settings } = await supabase
@@ -388,9 +396,7 @@ L'équipe Book'nPay`,
   // ── ABONNEMENT PRO — échec de paiement de facture ───────────────────────
   if (event.type === 'invoice.payment_failed') {
     const invoice = event.data.object as Stripe.Invoice;
-    // Cast local — le SDK stripe (v17.7.0) ne declare que `metadata` sur
-    // SubscriptionDetails, ce champ existe pourtant bien dans le payload reel.
-    const subscriptionId = (invoice.subscription_details as { subscription?: string } | null)?.subscription;
+    const subscriptionId = getInvoiceSubscriptionId(invoice);
 
     if (subscriptionId) {
       const { data: settings } = await supabase
