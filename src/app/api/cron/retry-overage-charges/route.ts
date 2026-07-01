@@ -1,6 +1,7 @@
 // src/app/api/cron/retry-overage-charges/route.ts
-// Cron toutes les 6h (voir vercel.json) — retente les charges hors-forfait
-// dont le retry à +24h est arrivé à échéance (voir 0020_overage_charges.sql).
+// Cron quotidien (voir vercel.json — plan Hobby Vercel limité à 1x/jour) —
+// retente les charges hors-forfait dont le retry à +24h est arrivé à
+// échéance (voir 0020_overage_charges.sql).
 // pending → retry_scheduled (webhook, tentative immédiate) → ce cron tente
 // une 2e et dernière fois : succès → paid, échec → failed (bandeau urgent pro).
 import { NextRequest, NextResponse } from 'next/server';
