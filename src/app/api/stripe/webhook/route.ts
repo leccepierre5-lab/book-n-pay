@@ -360,7 +360,13 @@ L'équipe Book'nPay`,
   // qui fait passer subscription_status à 'active'.
   if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object as Stripe.Invoice;
-    const subscriptionId = invoice.subscription;
+    // ⚠️ CORRECTIF (test E2E) : invoice.subscription n'est plus peuplé dans la
+    // version d'API de ce compte (2026-05-27.dahlia) — confirmé en inspectant
+    // le payload brut de l'evenement, la reference vit desormais sous
+    // subscription_details.subscription.
+    // Cast local — le SDK stripe (v17.7.0) ne declare que `metadata` sur
+    // SubscriptionDetails, ce champ existe pourtant bien dans le payload reel.
+    const subscriptionId = (invoice.subscription_details as { subscription?: string } | null)?.subscription;
 
     if (subscriptionId) {
       const { data: settings } = await supabase
@@ -382,7 +388,9 @@ L'équipe Book'nPay`,
   // ── ABONNEMENT PRO — échec de paiement de facture ───────────────────────
   if (event.type === 'invoice.payment_failed') {
     const invoice = event.data.object as Stripe.Invoice;
-    const subscriptionId = invoice.subscription;
+    // Cast local — le SDK stripe (v17.7.0) ne declare que `metadata` sur
+    // SubscriptionDetails, ce champ existe pourtant bien dans le payload reel.
+    const subscriptionId = (invoice.subscription_details as { subscription?: string } | null)?.subscription;
 
     if (subscriptionId) {
       const { data: settings } = await supabase
