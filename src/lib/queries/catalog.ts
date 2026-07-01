@@ -29,11 +29,12 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
 
   if (filters.category && filters.category !== 'all') {
     if (filters.category === 'autre') {
-      // "Autre" = tout ce qui n'est pas l'un des 3 secteurs principaux
-      queryBuilder = queryBuilder
-        .neq('category', 'beaute')
-        .neq('category', 'bien-etre')
-        .neq('category', 'sport');
+      // "Autre" = tout ce qui n'est pas un secteur nommé (inclut aussi les
+      // valeurs héritées creatif/education/enfants/food/services)
+      const namedCategories = CATEGORIES.map((c) => c.id).filter((id) => id !== 'all' && id !== 'autre');
+      for (const cat of namedCategories) {
+        queryBuilder = queryBuilder.neq('category', cat);
+      }
     } else {
       queryBuilder = queryBuilder.eq('category', filters.category);
     }
@@ -119,6 +120,14 @@ export const CATEGORIES = [
   { id: 'beaute', label: 'Beauté' },
   { id: 'bien-etre', label: 'Bien Être' },
   { id: 'sport', label: 'Sport' },
+  { id: 'sante', label: 'Santé' },
+  { id: 'soins-corps', label: 'Soins du corps' },
+  { id: 'coiffure-barber', label: 'Coiffure & Barber' },
+  { id: 'tatouage-piercing', label: 'Tatouage & Piercing' },
+  { id: 'coaching', label: 'Coaching' },
+  { id: 'animaux', label: 'Animaux' },
+  { id: 'beaute-domicile', label: 'Beauté à domicile' },
+  { id: 'photographie', label: 'Photographie' },
   { id: 'autre', label: 'Autre' },
 ];
 

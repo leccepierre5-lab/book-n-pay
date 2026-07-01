@@ -6,8 +6,29 @@ const CATEGORIES = [
   { value: 'beaute', label: 'Beauté', sub: 'Coiffure, esthétique, barber, onglerie…' },
   { value: 'bien-etre', label: 'Bien-être', sub: 'Massage, yoga, ostéo, méditation…' },
   { value: 'sport', label: 'Sport & fitness', sub: 'Coaching, gym, natation, arts martiaux…' },
-  { value: 'autre', label: 'Autre', sub: 'Photographie, tatouage, vétérinaire, alimentation…' },
+  { value: 'sante', label: 'Santé & médecines douces', sub: 'Ostéopathe, naturopathe, diététicien, réflexologue…' },
+  { value: 'soins-corps', label: 'Soins du corps', sub: 'Spa, hammam, épilation, UV, balnéo…' },
+  { value: 'coiffure-barber', label: 'Coiffure & Barber', sub: 'Coiffeur·se, barbier, afro, extensions…' },
+  { value: 'tatouage-piercing', label: 'Tatouage & Piercing', sub: 'Tatoueur, perceur, maquillage permanent…' },
+  { value: 'coaching', label: 'Coaching & développement personnel', sub: 'Coach de vie, hypnothérapeute, sophrologue…' },
+  { value: 'animaux', label: 'Animaux', sub: 'Toiletteur, pet-sitter, éducateur canin…' },
+  { value: 'beaute-domicile', label: 'Beauté à domicile', sub: 'Coiffure, esthétique, manucure à domicile…' },
+  { value: 'photographie', label: 'Photographie', sub: 'Portrait, mariage, nouveau-né, entreprise…' },
+  { value: 'autre', label: 'Autre', sub: 'Un secteur qui ne correspond à aucune catégorie ci-dessus…' },
 ] as const;
+
+// Suggestions affichées comme exemple dans le champ "type d'établissement"
+// une fois la catégorie sélectionnée.
+const TYPE_PLACEHOLDERS: Partial<Record<(typeof CATEGORIES)[number]['value'], string>> = {
+  sante: 'ex : Ostéopathe, Naturopathe, Diététicien/Nutritionniste, Podologue, Réflexologue, Énergéticien/Reiki, Kinésiologue, Magnétiseur, Acupressure/Shiatsu, Ayurveda…',
+  'soins-corps': 'ex : Spa/Institut, Hammam/Sauna, Épilation, UV/Bronzage, Balnéo/Bains, Masseur bien-être, Drainage lymphatique…',
+  'coiffure-barber': 'ex : Coiffeur·se, Barbier, Coiffeur afro, Extensions/Tresses…',
+  'tatouage-piercing': 'ex : Tatoueur, Perceur, Maquillage permanent/Microblading…',
+  coaching: 'ex : Coach de vie, Hypnothérapeute, Sophrologue, Psychologue (non remboursé), Méditation/Pleine conscience…',
+  animaux: 'ex : Toiletteur, Dog-sitter/Pet-sitter, Éducateur canin, Vétérinaire (consultations privées)…',
+  'beaute-domicile': 'ex : Coiffeur·se à domicile, Esthéticienne à domicile, Maquilleur·se à domicile, Manucure à domicile…',
+  photographie: 'ex : Portrait, Mariage, Nouveau-né/Bébé, Famille, Entreprise/Corporate…',
+};
 
 const BOOKINGS_ESTIMATES = [
   { value: '0-80', label: 'Moins de 80 / mois', hint: 'Plan Starter — 79 € HT' },
@@ -25,7 +46,7 @@ export default function PartnerApplicationForm() {
     instagram: '',
     website: '',
   });
-  const [category, setCategory] = useState<'beaute' | 'bien-etre' | 'sport' | 'autre' | ''>('');
+  const [category, setCategory] = useState<(typeof CATEGORIES)[number]['value'] | ''>('');
   const [categoryLabel, setCategoryLabel] = useState('');
   const [bizType, setBizType] = useState('');
   const [bookingsEstimate, setBookingsEstimate] = useState<'0-80' | '81-300' | '300+' | ''>('');
@@ -147,17 +168,23 @@ export default function PartnerApplicationForm() {
           ))}
         </div>
 
-        {/* Champs supplémentaires pour la catégorie "Autre" */}
+        {/* Champ libre pour décrire le secteur — obligatoire seulement pour "Autre" */}
         {category === 'autre' && (
-          <div className="space-y-2 pt-1">
+          <div className="pt-1">
             <input
               placeholder="Votre secteur d'activité * (ex : Photographie, Tatouage…)"
               value={categoryLabel}
               onChange={(e) => setCategoryLabel(e.target.value)}
               className={inputClass}
             />
+          </div>
+        )}
+
+        {/* Type d'établissement — optionnel, placeholder d'exemples selon la catégorie */}
+        {category && (
+          <div className={category === 'autre' ? '' : 'pt-1'}>
             <input
-              placeholder="Type d'établissement (ex : Studio, Indépendant…)"
+              placeholder={TYPE_PLACEHOLDERS[category] || "Type d'établissement (ex : Studio, Indépendant…)"}
               value={bizType}
               onChange={(e) => setBizType(e.target.value)}
               className={inputClass}

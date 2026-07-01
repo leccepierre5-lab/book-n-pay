@@ -229,8 +229,9 @@ export interface PartnerApplication {
   status: ApplicationStatus;
   admin_note: string | null;
   created_at: string;
-  // Migration 0016
-  category: 'beaute' | 'bien-etre' | 'sport' | 'autre';
+  // Migration 0016 + 0018
+  category: 'beaute' | 'bien-etre' | 'sport' | 'sante' | 'soins-corps' | 'coiffure-barber'
+    | 'tatouage-piercing' | 'coaching' | 'animaux' | 'beaute-domicile' | 'photographie' | 'autre';
   category_label: string | null;
   type: string | null;
   monthly_bookings_estimate: '0-80' | '81-300' | '300+';
