@@ -61,4 +61,38 @@
   .input-field {
     @apply w-full rounded-xl bg-navy-900 border border-white/[0.08] px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-mint-500/50 focus:ring-2 focus:ring-mint-500/20 transition-all duration-200;
   }
+
+  .slider-mint {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    outline: none;
+  }
+  .slider-mint::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #34d399, #6ee7b7);
+    box-shadow: 0 0 10px rgba(52,211,153,0.55);
+    cursor: pointer;
+    border: 2px solid #0f172a;
+  }
+  .slider-mint::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #34d399, #6ee7b7);
+    box-shadow: 0 0 10px rgba(52,211,153,0.55);
+    cursor: pointer;
+    border: 2px solid #0f172a;
+  }
+  .slider-mint::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+  }
 }
