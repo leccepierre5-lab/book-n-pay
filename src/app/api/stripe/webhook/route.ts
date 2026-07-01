@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
+import { maybeCreateOverageCharge, invoiceUnpaidOverageCharges } from '@/lib/stripe/overageCharge';
 
 // ⚠️ CORRECTIF (test E2E billing) : sur ce compte Stripe (version d'API
 // 2026-05-27.dahlia), invoice.subscription n'est plus peuplé — confirmé en
@@ -208,24 +209,32 @@ export async function POST(req: NextRequest) {
         .select('id, status')
         .eq('booking_id', bookingId);
 
+      const { data: bookingRow } = await supabase
+        .from('bookings')
+        .select('biz_id, status, group_ref, biz_name, service_name, date, time')
+        .eq('id', bookingId)
+        .maybeSingle();
+
       const activeMembers = (allMembers ?? []).filter(m => m.status !== 'cancelled');
+      const wasAlreadyComplete = bookingRow?.status === 'complete';
       if (activeMembers.length > 0 && activeMembers.every(m => m.status === 'paid')) {
         await supabase
           .from('bookings')
           .update({ status: 'complete' })
           .eq('id', bookingId);
         console.log(`[Webhook] ✅ Booking ${bookingId} → complete (tous les membres ont payé)`);
+
+        // ── Hors-forfait pro ────────────────────────────────────────────────
+        // Idempotence : on ne compte la réservation qu'une seule fois, à la
+        // toute première bascule vers 'complete' (le webhook peut être rejoué).
+        if (!wasAlreadyComplete && bookingRow?.biz_id) {
+          await maybeCreateOverageCharge(supabase, bookingRow.biz_id, bookingId);
+        }
       }
 
       // ── Complétion de groupe ─────────────────────────────────────────────
       // Si ce booking appartient à un groupe, vérifier si TOUS les bookings
       // du groupe sont maintenant complets → email de confirmation à tous
-      const { data: bookingRow } = await supabase
-        .from('bookings')
-        .select('group_ref, biz_name, service_name, date, time')
-        .eq('id', bookingId)
-        .maybeSingle();
-
       if (bookingRow?.group_ref) {
         const { data: groupBookings } = await supabase
           .from('bookings')
@@ -389,6 +398,13 @@ L'équipe Book'nPay`,
           .update({ subscription_status: 'active' })
           .eq('biz_id', settings.biz_id);
         console.log(`[Webhook] ✅ Abonnement actif — biz ${settings.biz_id}`);
+      }
+
+      // ── Hors-forfait pro — regroupement des impayés ─────────────────────
+      // Renouvellement mensuel de l'abonnement : on facture séparément les
+      // charges hors-forfait encore en retry_scheduled/failed du mois écoulé.
+      if (settings) {
+        await invoiceUnpaidOverageCharges(supabase, settings.biz_id);
       }
     }
   }
