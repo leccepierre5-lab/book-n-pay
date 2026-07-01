@@ -22,13 +22,19 @@ export default async function ProOnboardingPage({
 
   const admin = createServiceRoleClient();
 
-  // Bloque l'accès au wizard si le billing n'est pas encore configuré
+  // Bloque l'accès au wizard si le billing n'est pas encore configuré.
+  // ⚠️ CORRECTIF (audit — effet de bord du fix #5) : voir pro/page.tsx pour
+  // le détail — on ne renvoie vers setup-billing que si aucune Subscription
+  // Stripe n'a même été tentée, pas juste parce que la confirmation webhook
+  // n'est pas encore arrivée.
   const { data: billingCheck } = await admin
     .from('business_settings')
-    .select('subscription_status')
+    .select('subscription_status, stripe_subscription_id')
     .eq('biz_id', profile.biz_id)
     .maybeSingle();
-  if (billingCheck?.subscription_status === 'pending') redirect('/pro/setup-billing');
+  if (billingCheck?.subscription_status === 'pending' && !billingCheck.stripe_subscription_id) {
+    redirect('/pro/setup-billing');
+  }
 
   const [{ data: biz }, { data: photos }, { count: servicesCount }, { data: settings }] =
     await Promise.all([

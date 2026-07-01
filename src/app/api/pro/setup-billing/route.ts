@@ -84,11 +84,14 @@ export async function POST(req: NextRequest) {
     const engagementEnd = getEngagementEndDate(now, planKey).toISOString().split('T')[0];
     const nextBilling = new Date(subscription.current_period_end * 1000).toISOString().split('T')[0];
 
+    // ⚠️ CORRECTIF (audit — Élevé #5) : subscription_status restait auparavant
+    // 'active' dès la création de la Subscription Stripe, sans attendre la
+    // confirmation réelle du paiement. On laisse 'pending' ici — c'est le
+    // webhook invoice.payment_succeeded qui passe le statut à 'active'.
     await admin.from('business_settings').update({
       stripe_payment_method_id: paymentMethodId,
       payment_method_type: paymentMethodType,
       stripe_subscription_id: subscription.id,
-      subscription_status: 'active',
       subscription_start_date: startDate,
       engagement_end_date: engagementEnd,
       next_billing_date: nextBilling,

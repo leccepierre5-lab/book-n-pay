@@ -355,5 +355,97 @@ L'équipe Book'nPay`,
     }
   }
 
+  // ── ABONNEMENT PRO — paiement de facture confirmé ───────────────────────
+  // Audit (Élevé #5) : c'est ce webhook, pas la création de la Subscription,
+  // qui fait passer subscription_status à 'active'.
+  if (event.type === 'invoice.payment_succeeded') {
+    const invoice = event.data.object as Stripe.Invoice;
+    const subscriptionId = invoice.subscription;
+
+    if (subscriptionId) {
+      const { data: settings } = await supabase
+        .from('business_settings')
+        .select('biz_id, subscription_status')
+        .eq('stripe_subscription_id', subscriptionId)
+        .maybeSingle();
+
+      if (settings && settings.subscription_status !== 'active') {
+        await supabase
+          .from('business_settings')
+          .update({ subscription_status: 'active' })
+          .eq('biz_id', settings.biz_id);
+        console.log(`[Webhook] ✅ Abonnement actif — biz ${settings.biz_id}`);
+      }
+    }
+  }
+
+  // ── ABONNEMENT PRO — échec de paiement de facture ───────────────────────
+  if (event.type === 'invoice.payment_failed') {
+    const invoice = event.data.object as Stripe.Invoice;
+    const subscriptionId = invoice.subscription;
+
+    if (subscriptionId) {
+      const { data: settings } = await supabase
+        .from('business_settings')
+        .select('biz_id')
+        .eq('stripe_subscription_id', subscriptionId)
+        .maybeSingle();
+
+      if (settings) {
+        await supabase
+          .from('business_settings')
+          .update({ subscription_status: 'past_due' })
+          .eq('biz_id', settings.biz_id);
+        console.warn(`[Webhook] ⚠️ Échec de paiement abonnement — biz ${settings.biz_id}`);
+
+        const { data: biz } = await supabase
+          .from('businesses')
+          .select('name, owner_id')
+          .eq('id', settings.biz_id)
+          .maybeSingle();
+
+        if (biz?.owner_id) {
+          const { data: authUser } = await supabase.auth.admin.getUserById(biz.owner_id);
+          const email = authUser.user?.email;
+          if (email) {
+            const amount = (invoice.amount_due / 100).toFixed(2);
+            const reason = invoice.last_finalization_error?.message || null;
+            await sendEmail({
+              to: email,
+              subject: `⚠️ Échec de paiement Book'nPay`,
+              text: `Bonjour,
+
+Le paiement de votre abonnement Book'nPay (${amount}€) pour ${biz.name} n'a pas abouti.${reason ? `\n\nRaison : ${reason}` : ''}
+
+Merci de mettre à jour votre moyen de paiement dès que possible pour éviter une interruption de service :
+${process.env.NEXT_PUBLIC_SITE_URL}/pro/reglages
+
+L'équipe Book'nPay`,
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+  }
+
+  // ── ABONNEMENT PRO — résiliation ─────────────────────────────────────────
+  if (event.type === 'customer.subscription.deleted') {
+    const subscription = event.data.object as Stripe.Subscription;
+
+    const { data: settings } = await supabase
+      .from('business_settings')
+      .select('biz_id')
+      .eq('stripe_subscription_id', subscription.id)
+      .maybeSingle();
+
+    if (settings) {
+      await supabase
+        .from('business_settings')
+        .update({ subscription_status: 'cancelled' })
+        .eq('biz_id', settings.biz_id);
+      console.log(`[Webhook] Abonnement résilié — biz ${settings.biz_id}`);
+    }
+  }
+
   return NextResponse.json({ received: true });
 }
