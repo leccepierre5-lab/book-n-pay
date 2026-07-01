@@ -5,6 +5,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 export const metadata: Metadata = { title: 'Recherche' };
 import { searchBusinesses, CATEGORIES, type SearchFilters } from '@/lib/queries/catalog';
 import type { FlashSlot } from '@/lib/database.types';
+import { SortSelect } from './_components/SortSelect';
 
 const CAT_EMOJI: Record<string, string> = {
   beaute: '✂️',
@@ -145,11 +146,14 @@ export default async function SearchPage({
           </div>
         )}
 
-        {/* Results count */}
-        <p className="mb-4 text-xs font-medium text-slate-500 uppercase tracking-widest">
-          {businesses.length} établissement{businesses.length > 1 ? 's' : ''}
-          {filters.category !== 'all' && ` · ${CATEGORIES.find(c => c.id === filters.category)?.label}`}
-        </p>
+        {/* Results count + sort */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-widest">
+            {businesses.length} établissement{businesses.length > 1 ? 's' : ''}
+            {filters.category !== 'all' && ` · ${CATEGORIES.find(c => c.id === filters.category)?.label}`}
+          </p>
+          <SortSelect />
+        </div>
 
         {/* Business cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
