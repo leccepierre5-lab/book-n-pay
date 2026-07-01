@@ -140,6 +140,7 @@ export interface BookingMember {
   referral_discount_pct: number;
   paid_by_member_id: string | null;
   paid_for_at: string | null;
+  post_visit_popup_shown: boolean;
   created_at: string;
   updated_at: string;
 }
