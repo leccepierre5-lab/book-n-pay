@@ -92,18 +92,24 @@ export async function POST(req: NextRequest) {
     // 1. Générer le lien d'invitation — crée l'utilisateur dans auth.users sans envoyer
     //    d'email Supabase (on envoie un seul email via Resend avec notre template).
     //    Le trigger handle_new_user insère app_users(role='client') synchroniquement.
+    // ⚠️ CORRECTIF (trouvé en audit) : ce flux utilisait auparavant
+    // linkData.properties.action_link (le lien brut hébergé par Supabase) avec
+    // redirectTo=/pro/dashboard — une route qui n'existe pas dans l'app (404
+    // garanti). On construit maintenant notre propre lien via /auth/verify avec
+    // hashed_token, exactement comme register/route.ts et forgot-password/route.ts.
     const { data: linkData, error: linkError } = await service.auth.admin.generateLink({
       type: 'invite',
       email: app.email,
       options: {
         data: { name: app.gerant, role: 'pro' },
-        redirectTo: `${siteUrl}/pro/dashboard`,
+        redirectTo: `${siteUrl}/auth/verify`,
       },
     });
     if (linkError) return NextResponse.json({ error: linkError.message }, { status: 400 });
 
     const proUserId = linkData.user.id;
-    const inviteUrl = linkData.properties.action_link;
+    const { hashed_token } = linkData.properties;
+    const inviteUrl = `${siteUrl}/auth/verify?token_hash=${hashed_token}&type=invite`;
 
     // ── Rollback (supprime l'utilisateur Auth si une étape suivante échoue) ──
     const rollback = async (msg: string) => {
