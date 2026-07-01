@@ -172,13 +172,13 @@ export function isSlotClosed(biz: BizHoraires, date: string, slot: string): bool
 }
 
 // ── Frais de gestion progressifs ─────────────────────────────────────────────
-// Barème : < 50€ → 1,99€ | 50-79€ → 2,10€ | 80-99€ → 2,30€ | ≥ 100€ → 2,50€
+// Barème : ≤ 50€ → 1,99€ | 50,01-80€ → 2,10€ | 80,01-100€ → 2,30€ | > 100€ → 2,50€
 // ⚠️ Garder synchronisé avec app_config (frais_gestion_palier_*) côté serveur —
 // cette fonction sert de fallback si l'AppConfig n'est pas accessible.
 export function calcFraisGestion(servicePrice: number): number {
-  if (servicePrice >= 100) return 2.5;
-  if (servicePrice >= 80) return 2.3;
-  if (servicePrice >= 50) return 2.1;
+  if (servicePrice > 100) return 2.5;
+  if (servicePrice > 80) return 2.3;
+  if (servicePrice > 50) return 2.1;
   return 1.99;
 }
 

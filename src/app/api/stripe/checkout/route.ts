@@ -167,9 +167,9 @@ export async function POST(req: NextRequest) {
         if (!isNaN(n)) cfg[row.key] = n;
       });
 
-      if (amount >= 100) fraisGestion = cfg.frais_gestion_palier_4 ?? 2.5;
-      else if (amount >= 80) fraisGestion = cfg.frais_gestion_palier_3 ?? 2.3;
-      else if (amount >= 50) fraisGestion = cfg.frais_gestion_palier_2 ?? 2.1;
+      if (amount > 100) fraisGestion = cfg.frais_gestion_palier_4 ?? 2.5;
+      else if (amount > 80) fraisGestion = cfg.frais_gestion_palier_3 ?? 2.3;
+      else if (amount > 50) fraisGestion = cfg.frais_gestion_palier_2 ?? 2.1;
       else fraisGestion = cfg.frais_gestion_palier_1 ?? calcFraisGestion(amount);
     }
 
