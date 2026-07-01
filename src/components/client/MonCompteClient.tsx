@@ -85,7 +85,7 @@ export default function MonCompteClient({
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <div className="mx-auto max-w-lg px-4 py-6">
 
         {/* Header */}

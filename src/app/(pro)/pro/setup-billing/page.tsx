@@ -31,7 +31,7 @@ export default async function SetupBillingPage() {
   const planConfig = getPlanConfig(settings?.plan_key ?? 'starter')!;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <div className="mx-auto max-w-lg px-4 py-8">
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-1">

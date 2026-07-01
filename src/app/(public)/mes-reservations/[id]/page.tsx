@@ -27,7 +27,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
   const senderRole = profile?.role === 'pro' || profile?.role === 'admin' ? 'pro' : 'client';
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-dvh flex-col">
       <div className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
         <div className="mb-4 flex items-center gap-3">
           <Link href="/mes-reservations" className="text-white/60 hover:text-white">

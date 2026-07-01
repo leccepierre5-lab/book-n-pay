@@ -36,7 +36,7 @@ export default async function PayGuestPage({
 
   if (!member) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 text-center">
+      <div className="min-h-dvh flex items-center justify-center px-4 text-center">
         <div>
           <p className="text-3xl mb-3">🔗</p>
           <p className="text-white font-semibold mb-1">Lien invalide ou expiré</p>
@@ -51,7 +51,7 @@ export default async function PayGuestPage({
 
   if (member.status === 'paid' || member.status === 'arrived') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 text-center">
+      <div className="min-h-dvh flex items-center justify-center px-4 text-center">
         <div>
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
@@ -73,7 +73,7 @@ export default async function PayGuestPage({
 
   if (member.status === 'cancelled') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 text-center">
+      <div className="min-h-dvh flex items-center justify-center px-4 text-center">
         <div>
           <p className="text-3xl mb-3">❌</p>
           <p className="text-white font-semibold mb-1">Réservation annulée</p>

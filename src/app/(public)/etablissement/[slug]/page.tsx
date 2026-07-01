@@ -29,7 +29,7 @@ export default async function EtablissementPage({
 
   if (business.frozen) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4 text-center">
+      <div className="flex min-h-dvh items-center justify-center px-4 text-center">
         <div>
           <p className="mb-2 text-2xl">⏸️</p>
           <h1 className="mb-2 text-lg font-semibold text-white">{business.name}</h1>

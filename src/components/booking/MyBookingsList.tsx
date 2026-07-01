@@ -432,7 +432,7 @@ export default function MyBookingsList({
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <div className="mx-auto max-w-lg px-4 py-6">
 
         <div className="mb-5 flex items-center justify-between">

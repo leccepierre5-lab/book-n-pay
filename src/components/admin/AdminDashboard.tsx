@@ -107,7 +107,7 @@ export default function AdminDashboard({
   const pendingApplications = localApplications.filter((a) => a.status === 'pending');
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <div className="mx-auto max-w-2xl px-4 py-6">
         <h1 className="mb-4 text-lg font-semibold text-white">Administration</h1>
 

@@ -68,7 +68,7 @@ export default function FlashSlotsManager({
   };
 
   return (
-    <div className="min-h-screen p-4">
+    <div className="min-h-dvh p-4">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Link href="/pro" className="text-slate-400 hover:text-slate-200 text-sm">← Tableau de bord</Link>

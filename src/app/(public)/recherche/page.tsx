@@ -64,7 +64,7 @@ export default async function SearchPage({
   ]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <div className="max-w-5xl mx-auto px-4 py-6">
 
         <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors mb-4">

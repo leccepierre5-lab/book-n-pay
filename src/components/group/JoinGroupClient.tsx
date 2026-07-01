@@ -140,12 +140,12 @@ export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
   };
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center text-white/40">Chargement...</div>;
+    return <div className="flex min-h-dvh items-center justify-center text-white/40">Chargement...</div>;
   }
 
   if (!booking) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4 text-center">
+      <div className="flex min-h-dvh items-center justify-center px-4 text-center">
         <p className="text-white/60">{error || 'Cette réservation de groupe est introuvable ou a expiré.'}</p>
       </div>
     );
@@ -163,7 +163,7 @@ export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
       : null;
 
   return (
-    <div className="min-h-screen px-4 py-8">
+    <div className="min-h-dvh px-4 py-8">
       <div className="mx-auto max-w-md">
         <a href="/" className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors mb-5">
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>

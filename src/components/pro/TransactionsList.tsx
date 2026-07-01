@@ -31,7 +31,7 @@ export default function TransactionsList({ bizId }: { bizId: string }) {
   }, [bizId]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <div className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center gap-3">
           <Link href="/pro" className="text-white/60 hover:text-white">

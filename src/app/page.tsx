@@ -181,7 +181,7 @@ export default function HomePage() {
   /* ── Écran auth Particulier ── */
   if (slide === 4) {
     return (
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-dvh">
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
@@ -216,7 +216,7 @@ export default function HomePage() {
   /* ── Écran auth Professionnel ── */
   if (slide === 5) {
     return (
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-dvh">
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
@@ -251,7 +251,7 @@ export default function HomePage() {
   /* ── Écran choix Particulier / Professionnel ── */
   if (slide === 3) {
     return (
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-dvh">
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <InlineLogo />
@@ -304,7 +304,7 @@ export default function HomePage() {
   const current = SLIDES[slide];
 
   return (
-    <div className="flex flex-col min-h-screen overflow-hidden">
+    <div className="flex flex-col min-h-dvh overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(52,211,153,0.07)_0%,transparent_65%)] pointer-events-none" />
 
       {/* Bouton retour (slides 1 et 2) */}

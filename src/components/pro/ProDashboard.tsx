@@ -147,7 +147,7 @@ export default function ProDashboard({
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <div className="mx-auto max-w-2xl px-4 py-6">
 
         {/* Header */}

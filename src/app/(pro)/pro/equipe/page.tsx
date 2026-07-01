@@ -24,7 +24,7 @@ export default async function ProEquipePage() {
     .order('created_at', { ascending: true });
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh">
       <div className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-6 flex items-center gap-3">
           <Link href="/pro" className="text-white/60 hover:text-white">←</Link>
