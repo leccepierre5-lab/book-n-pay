@@ -3,7 +3,7 @@ import PartnerApplicationForm from '@/components/partner/PartnerApplicationForm'
 
 export default function DevenirPartenairePage() {
   return (
-    <div className="mx-auto max-w-lg px-4 py-10">
+    <div className="min-h-screen mx-auto max-w-lg px-4 py-10">
       <Link
         href="/tarifs"
         className="mb-6 inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-white transition-colors"
