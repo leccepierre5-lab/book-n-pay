@@ -40,7 +40,7 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
     }
   }
   if (filters.city) {
-    queryBuilder = queryBuilder.ilike('city', filters.city);
+    queryBuilder = queryBuilder.ilike('city', `%${filters.city}%`);
   }
   if (filters.query) {
     const q = filters.query;
