@@ -42,7 +42,15 @@ export async function GET() {
     return bk?.payment_deadline && bk.payment_deadline <= now;
   });
   if (expiredRows.length > 0) {
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+    // ⚠️ CORRECTIF SÉCURITÉ (audit) : utilisait toujours la clé live, même
+    // en mode_test_paiement. Même bascule que stripe/checkout/route.ts.
+    const { data: testModeConfig } = await supabaseAdmin
+      .from('app_config')
+      .select('value')
+      .eq('key', 'mode_test_paiement')
+      .maybeSingle();
+    const isTestMode = testModeConfig?.value === 'true';
+    const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
     const expiredRefs = [...new Set(expiredRows.map((r) => (r as any).bookings?.group_ref as string).filter(Boolean))];
     for (const ref of expiredRefs) {
       await expireGroupByRef(ref, supabaseAdmin, stripe).catch((e) =>

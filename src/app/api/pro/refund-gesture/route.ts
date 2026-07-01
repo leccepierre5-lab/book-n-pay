@@ -49,7 +49,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Aucun paiement associé à rembourser' }, { status: 400 });
     }
 
-    const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_SECRET_KEY!;
+    // ⚠️ CORRECTIF SÉCURITÉ (audit) : utilisait toujours la clé live, même
+    // en mode_test_paiement — un remboursement pendant un test aurait pu
+    // toucher un vrai compte Stripe. Même bascule que stripe/checkout/route.ts.
+    const { data: testModeConfig } = await serviceSupabase
+      .from('app_config')
+      .select('value')
+      .eq('key', 'mode_test_paiement')
+      .maybeSingle();
+    const isTestMode = testModeConfig?.value === 'true';
+    const stripeKey = isTestMode
+      ? process.env.STRIPE_TEST_SECRET_KEY!
+      : process.env.STRIPE_SECRET_KEY!;
     const stripe = new Stripe(stripeKey);
     await stripe.refunds.create({
       payment_intent: member.stripe_payment_intent_id,

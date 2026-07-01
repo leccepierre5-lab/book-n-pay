@@ -14,7 +14,17 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServiceRoleClient();
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+  // ⚠️ CORRECTIF SÉCURITÉ (audit) : utilisait toujours la clé live, même
+  // en mode_test_paiement. Même bascule que stripe/checkout/route.ts.
+  const { data: testModeConfig } = await supabase
+    .from('app_config')
+    .select('value')
+    .eq('key', 'mode_test_paiement')
+    .maybeSingle();
+  const isTestMode = testModeConfig?.value === 'true';
+  const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+
   const now = new Date().toISOString();
 
   const { data: expiredRows } = await supabase
