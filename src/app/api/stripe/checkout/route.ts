@@ -1,7 +1,7 @@
 // src/app/api/stripe/checkout/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { calcFraisGestion } from '@/lib/booking-utils';
 
 function isAllowedOrigin(url: string, reqOrigin: string | null, reqHost: string | null): boolean {
@@ -26,6 +26,17 @@ function isAllowedOrigin(url: string, reqOrigin: string | null, reqHost: string 
 export async function POST(req: NextRequest) {
   try {
     const supabase = createServiceRoleClient();
+
+    // ⚠️ CORRECTIF SÉCURITÉ (audit) : clientUserId était auparavant lu tel
+    // quel depuis le body — n'importe qui connaissant l'UUID app_users d'un
+    // tiers pouvait se faire passer pour lui et consommer son stock de
+    // réduction de parrainage. On dérive maintenant l'identité depuis la
+    // session authentifiée côté serveur ; un appel sans session (paiement
+    // invité via /pay/[memberId]) reste volontairement sans réduction.
+    const userClient = await createClient();
+    const { data: authData } = await userClient.auth.getUser();
+    const clientUserId = authData.user?.id || '';
+
     const body = await req.json();
     const {
       amount,
@@ -36,7 +47,6 @@ export async function POST(req: NextRequest) {
       fraisGestion: fraisGestionInput,
       quantity = 1,
       groupSize = 1,
-      clientUserId,
     } = body;
 
     if (!successUrl || !cancelUrl) {
