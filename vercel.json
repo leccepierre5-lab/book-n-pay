@@ -9,6 +9,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/send-rdv-reminders-j2",
+      "schedule": "0 7 * * *"
+    },
+    {
       "path": "/api/cron/verifier-inactivite",
       "schedule": "0 6 * * *"
     },

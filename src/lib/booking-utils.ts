@@ -131,9 +131,14 @@ export function parseParisDatetime(date: string, time: string): Date {
 
 // Renvoie la date de demain au format "YYYY-MM-DD" selon l'heure de Paris.
 export function getParisTomorrowStr(): string {
+  return getParisDateOffsetStr(1);
+}
+
+// Renvoie la date à J+offsetDays (heure de Paris) au format "YYYY-MM-DD".
+export function getParisDateOffsetStr(offsetDays: number): string {
   const todayParis = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
   const [y, mo, d] = todayParis.split('-').map(Number);
-  return new Date(Date.UTC(y, mo - 1, d + 1)).toISOString().split('T')[0];
+  return new Date(Date.UTC(y, mo - 1, d + offsetDays)).toISOString().split('T')[0];
 }
 
 // ── Disponibilité ────────────────────────────────────────────────────────────
