@@ -12,12 +12,21 @@
 //    explicite). Corrigé : vérification biz_id du pro == biz_id du booking.
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: authData } = await supabase.auth.getUser();
     if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+
+    // SECURITY_TODO.md #3 — qr_code = 6 chiffres (1M combinaisons),
+    // brute-forçable sans limite. Rate limit par compte pro/admin appelant,
+    // assez large pour un scan rapide en rafale à l'accueil.
+    const { allowed } = await checkRateLimit(`checkin-by-qr:${authData.user.id}`, 30, 5 * 60);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Trop de tentatives, patiente quelques minutes.' }, { status: 429 });
+    }
 
     const { data: callerProfile } = await supabase
       .from('app_users')

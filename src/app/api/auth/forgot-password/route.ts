@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate } from '@/lib/email/send';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
     const { email } = await req.json();
     if (!email) return NextResponse.json({ error: 'email requis' }, { status: 400 });
+
+    // SECURITY_TODO.md #3 — par IP (spam/abus) et par email (éviter de
+    // harceler une boîte mail précise avec des demandes répétées).
+    const [byIp, byEmail] = await Promise.all([
+      checkRateLimit(`forgot-password:ip:${getClientIp(req)}`, 5, 15 * 60),
+      checkRateLimit(`forgot-password:email:${email.trim().toLowerCase()}`, 3, 15 * 60),
+    ]);
+    if (!byIp.allowed || !byEmail.allowed) {
+      // Même réponse "ok" que le cas nominal — ne pas révéler qu'un
+      // rate limit a été atteint, cohérent avec l'anti-énumération existant.
+      return NextResponse.json({ ok: true });
+    }
 
     const supabase = createServiceRoleClient();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://book-n-pay-next.vercel.app';

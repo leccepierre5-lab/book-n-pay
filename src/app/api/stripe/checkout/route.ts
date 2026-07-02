@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { calcFraisGestion } from '@/lib/booking-utils';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 function isAllowedOrigin(url: string, reqOrigin: string | null, reqHost: string | null): boolean {
   try {
@@ -25,6 +26,14 @@ function isAllowedOrigin(url: string, reqOrigin: string | null, reqHost: string 
 
 export async function POST(req: NextRequest) {
   try {
+    // SECURITY_TODO.md #3 — limite la création de sessions Stripe par IP.
+    // Généreux car un même réseau (salon, événement de groupe) peut légitimement
+    // créer plusieurs paiements en peu de temps.
+    const { allowed } = await checkRateLimit(`stripe-checkout:${getClientIp(req)}`, 30, 10 * 60);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Trop de tentatives, réessaie dans quelques minutes.' }, { status: 429 });
+    }
+
     const supabase = createServiceRoleClient();
 
     // ⚠️ CORRECTIF SÉCURITÉ (audit) : clientUserId était auparavant lu tel

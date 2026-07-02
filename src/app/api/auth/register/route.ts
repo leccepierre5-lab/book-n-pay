@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate } from '@/lib/email/send';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const COMBINING_MARKS = /[̀-ͯ]/g;
 
@@ -18,6 +19,12 @@ function buildCode(firstName: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    // SECURITY_TODO.md #3 — évite le spam de comptes/emails de confirmation.
+    const { allowed } = await checkRateLimit(`register:${getClientIp(req)}`, 5, 15 * 60);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Trop de tentatives, réessaie dans quelques minutes.' }, { status: 429 });
+    }
+
     const { email, password, name, phone, referralCode } = await req.json();
     if (!email || !password) {
       return NextResponse.json({ error: 'email et password requis' }, { status: 400 });

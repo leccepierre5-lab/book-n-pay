@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { calcFraisGestion, generateQrCode, normalizePhone } from '@/lib/booking-utils';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const MAX_GROUP_SIZE = 23;
 const INVITE_DELAY_MS = 30 * 60 * 1000; // 30 minutes
@@ -52,6 +53,13 @@ export async function POST(req: NextRequest) {
     // FRONT d'appeler ensuite /api/stripe/checkout avec ces infos (même
     // pattern que StepPayment.tsx pour une réservation simple).
     if (action === 'addMemberAndGetCheckout') {
+      // SECURITY_TODO.md #3 — évite qu'un script spamme la création de
+      // membres invités (route publique, sans compte requis) par IP.
+      const { allowed } = await checkRateLimit(`join-group:${getClientIp(req)}`, 10, 10 * 60);
+      if (!allowed) {
+        return NextResponse.json({ error: 'Trop de tentatives, réessaie dans quelques minutes.' }, { status: 429 });
+      }
+
       if (!memberData) return NextResponse.json({ error: 'memberData requis' }, { status: 400 });
 
       const { data: booking } = await supabase
