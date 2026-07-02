@@ -22,22 +22,30 @@ modification manuelle (voir l'incident du 30/06 : récursion infinie sur
 Dashboard → Database → Roles/Policies) pour générer une migration de
 rattrapage capturant l'état actuel, puis versionner toute modification future.
 
-## 2. IDOR bookings/group
+## 2. IDOR bookings/group — ✅ corrigé le 02/07/2026 (commit `357d678`)
 
 `src/app/api/bookings/group/route.ts` — route multi-actions volontairement
-publique (rejoindre un groupe sans compte). Les actions `getBooking` et
-`getBookingsByGroupRef` renvoient la réservation complète (membres, téléphones,
-dépôts) à quiconque connaît un `bookingId` ou `groupRef` — aucune vérification
-de session, l'UUID est le seul contrôle d'accès.
+publique (rejoindre un groupe sans compte). `getBooking` et
+`addMemberAndGetCheckout` renvoyaient la ligne complète (téléphone, email,
+`qr_code` de check-in, IDs Stripe) à quiconque connaît un `bookingId` — aucune
+vérification de session, l'UUID était le seul contrôle d'accès.
+`getBookingsByGroupRef` renvoyait en plus toutes les réservations d'un groupe
+via `groupRef` seul, sans être appelée par aucun code front.
 
-**Risque** : un `bookingId`/`groupRef` qui fuite (lien partagé, log, capture
-d'écran) expose les données personnelles de tous les participants du groupe,
-sans limite de tentatives (voir aussi #3).
+**Risque accepté et non éliminé** : un `bookingId` qui fuite (lien partagé,
+log, capture d'écran) permet toujours de voir les noms et statuts des
+participants du groupe — c'est le cas d'usage produit (rejoindre sans compte).
+Ce qui a été supprimé, c'est la fuite des champs sensibles non affichés
+(téléphone, email, `qr_code`, IDs Stripe, coordonnées de l'organisateur) et
+l'action `getBookingsByGroupRef` (dead code, aucun bénéfice produit).
 
-**Piste** : accepter le risque documenté si le produit exige un accès sans
-compte (cas d'usage réel), mais a minima logger les accès et envisager un
-token à durée de vie courte plutôt que le `groupRef`/`bookingId` brut pour les
-actions en lecture large.
+**Correctif appliqué** : `getBooking` ne sélectionne plus que
+`id, biz_name, service_name, date, time, status, services(...), booking_members(id, name, status, invite_expiry)`.
+`addMemberAndGetCheckout` ne renvoie plus la ligne membre brute dans
+`alreadyJoined`. `getBookingsByGroupRef` supprimée entièrement.
+
+**Reste à envisager si besoin futur** : logger les accès, token à durée de vie
+courte plutôt que le `bookingId` brut pour un contrôle d'accès plus strict.
 
 ## 3. Rate limiting absent
 
