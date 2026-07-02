@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { sendEmail, emailTemplate } from '@/lib/email/send';
+import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const COMBINING_MARKS = /[̀-ͯ]/g;
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       to: email,
       subject: "Confirme ton adresse email — Book'nPay",
       html: emailTemplate(`
-        <h2 style="color: #34d399; font-size: 20px; margin: 0 0 12px;">Bienvenue, ${firstName} !</h2>
+        <h2 style="color: #34d399; font-size: 20px; margin: 0 0 12px;">Bienvenue, ${escapeHtml(firstName)} !</h2>
         <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
           Tu es à un clic de rejoindre Book'nPay. Clique sur le bouton ci-dessous pour confirmer
           ton adresse email et activer ton compte.

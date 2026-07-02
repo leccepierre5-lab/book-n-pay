@@ -6,7 +6,8 @@
 // - 60 jours → déclassement automatique en Standard + email constat
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { sendEmail, emailTemplate } from '@/lib/email/send';
+import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
+import { isValidBearerSecret } from '@/lib/constant-time';
 
 const JOURS_ALERTE_DOUCE = 45;
 const JOURS_ALERTE_URGENCE = 55;
@@ -16,7 +17,7 @@ const STATUT_EMOJI: Record<string, string> = { Gold: '🏆', Argent: '🥈', Bro
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isValidBearerSecret(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -38,7 +39,9 @@ export async function GET(req: NextRequest) {
 
     const dernier = new Date(user.derniere_activite);
     const joursInactivite = Math.floor((today.getTime() - dernier.getTime()) / (1000 * 60 * 60 * 24));
-    const prenom = user.name?.split(' ')[0] || user.name || 'Client';
+    // Échappé une fois ici — réutilisé tel quel dans les 3 templates HTML
+    // ci-dessous (nom saisi librement à l'inscription).
+    const prenom = escapeHtml(user.name?.split(' ')[0] || user.name || 'Client');
 
     const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
     const email = authUser.user?.email;

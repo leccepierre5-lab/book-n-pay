@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { computeStatut } from '@/lib/booking-utils';
+import { isValidBearerSecret } from '@/lib/constant-time';
 
 const UPGRADE_MESSAGES: Record<string, { subject: string; body: string }> = {
   Bronze: {
@@ -21,7 +22,7 @@ const UPGRADE_MESSAGES: Record<string, { subject: string; body: string }> = {
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.INTERNAL_API_SECRET}`) {
+    if (!isValidBearerSecret(authHeader, process.env.INTERNAL_API_SECRET)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

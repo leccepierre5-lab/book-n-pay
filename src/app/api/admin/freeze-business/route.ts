@@ -6,8 +6,11 @@
 // notifie les clients concernés ; dégeler notifie les clients annulés que
 // l'établissement a repris (port de notifyUnfreeze).
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,28 +49,66 @@ export async function POST(req: NextRequest) {
       const today = new Date().toISOString().split('T')[0];
       const { data: futureBookings } = await serviceSupabase
         .from('bookings')
-        .select('id, booking_members(id, phone, name, status)')
+        .select(
+          'id, client_email, service_name, date, time, booking_members(id, phone, name, status, email, deposit, stripe_payment_intent_id)'
+        )
         .eq('biz_id', bizId)
         .eq('status', 'active')
         .gte('date', today);
 
       let cancelledCount = 0;
+      let refundedCount = 0;
       for (const booking of futureBookings || []) {
         await serviceSupabase.from('bookings').update({ status: 'cancelled' }).eq('id', booking.id);
         await serviceSupabase.from('booking_logs').insert({
           booking_id: booking.id,
           message: `Réservation annulée — gel établissement (${reason || 'raison non précisée'})`,
         });
+
+        const dateFormatted = new Date(booking.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        });
+
         for (const member of (booking as any).booking_members || []) {
-          if (member.status === 'paid' || member.status === 'arrived') {
+          if (member.status !== 'paid' && member.status !== 'arrived') continue;
+
+          // Rembourse systématiquement les membres déjà payés — même logique
+          // que expireGroup.ts pour un groupe expiré. Sans ça, le client perd
+          // ses frais de réservation sans remboursement ni notification.
+          if (member.stripe_payment_intent_id) {
+            try {
+              await stripe.refunds.create({
+                payment_intent: member.stripe_payment_intent_id,
+                metadata: { reason: 'business_frozen', biz_id: bizId },
+              });
+              await serviceSupabase
+                .from('booking_members')
+                .update({ status: 'cancelled', montant_rembourse: member.deposit ?? 0 })
+                .eq('id', member.id);
+              refundedCount++;
+
+              const emailTo = member.email || booking.client_email;
+              if (emailTo) {
+                await sendEmail({
+                  to: emailTo,
+                  subject: `💸 Remboursement — Réservation annulée chez ${business.name}`,
+                  text: `Bonjour ${member.name || 'vous'},\n\nL'établissement ${business.name} est temporairement indisponible, votre réservation a donc été annulée.\n\n💆 ${booking.service_name}\n📅 ${dateFormatted} à ${booking.time}\n\nVos frais de réservation (${member.deposit ?? 0}€) vous seront remboursés sous 5 à 10 jours ouvrés.\n\nNous sommes désolés pour la gêne occasionnée.\nL'équipe Book'nPay`,
+                }).catch(() => {});
+              }
+            } catch (err: any) {
+              console.error(`[FreezeBusiness] Remboursement échoué membre ${member.id}:`, err.message);
+              await serviceSupabase.from('booking_members').update({ status: 'cancelled' }).eq('id', member.id);
+            }
+          } else {
+            // Statut paid/arrived mais pas d'ID de paiement (paiement especes/tpe) — pas de remboursement Stripe possible.
             await serviceSupabase.from('booking_members').update({ status: 'cancelled' }).eq('id', member.id);
-            cancelledCount++;
           }
+          cancelledCount++;
         }
       }
 
-      console.log(`[FreezeBusiness] ${business.name} gelé — ${cancelledCount} membre(s) annulé(s)`);
-      return NextResponse.json({ success: true, frozen: true, cancelledMembers: cancelledCount });
+      console.log(`[FreezeBusiness] ${business.name} gelé — ${cancelledCount} membre(s) annulé(s), ${refundedCount} remboursement(s)`);
+      return NextResponse.json({ success: true, frozen: true, cancelledMembers: cancelledCount, refundedMembers: refundedCount });
     }
 
     // ── unfreeze ──────────────────────────────────────────────────────────

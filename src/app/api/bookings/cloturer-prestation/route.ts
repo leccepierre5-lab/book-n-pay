@@ -4,7 +4,7 @@
 // solde choisi par le pro (app/tpe/especes), et envoie un email de reçu.
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { sendEmail } from '@/lib/email/send';
+import { sendEmail, escapeHtml } from '@/lib/email/send';
 
 const MODE_LABEL: Record<string, string> = {
   app: "via l'application Book'nPay",
@@ -82,9 +82,9 @@ export async function POST(req: NextRequest) {
     <p style="font-size: 40px; margin: 0;">✅</p>
     <h2 style="color: white; margin: 8px 0 4px; font-size: 20px;">Prestation confirmée</h2>
   </div>
-  <p style="font-size: 15px; color: #2A2A3A;">Bonjour <strong>${member.name}</strong>, votre prestation chez <strong>${booking.biz_name}</strong> a bien été clôturée.</p>
+  <p style="font-size: 15px; color: #2A2A3A;">Bonjour <strong>${escapeHtml(member.name)}</strong>, votre prestation chez <strong>${escapeHtml(booking.biz_name)}</strong> a bien été clôturée.</p>
   <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 16px 0;">
-    <p style="font-size: 13px; color: #7A7A8C; margin: 4px 0;">Prestation : <strong style="color:#0D0D14;">${booking.service_name}</strong></p>
+    <p style="font-size: 13px; color: #7A7A8C; margin: 4px 0;">Prestation : <strong style="color:#0D0D14;">${escapeHtml(booking.service_name)}</strong></p>
     <p style="font-size: 13px; color: #7A7A8C; margin: 4px 0;">Date : <strong style="color:#0D0D14;">${booking.date} à ${booking.time}</strong></p>
     <p style="font-size: 13px; color: #7A7A8C; margin: 4px 0;">Mode de paiement : <strong style="color:#059669;">${MODE_EMOJI[paymentMode]} ${MODE_LABEL[paymentMode]}</strong></p>
   </div>

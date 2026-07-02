@@ -5,6 +5,7 @@
 // (5 RDV/an) pour les statuts non-Standard.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { isValidBearerSecret } from '@/lib/constant-time';
 
 const JOKERS_BY_STATUT: Record<string, number> = { Standard: 1, Bronze: 1, Argent: 2, Gold: 3 };
 const DOWNGRADE: Record<string, string> = { Gold: 'Argent', Argent: 'Bronze', Bronze: 'Standard' };
@@ -12,7 +13,7 @@ const MIN_RDV_ANNUEL = 5;
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isValidBearerSecret(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

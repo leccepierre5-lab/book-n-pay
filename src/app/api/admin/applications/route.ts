@@ -5,7 +5,7 @@
 // crée business_settings, envoie UN email Resend avec le lien + les détails du plan.
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { sendEmail, emailTemplate } from '@/lib/email/send';
+import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { getPlanConfig, getEngagementEndDate } from '@/lib/plans-config';
 
 function slugify(text: string): string {
@@ -215,10 +215,10 @@ export async function POST(req: NextRequest) {
       subject: `✅ Bienvenue sur Book'nPay — ${app.etablissement}`,
       html: emailTemplate(`
         <h2 style="color: #34d399; font-size: 20px; margin: 0 0 12px;">
-          Félicitations, ${firstName} !
+          Félicitations, ${escapeHtml(firstName)} !
         </h2>
         <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
-          Votre candidature pour <strong style="color:white">${app.etablissement}</strong>
+          Votre candidature pour <strong style="color:white">${escapeHtml(app.etablissement)}</strong>
           a été approuvée. Cliquez sur le bouton ci-dessous pour définir votre mot de passe
           et accéder à votre espace pro.
         </p>

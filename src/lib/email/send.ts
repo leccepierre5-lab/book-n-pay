@@ -40,6 +40,19 @@ export async function sendEmail({
   }
 }
 
+// SECURITY_TODO.md #5 — échappe toute valeur utilisateur (nom saisi à la
+// réservation/inscription, nom d'établissement candidat, etc.) avant de
+// l'interpoler dans un template HTML d'email. Ne jamais passer une valeur
+// non échappée directement dans emailTemplate() ou un template inline.
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Template HTML de base — port du style emailBase() de verifierInactivite/entry.ts
 export function emailTemplate(content: string): string {
   return `
