@@ -4,7 +4,7 @@ Points relevés lors de l'audit de sécurité du 01/07/2026 (fork dédié), non
 traités depuis. Chaque section donne la localisation exacte trouvée en
 vérifiant le code actuel, le risque, et une piste de correctif.
 
-## 1. RLS non versionnée (Critique)
+## 1. RLS non versionnée (Critique) — ✅ corrigé le 02/07/2026 (commit `abf87d6`)
 
 Seules 2 tables ont leurs policies RLS suivies dans `supabase/migrations/` :
 `business_photos` (`0012_social_photos_payments.sql`) et `staff_schedules`
@@ -22,20 +22,23 @@ modification manuelle (voir l'incident du 30/06 : récursion infinie sur
 Dashboard → Database → Roles/Policies) pour générer une migration de
 rattrapage capturant l'état actuel, puis versionner toute modification future.
 
-**Bloqué côté agent (02/07/2026)** : pas de CLI Supabase liée, pas de
-`DATABASE_URL` dans `.env.local`, et l'API REST n'expose pas `pg_policies`
-(catalogue système hors du schéma `public`). Impossible d'introspecter l'état
-RLS actuel depuis cet environnement sans risquer de le deviner et de casser
-une policy en prod. Requête à faire tourner dans le SQL Editor Supabase et à
-transmettre pour générer la migration de rattrapage :
-```sql
-SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
-FROM pg_policies WHERE schemaname = 'public' ORDER BY tablename, policyname;
+**Résolu** : `supabase/migrations/0022_rls_snapshot.sql` documente les 53
+policies existantes sur 18 tables, transcrites depuis un dump `pg_policies`
+complet (aucune clause devinée, vérifié programmatiquement 1:1 contre le
+dump). `overage_charges` et `rate_limits` : RLS activée sans policy,
+confirmé intentionnel (accès service role uniquement, vérifié dans le code).
+Ne modifie rien en base — sert à rendre l'état actuel reproductible/revuable
+depuis git, et à recréer les mêmes policies sur un environnement vierge.
 
-SELECT relname, relrowsecurity, relforcerowsecurity
-FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relkind = 'r'
-ORDER BY relname;
-```
+**Limite connue** : les fonctions référencées (`is_admin()`, `owns_biz()`,
+`check_booking_access()`) sont elles-mêmes non versionnées — un environnement
+réellement vierge devra d'abord les recréer avant de rejouer cette migration.
+Hors périmètre de ce snapshot (documente les policies, pas leurs dépendances).
+
+**Découverte en passant** : la table `profiles` a du RLS + 2 policies mais
+n'apparaît pas dans `src/lib/database.types.ts` — probable reliquat d'une
+itération antérieure à `app_users`. Documentée telle quelle, à vérifier si
+encore utilisée avant suppression éventuelle (pas fait ici, hors scope).
 
 ## 2. IDOR bookings/group — ✅ corrigé le 02/07/2026 (commit `357d678`)
 
