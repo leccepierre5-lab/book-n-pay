@@ -18,13 +18,14 @@ const PLANS = [
     title: 'STARTER',
     price: '79',
     engagement: '3 mois',
+    promise: 'Pour ne plus perdre une réservation sur cinq.',
     accentColor: 'text-blue-400',
     borderColor: 'border-blue-500/30',
     glowColor: 'rgba(59,130,246,0.12)',
     features: [
-      "Jusqu'à 80 réservations / mois",
-      'Encaissement direct des frais',
-      'QR code check-in & Trust Score',
+      '80 réservations protégées / mois',
+      'Vos frais encaissés directement',
+      'Check-in QR + fiabilité clients',
       'Apple Pay & Google Pay',
     ],
     back: {
@@ -40,15 +41,16 @@ const PLANS = [
     title: 'BUSINESS',
     price: '139',
     engagement: '6 mois',
+    promise: 'Pour un planning à plusieurs qui ne craque jamais.',
     accentColor: 'text-mint-400',
     borderColor: 'border-mint-500/40',
     glowColor: 'rgba(52,211,153,0.12)',
     highlighted: true,
     features: [
-      "Jusqu'à 300 réservations / mois",
-      'Mode staff multi-praticiens',
-      'Stats CA estimé / réalisé',
-      'Programme parrainage intégré',
+      '300 réservations protégées / mois',
+      'Toute l\'équipe sur un agenda',
+      'CA réel vs prévisionnel en un coup d\'œil',
+      'Vos clients vous recommandent (parrainage intégré)',
     ],
     back: {
       title: 'Exemple de rentabilité',
@@ -63,6 +65,7 @@ const PLANS = [
     title: 'SCALE',
     price: '299',
     engagement: '12 mois',
+    promise: 'Pour ne plus jamais penser aux no-shows.',
     accentColor: 'text-purple-400',
     borderColor: 'border-purple-500/30',
     glowColor: 'rgba(168,85,247,0.12)',
@@ -78,6 +81,25 @@ const PLANS = [
       para2: "299 € offre la tranquillité absolue : automatisation complète, zéro faille dans l'agenda.",
       bilan: "Pour 3 prestations/mois, une infrastructure blindée. Zéro créneaux perdus.",
     },
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: 'Qui paie les frais de gestion ?',
+    a: "Le client, au moment de la réservation — jamais vous. Ces frais transitent via Stripe Connect et servent de garantie anti no-show.",
+  },
+  {
+    q: "Quel est l'engagement ?",
+    a: "3 mois pour Starter, 6 pour Business, 12 pour Scale. Résiliation possible en fin de période d'engagement.",
+  },
+  {
+    q: "Que se passe-t-il en cas de no-show ?",
+    a: "Les frais de gestion prépayés par le client sont automatiquement encaissés — vous êtes couvert sans réclamation ni relance à faire.",
+  },
+  {
+    q: "En quoi c'est différent des plateformes à commission ?",
+    a: "Elles prennent 10 à 25 % sur chaque vente, à vie. Book'nPay applique un abonnement fixe : plus vous vendez, plus votre marge reste intacte.",
   },
 ];
 
@@ -98,8 +120,8 @@ export default function TarifsPage() {
 
         <header className="mb-12 text-center">
           <p className="text-xs font-bold tracking-[0.2em] text-mint-500/70 uppercase mb-3">TARIFICATION</p>
-          <h1 className="text-3xl font-bold text-white mb-3">Plans & Tarifs</h1>
-          <p className="text-slate-500 text-sm">Cliquez sur une carte pour voir l'exemple de rentabilité.</p>
+          <h1 className="text-3xl font-bold text-white mb-3">Un abonnement. Zéro commission.</h1>
+          <p className="text-slate-500 text-sm">Contrairement aux plateformes à commission (10 à 25%), vos ventes restent les vôtres — juste un abonnement fixe.</p>
         </header>
 
         <div className="mb-16 grid gap-5 sm:grid-cols-3">
@@ -131,7 +153,8 @@ export default function TarifsPage() {
                     <span className="text-4xl font-black text-white">{plan.price}€</span>
                     <span className="text-sm text-slate-500 ml-1">/ mois HT</span>
                   </div>
-                  <p className="text-xs text-slate-600 mb-5 italic">Engagement {plan.engagement}</p>
+                  <p className="text-xs text-slate-600 mb-1 italic">Engagement {plan.engagement}</p>
+                  <p className={`text-xs font-medium mb-5 ${plan.accentColor}`}>{plan.promise}</p>
                   <ul className="flex-1 space-y-2.5">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-start gap-2 text-sm text-slate-300">
@@ -251,6 +274,18 @@ export default function TarifsPage() {
             >
               Simuler mon ROI →
             </Link>
+          </div>
+        </section>
+
+        <section className="border-t border-white/[0.07] pt-12 mt-12">
+          <h2 className="mb-8 text-center text-xl font-bold text-white">Questions fréquentes</h2>
+          <div className="mx-auto max-w-2xl space-y-5">
+            {FAQ_ITEMS.map((item) => (
+              <div key={item.q} className="rounded-2xl bg-navy-900 border border-white/[0.08] p-5">
+                <h3 className="mb-2 text-sm font-semibold text-white">{item.q}</h3>
+                <p className="text-xs leading-relaxed text-slate-500">{item.a}</p>
+              </div>
+            ))}
           </div>
         </section>
       </div>
