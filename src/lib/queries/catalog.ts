@@ -47,8 +47,11 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
     queryBuilder = queryBuilder.or(`name.ilike.%${q}%,city.ilike.%${q}%,type.ilike.%${q}%`);
   }
 
-  // Exclut uniquement les établissements gelés par l'admin
-  queryBuilder = queryBuilder.eq('frozen', false);
+  // Exclut les établissements gelés par l'admin et ceux non publiés — sans ce
+  // filtre, un business is_published=false apparaît dans la liste mais 404
+  // sur sa page détail (getBusinessBySlug le filtre déjà), incohérence trouvée
+  // en diagnostiquant un vrai 404 en prod sur les 45 établissements vitrine.
+  queryBuilder = queryBuilder.eq('frozen', false).eq('is_published', true);
 
   const { data, error } = await queryBuilder;
   if (error) {
