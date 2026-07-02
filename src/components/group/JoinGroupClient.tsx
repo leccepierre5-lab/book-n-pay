@@ -11,9 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 interface Member {
   id: string;
   name: string;
-  phone: string | null;
   status: string;
-  deposit: number | null;
   invite_expiry: string | null;
 }
 

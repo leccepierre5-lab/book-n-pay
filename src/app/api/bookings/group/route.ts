@@ -14,7 +14,7 @@ const INVITE_DELAY_MS = 30 * 60 * 1000; // 30 minutes
 export async function POST(req: NextRequest) {
   const supabase = createServiceRoleClient();
   const body = await req.json();
-  const { action, bookingId, memberId, memberData, groupRef } = body;
+  const { action, bookingId, memberId, memberData } = body;
 
   // Normalise le téléphone dès la réception — voir normalizePhone() pour
   // le détail du problème que ça résout (comparaisons phone === phone
@@ -23,30 +23,27 @@ export async function POST(req: NextRequest) {
     memberData.phone = normalizePhone(memberData.phone);
   }
 
-  if (!bookingId && action !== 'getBookingsByGroupRef') {
+  if (!bookingId) {
     return NextResponse.json({ error: 'bookingId requis' }, { status: 400 });
   }
 
   try {
     // ── getBooking ──────────────────────────────────────────────────────────
+    // Route publique (rejoindre un groupe sans compte) : le seul contrôle
+    // d'accès est de connaître le bookingId. Ne renvoyer donc que les champs
+    // effectivement affichés par JoinGroupClient — jamais le téléphone/email/
+    // qr_code/IDs Stripe des membres ni les coordonnées du client organisateur
+    // (IDOR — voir SECURITY_TODO.md #2).
     if (action === 'getBooking') {
       const { data: booking } = await supabase
         .from('bookings')
-        .select('*, booking_members(*), services(max_persons, deposit, price)')
+        .select(
+          'id, biz_name, service_name, date, time, status, services(max_persons, deposit, price), booking_members(id, name, status, invite_expiry)'
+        )
         .eq('id', bookingId)
         .maybeSingle();
       if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });
       return NextResponse.json({ booking });
-    }
-
-    // ── getBookingsByGroupRef ───────────────────────────────────────────────
-    if (action === 'getBookingsByGroupRef') {
-      if (!groupRef) return NextResponse.json({ error: 'groupRef requis' }, { status: 400 });
-      const { data: bookings } = await supabase
-        .from('bookings')
-        .select('*, booking_members(*)')
-        .eq('group_ref', groupRef);
-      return NextResponse.json({ bookings: bookings || [] });
     }
 
     // ── addMemberAndGetCheckout ──────────────────────────────────────────────
@@ -70,7 +67,9 @@ export async function POST(req: NextRequest) {
         (m: any) => m.phone && m.phone === memberData.phone && m.status !== 'cancelled'
       );
       if (existingByPhone) {
-        return NextResponse.json({ alreadyJoined: true, member: existingByPhone });
+        // Ne renvoie pas la ligne brute (qr_code, stripe_*, email...) —
+        // le front n'utilise que le flag pour recharger la réservation.
+        return NextResponse.json({ alreadyJoined: true });
       }
 
       if (memberData.phone && memberData.phone === booking.businesses?.phone) {
