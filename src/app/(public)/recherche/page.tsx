@@ -13,6 +13,8 @@ export default async function SearchPage({
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
   const params = await searchParams;
+  const { type: _droppedType, ...paramsWithoutTypeRaw } = params;
+  const paramsWithoutType = paramsWithoutTypeRaw as Record<string, string>;
 
   const filters: SearchFilters = {
     query: params.q,
@@ -36,6 +38,20 @@ export default async function SearchPage({
       .order('date', { ascending: true })
       .limit(5),
   ]);
+
+  // Sous-catégories : dérivées des résultats déjà filtrés par catégorie (pas de requête
+  // supplémentaire), pour rester cohérentes avec ce qui existe réellement en base.
+  const availableTypes =
+    filters.category !== 'all'
+      ? Array.from(
+          new Set(businesses.map((b) => b.type?.trim()).filter((t): t is string => Boolean(t)))
+        ).sort((a, b) => a.localeCompare(b))
+      : [];
+  const selectedType = filters.category !== 'all' ? params.type : undefined;
+  const displayedBusinesses = selectedType
+    ? businesses.filter((b) => b.type === selectedType)
+    : businesses;
+  const formatType = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
   return (
     <div className="min-h-dvh">
@@ -87,7 +103,7 @@ export default async function SearchPage({
             {CATEGORIES.map((cat) => (
               <Link
                 key={cat.id}
-                href={`/recherche?${new URLSearchParams({ ...params, category: cat.id }).toString()}`}
+                href={`/recherche?${new URLSearchParams({ ...paramsWithoutType, category: cat.id }).toString()}`}
                 className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                   filters.category === cat.id
                     ? 'bg-mint-500 text-navy-950 shadow-[0_0_12px_rgba(52,211,153,0.35)]'
@@ -98,6 +114,34 @@ export default async function SearchPage({
               </Link>
             ))}
           </div>
+
+          {availableTypes.length > 0 && (
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              <Link
+                href={`/recherche?${new URLSearchParams(paramsWithoutType).toString()}`}
+                className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium transition-all duration-200 ${
+                  !selectedType
+                    ? 'bg-white/10 text-white'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                Toutes
+              </Link>
+              {availableTypes.map((t) => (
+                <Link
+                  key={t}
+                  href={`/recherche?${new URLSearchParams({ ...paramsWithoutType, type: t }).toString()}`}
+                  className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium transition-all duration-200 ${
+                    selectedType === t
+                      ? 'bg-white/10 text-white'
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {formatType(t)}
+                </Link>
+              ))}
+            </div>
+          )}
         </form>
 
         {/* Flash slots */}
@@ -136,12 +180,13 @@ export default async function SearchPage({
         {/* Results count */}
         <div className="mb-4">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-widest">
-            {businesses.length} établissement{businesses.length > 1 ? 's' : ''}
+            {displayedBusinesses.length} établissement{displayedBusinesses.length > 1 ? 's' : ''}
             {filters.category !== 'all' && ` · ${CATEGORIES.find(c => c.id === filters.category)?.label}`}
+            {selectedType && ` · ${formatType(selectedType)}`}
           </p>
         </div>
 
-        <SearchResults businesses={businesses} />
+        <SearchResults businesses={displayedBusinesses} />
       </div>
     </div>
   );
