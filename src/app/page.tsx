@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 /* ── Icônes slides ── */
 function GhostIcon() {
@@ -98,39 +99,6 @@ function InlineLogo() {
   );
 }
 
-/* ── Badge social proof ── */
-function AvatarCircle({ color, letter }: { color: string; letter: string }) {
-  return (
-    <div
-      className="w-8 h-8 rounded-full border-2 border-[#0a1224] flex items-center justify-center text-xs font-bold text-white shrink-0"
-      style={{ background: color }}
-    >
-      {letter}
-    </div>
-  );
-}
-function SocialProofBadge() {
-  return (
-    <div
-      className="flex items-center gap-3 px-4 py-2.5 rounded-full"
-      style={{
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.09)',
-        backdropFilter: 'blur(12px)',
-      }}
-    >
-      <div className="flex -space-x-2">
-        <AvatarCircle color="linear-gradient(135deg,#f97316,#ea580c)" letter="M" />
-        <AvatarCircle color="linear-gradient(135deg,#8b5cf6,#7c3aed)" letter="S" />
-        <AvatarCircle color="linear-gradient(135deg,#0ea5e9,#0284c7)" letter="A" />
-      </div>
-      <span className="text-xs text-slate-300 whitespace-nowrap">
-        Déjà adopté par de nombreux professionnels <span className="text-yellow-400">★</span>
-      </span>
-    </div>
-  );
-}
-
 function BackButton({ onBack }: { onBack: () => void }) {
   return (
     <button
@@ -153,19 +121,68 @@ function CGULine() {
   );
 }
 
+/* ── Bandeau utilisateur déjà connecté ──
+   Remplace l'ancien redirect forcé au montage (cassait le bouton retour, cf. 02/07/2026) :
+   la home reste affichée et navigable, ce bandeau propose juste un raccourci. */
+function ConnectedBanner({ href }: { href: string }) {
+  return (
+    <div className="w-full bg-navy-900/90 backdrop-blur border-b border-emerald-500/15 px-4 py-2.5 flex items-center justify-center gap-2 text-xs sm:text-sm text-center">
+      <span className="text-slate-300">Vous êtes déjà connecté</span>
+      <Link
+        href={href}
+        className="font-semibold text-emerald-400 hover:text-emerald-300 transition-colors whitespace-nowrap"
+      >
+        Accéder à mon espace →
+      </Link>
+    </div>
+  );
+}
+
 export default function HomePage() {
-  const [slide, setSlide] = useState(0);
+  // null = vérification de session en cours (évite un flash onboarding pour les utilisateurs connectés)
+  const [slide, setSlide] = useState<number | null>(null);
+  // Destination du bandeau si connecté (null = déconnecté, ou statut pas encore résolu)
+  const [connectedSpace, setConnectedSpace] = useState<string | null>(null);
   const router = useRouter();
 
+  useEffect(() => {
+    const init = async () => {
+      const supabase = createClient();
+      // Source de vérité : session Supabase (couvre nouvel appareil sans localStorage)
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        const { data: appUser } = await supabase
+          .from('app_users')
+          .select('role')
+          .eq('id', data.session.user.id)
+          .single();
+        const role = appUser?.role;
+        setConnectedSpace(role === 'admin' ? '/admin' : role === 'pro' ? '/pro' : '/recherche');
+      }
+      // Fallback rapide : localStorage pour les visiteurs qui ont déjà vu l'onboarding.
+      // La home reste affichée et navigable même pour un utilisateur connecté (voir ConnectedBanner) —
+      // ne plus rediriger de force au montage, ça cassait le bouton retour (02/07/2026).
+      setSlide(localStorage.getItem('bnp_onboarding_done') ? 3 : 0);
+    };
+    init();
+  }, []);
+
   const handleNext = () => {
+    if (slide === null) return;
     if (slide < 2) setSlide(slide + 1);
-    else setSlide(3);
+    else {
+      localStorage.setItem('bnp_onboarding_done', '1');
+      setSlide(3);
+    }
   };
+
+  if (slide === null) return <div className="min-h-dvh" />;
 
   /* ── Écran auth Particulier ── */
   if (slide === 4) {
     return (
       <div className="flex flex-col min-h-dvh">
+        {connectedSpace && <ConnectedBanner href={connectedSpace} />}
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
@@ -201,6 +218,7 @@ export default function HomePage() {
   if (slide === 5) {
     return (
       <div className="flex flex-col min-h-dvh">
+        {connectedSpace && <ConnectedBanner href={connectedSpace} />}
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
@@ -236,8 +254,10 @@ export default function HomePage() {
   if (slide === 3) {
     return (
       <div className="flex flex-col min-h-dvh">
+        {connectedSpace && <ConnectedBanner href={connectedSpace} />}
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
+          <BackButton onBack={() => setSlide(2)} />
           <InlineLogo />
           <p className="text-slate-500 text-xs mb-5 mt-6 tracking-widest uppercase font-semibold">Vous êtes…</p>
           <div className="w-full max-w-sm space-y-3">
@@ -288,72 +308,71 @@ export default function HomePage() {
   const current = SLIDES[slide];
 
   return (
-    <div className="flex flex-col min-h-dvh overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(52,211,153,0.07)_0%,transparent_65%)] pointer-events-none" />
+    <>
+      {connectedSpace && <ConnectedBanner href={connectedSpace} />}
+      <div className="relative flex flex-col min-h-dvh overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(52,211,153,0.07)_0%,transparent_65%)] pointer-events-none" />
 
-      {/* Bouton retour (slides 1 et 2) */}
-      {slide > 0 && <BackButton onBack={() => setSlide(slide - 1)} />}
+        {/* Bouton retour (slides 1 et 2) */}
+        {slide > 0 && <BackButton onBack={() => setSlide(slide - 1)} />}
 
-      {/* Contenu central */}
-      <div key={slide} className="animate-slide-in flex flex-col items-center text-center flex-1 justify-center gap-7 max-w-sm mx-auto w-full px-4 relative z-10">
-        <InlineLogo />
-        {current.icon}
+        {/* Contenu central */}
+        <div key={slide} className="animate-slide-in flex flex-col items-center text-center flex-1 justify-center gap-7 max-w-sm mx-auto w-full px-4 relative z-10">
+          <InlineLogo />
+          {current.icon}
 
-        <div className="space-y-3">
-          <h1 className="text-[1.9rem] font-bold text-white leading-tight whitespace-pre-line">
-            {current.title}
-          </h1>
-          <p className="text-slate-400 text-sm leading-relaxed max-w-[270px] mx-auto">
-            {current.desc}
-          </p>
+          <div className="space-y-3">
+            <h1 className="text-[1.9rem] font-bold text-white leading-tight whitespace-pre-line">
+              {current.title}
+            </h1>
+            <p className="text-slate-400 text-sm leading-relaxed max-w-[270px] mx-auto">
+              {current.desc}
+            </p>
+          </div>
+
+          {/* Dots pagination */}
+          <div className="flex gap-2">
+            {SLIDES.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setSlide(i)}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === slide
+                    ? 'w-8 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]'
+                    : 'w-1.5 bg-white/15'
+                }`}
+              />
+            ))}
+          </div>
         </div>
 
-        {/* Dots pagination */}
-        <div className="flex gap-2">
-          {SLIDES.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setSlide(i)}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === slide
-                  ? 'w-8 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]'
-                  : 'w-1.5 bg-white/15'
-              }`}
-            />
-          ))}
+        {/* Bas de page */}
+        <div className="px-4 pb-8 max-w-sm mx-auto w-full space-y-3 relative z-10">
+          <button
+            onClick={handleNext}
+            className="w-full rounded-2xl py-4 font-bold text-[#0a1224] text-base flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+            style={{
+              background: 'linear-gradient(135deg, #34d399, #6ee7b7)',
+              boxShadow: '0 4px 28px rgba(52,211,153,0.45)',
+            }}
+          >
+            {current.btn} <span className="text-lg">›</span>
+          </button>
+
+          <button
+            onClick={() => { localStorage.setItem('bnp_onboarding_done', '1'); setSlide(3); }}
+            className={`w-full text-sm py-2 transition-colors ${
+              current.showPasser
+                ? 'text-slate-500 hover:text-slate-300'
+                : 'invisible'
+            }`}
+          >
+            Passer →
+          </button>
+
+          <CGULine />
         </div>
       </div>
-
-      {/* Bas de page */}
-      <div className="px-4 pb-8 max-w-sm mx-auto w-full space-y-3 relative z-10">
-        <button
-          onClick={handleNext}
-          className="w-full rounded-2xl py-4 font-bold text-[#0a1224] text-base flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
-          style={{
-            background: 'linear-gradient(135deg, #34d399, #6ee7b7)',
-            boxShadow: '0 4px 28px rgba(52,211,153,0.45)',
-          }}
-        >
-          {current.btn} <span className="text-lg">›</span>
-        </button>
-
-        <button
-          onClick={() => setSlide(3)}
-          className={`w-full text-sm py-2 transition-colors ${
-            current.showPasser
-              ? 'text-slate-500 hover:text-slate-300'
-              : 'invisible'
-          }`}
-        >
-          Passer →
-        </button>
-
-        <CGULine />
-
-        <div className="flex justify-center pt-1">
-          <SocialProofBadge />
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
