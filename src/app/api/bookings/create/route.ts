@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode } from '@/lib/booking-utils';
+import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/lib/staff-assignment';
+import type { Booking } from '@/lib/database.types';
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,6 +42,92 @@ export async function POST(req: NextRequest) {
 
     const supabaseService = createServiceRoleClient();
 
+    const { data: service } = await supabaseService
+      .from('services')
+      .select('allow_group, duration_minutes')
+      .eq('id', serviceId)
+      .maybeSingle();
+
+    // Assignation praticien — uniquement pour les services individuels
+    // (allow_group === false) d'un business qui a des praticiens actifs.
+    // Le pré-check JS ci-dessous ne sert qu'à (a) rejeter vite un cas déjà
+    // certain sans appeler la RPC, (b) ordonner les candidats à essayer —
+    // la garantie anti-race-condition vient entièrement de la fonction
+    // Postgres assign_staff_and_create_booking (verrou + re-vérification +
+    // insert dans une seule transaction, voir migration 0024). Un pré-check
+    // périmé n'est donc jamais une faille, juste un candidat qui s'avère
+    // occupé et que la RPC écarte elle-même.
+    let rpcBooking: Booking | null = null;
+
+    if (service && service.allow_group === false) {
+      const staffAvailability = await computeStaffAvailabilityForDay(
+        supabaseService,
+        bizId,
+        date,
+        service.duration_minutes
+      );
+
+      if (staffAvailability) {
+        const freeStaffIds = staffAvailability.availability[time]?.freeStaffIds ?? [];
+        const allStaffIds = staffAvailability.staffRows.map((s) => s.id);
+
+        let candidateStaffIds: string[];
+        if (staffId) {
+          // Praticien choisi explicitement : pas de substitution automatique
+          // s'il s'avère occupé, on respecte le choix du client (comme avant).
+          if (!freeStaffIds.includes(staffId)) {
+            return NextResponse.json(
+              { error: 'Ce praticien vient d\'être réservé pour ce créneau. Merci de choisir un autre créneau ou praticien.' },
+              { status: 409 }
+            );
+          }
+          candidateStaffIds = [staffId];
+        } else {
+          if (freeStaffIds.length === 0) {
+            return NextResponse.json(
+              { error: 'Aucun praticien disponible pour ce créneau. Merci de choisir un autre créneau.' },
+              { status: 409 }
+            );
+          }
+          // Candidats "vus libres" par le pré-check en premier, puis le reste
+          // du staff actif en secours (ex: une annulation concurrente vient
+          // de libérer quelqu'un entre le pré-check et l'appel RPC).
+          candidateStaffIds = [
+            ...freeStaffIds,
+            ...allStaffIds.filter((id) => !freeStaffIds.includes(id)),
+          ];
+        }
+
+        rpcBooking = await assignStaffAndCreateBooking(supabaseService, {
+          bizId,
+          bizName,
+          serviceId,
+          serviceName,
+          date,
+          time,
+          durationMinutes: service.duration_minutes,
+          candidateStaffIds,
+          clientId: authData.user?.id || null,
+          clientPhone: clientPhone || null,
+          clientName,
+          clientEmail: clientEmail || null,
+        });
+
+        if (!rpcBooking) {
+          // Tous les candidats se sont avérés occupés sous verrou (pré-check
+          // périmé) — même messages que le fast-path ci-dessus, selon le cas.
+          return NextResponse.json(
+            {
+              error: staffId
+                ? 'Ce praticien vient d\'être réservé pour ce créneau. Merci de choisir un autre créneau ou praticien.'
+                : 'Aucun praticien disponible pour ce créneau. Merci de choisir un autre créneau.',
+            },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     // Upsert app_users pour les comptes existants créés avant le fix du trigger
     if (authData.user?.id) {
       await supabaseService.from('app_users').upsert({
@@ -50,27 +138,35 @@ export async function POST(req: NextRequest) {
       }, { onConflict: 'id', ignoreDuplicates: true });
     }
 
-    const { data: booking, error: bookingError } = await supabaseService
-      .from('bookings')
-      .insert({
-        biz_id: bizId,
-        biz_name: bizName,
-        service_id: serviceId,
-        service_name: serviceName,
-        staff_id: staffId || null,
-        staff_name: staffName || null,
-        date,
-        time,
-        status: 'active',
-        client_id: authData.user?.id || null,
-        client_phone: clientPhone,
-        client_name: clientName,
-        client_email: clientEmail,
-      })
-      .select()
-      .single();
+    let booking: Booking;
+    if (rpcBooking) {
+      // Déjà inséré par assign_staff_and_create_booking (RETURNING *).
+      booking = rpcBooking;
+    } else {
+      // Service collectif, ou business sans staff actif — chemin inchangé.
+      const { data: insertedBooking, error: bookingError } = await supabaseService
+        .from('bookings')
+        .insert({
+          biz_id: bizId,
+          biz_name: bizName,
+          service_id: serviceId,
+          service_name: serviceName,
+          staff_id: staffId || null,
+          staff_name: staffName || null,
+          date,
+          time,
+          status: 'active',
+          client_id: authData.user?.id || null,
+          client_phone: clientPhone,
+          client_name: clientName,
+          client_email: clientEmail,
+        })
+        .select()
+        .single();
 
-    if (bookingError) throw bookingError;
+      if (bookingError) throw bookingError;
+      booking = insertedBooking;
+    }
 
     // Nom du parrain (si le client a été parrainé) — dénormalisé pour le pro
     let referrerName: string | null = null;

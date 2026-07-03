@@ -124,7 +124,7 @@ export default function BookingFlow({
             {step === 1 && service && (
               <>
                 <h2 className="mb-4 text-base font-semibold text-white">Date et Heure</h2>
-                <StepDateTime business={business} service={service} onSelect={handleDateTimeSelect} />
+                <StepDateTime business={business} service={service} staff={staff} onSelect={handleDateTimeSelect} />
               </>
             )}
             {step === 2 && service && date && slots.length > 0 && (

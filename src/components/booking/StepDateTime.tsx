@@ -1,8 +1,10 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
-import type { Service } from '@/lib/database.types';
+import type { Service, Staff } from '@/lib/database.types';
 import { isSlotClosed } from '@/lib/booking-utils';
+
+type StaffAvailability = Record<string, { freeCount: number; freeStaffIds: string[] }>;
 
 // ── Calendar helpers ──────────────────────────────────────────────────────────
 
@@ -69,15 +71,13 @@ const MONTHS_FR = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juill
 function SlotGrid({
   slots,
   date,
-  occupancy,
-  maxPersons,
+  isFull,
   selected,
   onSelect,
 }: {
   slots: string[];
   date: string;
-  occupancy: Record<string, number>;
-  maxPersons: number;
+  isFull: (slot: string) => boolean;
   selected: string | null;
   onSelect: (s: string) => void;
 }) {
@@ -86,7 +86,7 @@ function SlotGrid({
       {slots.map((slot) => {
         const closed = isSlotClosed({ open_time: null, close_time: null, open_days: [] }, date, slot);
         const past = isSlotPast(date, slot);
-        const full = (occupancy[slot] || 0) >= maxPersons;
+        const full = isFull(slot);
         const unavailable = closed || past || full;
         const isSelected = selected === slot;
 
@@ -126,10 +126,12 @@ function SlotGrid({
 export default function StepDateTime({
   business,
   service,
+  staff,
   onSelect,
 }: {
   business: BusinessWithDetails;
   service: Service;
+  staff: Staff | null;
   onSelect: (date: string, slots: string[], participants: number) => void;
 }) {
   const maxPersons = service.allow_group !== false ? (service.max_persons || 8) : 1;
@@ -141,6 +143,7 @@ export default function StepDateTime({
   const [participants, setParticipants] = useState(1);
   const [selectedSlots, setSelectedSlots] = useState<(string | null)[]>([null]);
   const [occupancy, setOccupancy] = useState<Record<string, number>>({});
+  const [staffAvailability, setStaffAvailability] = useState<StaffAvailability | null>(null);
 
   const slots = useMemo(
     () => generateSlots(business.open_time, business.close_time),
@@ -151,10 +154,27 @@ export default function StepDateTime({
 
   useEffect(() => {
     if (!date) return;
-    fetch(`/api/bookings/availability?bizId=${business.id}&date=${date}`)
+    const params = new URLSearchParams({ bizId: business.id, date, serviceId: service.id });
+    fetch(`/api/bookings/availability?${params}`)
       .then((r) => r.json())
-      .then((data) => setOccupancy(data.counts || {}));
-  }, [date, business.id]);
+      .then((data) => {
+        setOccupancy(data.counts || {});
+        const sa = data.staffAvailability;
+        // Défense côté client : {} est truthy et masquerait les counts ; on repasse à null si vide
+        setStaffAvailability(sa && Object.keys(sa).length > 0 ? sa : null);
+      });
+  }, [date, business.id, service.id]);
+
+  // Présent uniquement pour les services individuels d'un business qui a des
+  // praticiens actifs (voir availability/route.ts) — sinon on retombe sur
+  // l'occupation par tête (counts), comportement identique à avant.
+  const isSlotFull = (slot: string): boolean => {
+    if (staffAvailability) {
+      if (staff) return !staffAvailability[slot]?.freeStaffIds.includes(staff.id);
+      return (staffAvailability[slot]?.freeCount ?? 0) === 0;
+    }
+    return (occupancy[slot] || 0) >= maxPersons;
+  };
 
   const handleParticipantsChange = (n: number) => {
     setParticipants(n);
@@ -239,6 +259,7 @@ export default function StepDateTime({
                   setDate(iso);
                   setSelectedSlots(Array(participants).fill(null));
                   setOccupancy({});
+                  setStaffAvailability(null);
                 }}
                 className={`aspect-square rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-150 ${
                   disabled
@@ -335,8 +356,7 @@ export default function StepDateTime({
               <SlotGrid
                 slots={slots}
                 date={date}
-                occupancy={occupancy}
-                maxPersons={maxPersons}
+                isFull={isSlotFull}
                 selected={selectedSlots[personIdx]}
                 onSelect={(s) => handleSlotSelect(personIdx, s)}
               />

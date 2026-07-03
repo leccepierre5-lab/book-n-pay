@@ -1,0 +1,137 @@
+// src/lib/staff-availability.ts
+// Calcul de disponibilité par praticien pour les services individuels
+// (allow_group === false) — un créneau est libre pour N personnes si au moins
+// N praticiens actifs n'ont ni jour off, ni chevauchement de réservation à ce
+// créneau. Logique pure, sans accès réseau : les données sont déjà chargées
+// par l'appelant (route API, ou routes de création côté serveur).
+//
+// Ne concerne pas les services collectifs (cours, allow_group === true), qui
+// gardent le calcul d'occupation par tête existant (guestsAtSlot / counts
+// dans availability/route.ts) — un praticien/une salle y sert plusieurs
+// personnes en même temps, ce n'est pas le même mécanisme.
+import { generateSlots, isSlotClosed } from './booking-utils';
+
+export interface StaffRow {
+  id: string;
+  name: string;
+}
+
+export interface StaffScheduleRow {
+  staff_id: string;
+  day_of_week: number; // 0=Dim..6=Sam (JS getDay())
+  open_time: string;
+  close_time: string;
+}
+
+// Réservation existante d'un praticien ce jour-là, avec la durée du SERVICE
+// DE CETTE RÉSERVATION (pas celui qu'on est en train de calculer) — nécessaire
+// pour détecter un chevauchement, pas juste une collision à l'heure exacte.
+export interface StaffBookingRow {
+  staff_id: string;
+  time: string;
+  duration_minutes: number;
+}
+
+export interface StaffAvailabilityParams {
+  date: string; // "YYYY-MM-DD"
+  durationMinutes: number; // durée du service demandé
+  businessOpenTime: string | null;
+  businessCloseTime: string | null;
+  businessOpenDays: number[];
+  staff: StaffRow[]; // déjà filtré is_active = true par l'appelant
+  schedules: StaffScheduleRow[]; // toutes les lignes staff_schedules des praticiens ci-dessus
+  existingBookings: StaffBookingRow[]; // réservations actives (status != cancelled) du jour, staff_id non nul
+}
+
+export interface SlotAvailability {
+  freeCount: number;
+  freeStaffIds: string[];
+}
+
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function overlaps(startA: number, endA: number, startB: number, endB: number): boolean {
+  return startA < endB && startB < endA;
+}
+
+export function computeStaffAvailability(
+  params: StaffAvailabilityParams
+): Record<string, SlotAvailability> {
+  const {
+    date,
+    durationMinutes,
+    businessOpenTime,
+    businessCloseTime,
+    businessOpenDays,
+    staff,
+    schedules,
+    existingBookings,
+  } = params;
+
+  const result: Record<string, SlotAvailability> = {};
+  if (!businessOpenTime || !businessCloseTime) return result;
+
+  const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+  const slots = generateSlots(businessOpenTime, businessCloseTime);
+
+  const schedulesByStaff = new Map<string, StaffScheduleRow[]>();
+  for (const s of schedules) {
+    const list = schedulesByStaff.get(s.staff_id) ?? [];
+    list.push(s);
+    schedulesByStaff.set(s.staff_id, list);
+  }
+
+  const bookingsByStaff = new Map<string, StaffBookingRow[]>();
+  for (const b of existingBookings) {
+    const list = bookingsByStaff.get(b.staff_id) ?? [];
+    list.push(b);
+    bookingsByStaff.set(b.staff_id, list);
+  }
+
+  const bizHoraires = { open_time: businessOpenTime, close_time: businessCloseTime, open_days: businessOpenDays };
+
+  for (const slot of slots) {
+    const freeStaffIds: string[] = [];
+
+    if (!isSlotClosed(bizHoraires, date, slot)) {
+      const slotStart = toMinutes(slot);
+      const slotEnd = slotStart + durationMinutes;
+
+      for (const st of staff) {
+        const staffSchedules = schedulesByStaff.get(st.id) ?? [];
+
+        let workStart: number;
+        let workEnd: number;
+
+        if (staffSchedules.length === 0) {
+          // Aucun horaire configuré pour ce praticien → fallback horaires business (décision actée)
+          workStart = toMinutes(businessOpenTime);
+          workEnd = toMinutes(businessCloseTime);
+        } else {
+          const today = staffSchedules.find((s) => s.day_of_week === dayOfWeek);
+          if (!today) continue; // a des horaires configurés, mais pas ce jour-là → jour off
+          workStart = toMinutes(today.open_time);
+          workEnd = toMinutes(today.close_time);
+        }
+
+        if (slotStart < workStart || slotEnd > workEnd) continue;
+
+        const staffBookings = bookingsByStaff.get(st.id) ?? [];
+        const isBusy = staffBookings.some((b) => {
+          const bStart = toMinutes(b.time);
+          const bEnd = bStart + b.duration_minutes;
+          return overlaps(slotStart, slotEnd, bStart, bEnd);
+        });
+
+        if (!isBusy) freeStaffIds.push(st.id);
+      }
+    }
+
+    result[slot] = { freeCount: freeStaffIds.length, freeStaffIds };
+  }
+
+  return result;
+}
