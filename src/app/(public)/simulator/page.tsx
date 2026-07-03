@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { BNP_PLANS } from '@/lib/plans-config';
 
 const COMMISSION_CLASSIQUE = 0.15; // commission moyenne d'une plateforme de réservation classique
-const NO_SHOW_REDUCTION = 0.3;     // friction du paiement anticipé Book'nPay = -30% de no-shows
 
 function formatEuro(n: number) {
   return n.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
@@ -58,6 +57,7 @@ export default function SimulatorPage() {
   const [panierMoyen, setPanierMoyen] = useState(60);
   const [nbReservations, setNbReservations] = useState(80);
   const [noShowRate, setNoShowRate] = useState(10);
+  const [noShowReduction, setNoShowReduction] = useState(30);
   const [planKey, setPlanKey] = useState<'starter' | 'business' | 'scale'>('starter');
 
   const plan = BNP_PLANS.find((p) => p.key === planKey)!;
@@ -73,14 +73,14 @@ export default function SimulatorPage() {
     const economieMensuelle = commissionClassiqueMensuelle - plan.priceHT;
     const economieAnnuelle = economieMensuelle * 12;
 
-    const noShowRateBnp = noShowRate * (1 - NO_SHOW_REDUCTION);
+    const noShowRateBnp = noShowRate * (1 - noShowReduction / 100);
     const noShowsEvitesMensuel = nbReservations * ((noShowRate - noShowRateBnp) / 100);
     const revenusRecuperesMensuel = noShowsEvitesMensuel * panierMoyen;
 
     const gainTotalAnnuel = economieAnnuelle + revenusRecuperesMensuel * 12;
 
     return { economieMensuelle, economieAnnuelle, revenusRecuperesMensuel, gainTotalAnnuel, noShowRateBnp };
-  }, [panierMoyen, nbReservations, noShowRate, plan]);
+  }, [panierMoyen, nbReservations, noShowRate, noShowReduction, plan]);
 
   return (
     <div className="min-h-dvh px-4 py-10">
@@ -127,6 +127,20 @@ export default function SimulatorPage() {
             unit="%"
             onChange={setNoShowRate}
           />
+          <div>
+            <Slider
+              label="Réduction des no-shows avec Book'nPay (hypothèse à ajuster)"
+              value={noShowReduction}
+              min={0}
+              max={60}
+              step={5}
+              unit="%"
+              onChange={setNoShowReduction}
+            />
+            <p className="mt-1.5 text-[11px] text-slate-600">
+              Estimation basée sur l&apos;effet dissuasif d&apos;un paiement anticipé — ajustez selon votre propre expérience, ce n&apos;est pas une donnée mesurée.
+            </p>
+          </div>
 
           <div>
             <label className="text-sm text-slate-300 mb-2 block">Plan Book&apos;nPay</label>
@@ -160,7 +174,7 @@ export default function SimulatorPage() {
           </div>
 
           <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-5">
-            <p className="text-xs text-slate-500 mb-1">🛡️ Revenus récupérés / mois</p>
+            <p className="text-xs text-slate-500 mb-1">🛡️ Revenus récupérés / mois (estimation)</p>
             <p className="text-2xl font-black text-mint-400">{formatEuro(revenusRecuperesMensuel)}</p>
             <p className="text-[11px] text-slate-600 mt-1">
               no-show {noShowRate}% → {noShowRateBnp.toFixed(1)}% avec Book&apos;nPay
