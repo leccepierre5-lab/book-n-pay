@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode, generateGroupRef, normalizePhone } from '@/lib/booking-utils';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
+  // Hissés hors du try : le catch a besoin d'y accéder pour le rollback
+  // applicatif des insertions partielles (pas de transaction SQL possible
+  // via PostgREST, chaque .insert() est un appel séparé).
+  const supabaseService = createServiceRoleClient();
+  const createdBookingIds: string[] = [];
+  const createdMemberIds: string[] = [];
+
   try {
     const supabase = await createClient();
     const { data: authData } = await supabase.auth.getUser();
@@ -28,8 +36,6 @@ export async function POST(req: NextRequest) {
     if (mode === 'b' && guests.length !== slots.length - 1) {
       return NextResponse.json({ error: 'Nombre d\'invités incorrect pour le mode B' }, { status: 400 });
     }
-
-    const supabaseService = createServiceRoleClient();
 
     // Check biz not frozen
     const { data: biz } = await supabaseService
@@ -109,7 +115,20 @@ export async function POST(req: NextRequest) {
         .select('id')
         .single();
 
-      if (bookingError) throw bookingError;
+      if (bookingError) {
+        // Violation de bookings_staff_slot_unique (migration 0023) — collision
+        // réelle sur ce praticien/créneau, pas une erreur inattendue. Message
+        // ciblé sur le créneau en cause, construit ici pendant qu'on a slots[i]
+        // sous la main (plus dispo dans le catch).
+        if (bookingError.code === '23505') {
+          throw Object.assign(
+            new Error(`Le créneau ${slots[i]} n'est plus disponible pour ce praticien. Merci de réessayer.`),
+            { isSlotConflict: true }
+          );
+        }
+        throw bookingError;
+      }
+      createdBookingIds.push(booking.id);
 
       const { data: member, error: memberError } = await supabaseService
         .from('booking_members')
@@ -125,6 +144,7 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (memberError) throw memberError;
+      createdMemberIds.push(member.id);
 
       created.push({ bookingId: booking.id, memberId: member.id, isOrganizer });
     }
@@ -140,7 +160,38 @@ export async function POST(req: NextRequest) {
       guestMemberIds: guestData.map((c) => c.memberId),
     });
   } catch (error: any) {
-    console.error('[CreateGroup] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Rollback des insertions partielles de cette requête. Isolé dans son
+    // propre try/catch : un échec du rollback (ex. nouvelle erreur réseau)
+    // ne doit jamais remplacer la réponse d'erreur d'origine renvoyée au
+    // client — loggé séparément avec les IDs orphelins pour investigation
+    // manuelle, la réponse ci-dessous part quoi qu'il arrive.
+    if (createdMemberIds.length > 0 || createdBookingIds.length > 0) {
+      try {
+        if (createdMemberIds.length > 0) {
+          const { error: delMemberErr } = await supabaseService
+            .from('booking_members')
+            .delete()
+            .in('id', createdMemberIds);
+          if (delMemberErr) throw delMemberErr;
+        }
+        if (createdBookingIds.length > 0) {
+          const { error: delBookingErr } = await supabaseService
+            .from('bookings')
+            .delete()
+            .in('id', createdBookingIds);
+          if (delBookingErr) throw delBookingErr;
+        }
+      } catch (rollbackError) {
+        console.error(
+          '[CreateGroup] Échec du rollback — lignes orphelines à nettoyer manuellement:',
+          { createdBookingIds, createdMemberIds, rollbackError }
+        );
+      }
+    }
+
+    if (error?.isSlotConflict) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    return logAndRespond('[CreateGroup] Erreur:', error);
   }
 }
