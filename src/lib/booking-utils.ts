@@ -165,23 +165,6 @@ export interface BizHoraires {
   open_days: number[];
 }
 
-// Grille de créneaux de 30 min entre deux horaires "HH:MM" — même logique que
-// generateSlots() dans StepDateTime.tsx, extraite ici pour être réutilisable
-// côté serveur (calcul de disponibilité par praticien, staff-availability.ts).
-export function generateSlots(open: string | null, close: string | null): string[] {
-  if (!open || !close) return [];
-  const [oh, om] = open.split(':').map(Number);
-  const [ch, cm] = close.split(':').map(Number);
-  const slots: string[] = [];
-  let h = oh, m = om;
-  while (h < ch || (h === ch && m < cm)) {
-    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-    m += 30;
-    if (m >= 60) { m -= 60; h += 1; }
-  }
-  return slots;
-}
-
 export function isSlotClosed(biz: BizHoraires, date: string, slot: string): boolean {
   if (!biz.open_time || !biz.close_time) return false;
   const dayOfWeek = new Date(date + 'T12:00:00').getDay();
