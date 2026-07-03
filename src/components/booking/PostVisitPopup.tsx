@@ -1,17 +1,30 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 interface PostVisit {
   pending: true;
+  memberId: string;
   bizName: string;
   serviceName: string;
   googlePlaceUrl: string | null;
   referralCode: string | null;
 }
 
+// Routes où un flow de réservation est en cours — le popup ne doit pas
+// s'afficher par-dessus (même logique que GroupPendingBanner qui exclut déjà
+// /pay/). Le poll de statut continue en arrière-plan sur ces pages ; seul
+// l'AFFICHAGE est différé, jusqu'à ce que l'utilisateur soit sur une page
+// non exclue (voir l'effet d'ack ci-dessous).
+const BOOKING_FLOW_PREFIXES = ['/etablissement/', '/pay/', '/rejoindre/'];
+
 export default function PostVisitPopup() {
+  const pathname = usePathname();
   const [data, setData] = useState<PostVisit | null>(null);
   const [copied, setCopied] = useState(false);
+  const ackedMemberRef = useRef<string | null>(null);
+
+  const isBookingFlow = BOOKING_FLOW_PREFIXES.some((p) => pathname.startsWith(p));
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -30,6 +43,22 @@ export default function PostVisitPopup() {
     return () => clearInterval(poll);
   }, [fetchStatus]);
 
+  // Marque le popup "vu" côté serveur seulement quand il est RÉELLEMENT
+  // affiché (pas juste détecté par le poll) — le GET ne mute plus rien
+  // (voir post-visit-status/route.ts), donc un affichage différé par
+  // isBookingFlow ne fait pas perdre au client sa chance de le voir ailleurs.
+  useEffect(() => {
+    if (data && !isBookingFlow && ackedMemberRef.current !== data.memberId) {
+      ackedMemberRef.current = data.memberId;
+      fetch('/api/booking/post-visit-status/ack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: data.memberId }),
+      }).catch(() => {});
+    }
+  }, [data, isBookingFlow]);
+
+  if (isBookingFlow) return null;
   if (!data) return null;
 
   const referralLink = data.referralCode

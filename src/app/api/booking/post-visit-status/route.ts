@@ -1,7 +1,13 @@
 // src/app/api/booking/post-visit-status/route.ts
 // Retourne, pour le client connecté, la dernière prestation clôturée par le
-// pro (status='arrived') pas encore vue via le popup post-RDV. Marque
-// immédiatement le membre comme "vu" pour ne pas le reservir au poll suivant.
+// pro (status='arrived') pas encore vue via le popup post-RDV.
+//
+// Ne marque PAS le membre comme "vu" — ce GET est un simple check de statut,
+// potentiellement appelé en arrière-plan (poll) sur une page où le popup ne
+// s'affiche pas réellement (ex: en plein flow de réservation, voir
+// PostVisitPopup.tsx). Marquer "vu" ici ferait perdre au client sa chance de
+// voir le popup ailleurs. Le marquage se fait via POST /ack, uniquement
+// quand le composant affiche effectivement le popup.
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { phonesMatch } from '@/lib/booking-utils';
@@ -56,13 +62,9 @@ export async function GET() {
     .eq('id', booking.biz_id)
     .maybeSingle();
 
-  await supabaseAdmin
-    .from('booking_members')
-    .update({ post_visit_popup_shown: true })
-    .eq('id', member.id);
-
   return NextResponse.json({
     pending: true,
+    memberId: member.id,
     bizName: business?.name || booking.biz_name,
     serviceName: booking.service_name,
     googlePlaceUrl: business?.google_place_url || null,
