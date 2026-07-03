@@ -148,7 +148,12 @@ export default function HomePage() {
   useEffect(() => {
     const init = async () => {
       const supabase = createClient();
-      // Source de vérité : session Supabase (couvre nouvel appareil sans localStorage)
+      // Source de vérité UNIQUE pour le slide de départ : la session Supabase.
+      // Avant : un flag localStorage persistant décidait du slide indépendamment
+      // de la session — un utilisateur qui se déconnectait gardait le flag et ne
+      // revoyait plus jamais le carousel (régression). Maintenant : connecté =
+      // toujours slide 3 (bandeau), déconnecté = toujours slide 0 (carousel
+      // complet), à chaque visite, sans mémoire persistée.
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         const { data: appUser } = await supabase
@@ -158,11 +163,10 @@ export default function HomePage() {
           .single();
         const role = appUser?.role;
         setConnectedSpace(role === 'admin' ? '/admin' : role === 'pro' ? '/pro' : '/recherche');
+        setSlide(3);
+      } else {
+        setSlide(0);
       }
-      // Fallback rapide : localStorage pour les visiteurs qui ont déjà vu l'onboarding.
-      // La home reste affichée et navigable même pour un utilisateur connecté (voir ConnectedBanner) —
-      // ne plus rediriger de force au montage, ça cassait le bouton retour (02/07/2026).
-      setSlide(localStorage.getItem('bnp_onboarding_done') ? 3 : 0);
     };
     init();
   }, []);
@@ -170,10 +174,7 @@ export default function HomePage() {
   const handleNext = () => {
     if (slide === null) return;
     if (slide < 2) setSlide(slide + 1);
-    else {
-      localStorage.setItem('bnp_onboarding_done', '1');
-      setSlide(3);
-    }
+    else setSlide(3);
   };
 
   if (slide === null) return <div className="min-h-dvh" />;
@@ -360,7 +361,7 @@ export default function HomePage() {
           </button>
 
           <button
-            onClick={() => { localStorage.setItem('bnp_onboarding_done', '1'); setSlide(3); }}
+            onClick={() => setSlide(3)}
             className={`w-full text-sm py-2 transition-colors ${
               current.showPasser
                 ? 'text-slate-500 hover:text-slate-300'
