@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { getPlanConfig, getEngagementEndDate } from '@/lib/plans-config';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, logAndRespondAuthError } from '@/lib/api-error';
 
 function slugify(text: string): string {
   return (text || '')
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
         redirectTo: `${siteUrl}/auth/verify`,
       },
     });
-    if (linkError) return logAndRespond('[AdminApplications] Erreur génération lien:', linkError, 400);
+    if (linkError) return logAndRespondAuthError('[AdminApplications] Erreur génération lien:', linkError);
 
     const proUserId = linkData.user.id;
     const { hashed_token } = linkData.properties;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getPlanConfig, getEngagementEndDate } from '@/lib/plans-config';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespondStripeError } from '@/lib/api-error';
 
 function getFirstOfNextMonth(): number {
   const now = new Date();
@@ -112,6 +112,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    return logAndRespond('[setup-billing]', err);
+    return logAndRespondStripeError('[setup-billing]', err);
   }
 }

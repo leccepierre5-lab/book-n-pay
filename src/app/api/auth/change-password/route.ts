@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, logAndRespondAuthError } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     // Change le mot de passe
     const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
     if (updateError) {
-      return logAndRespond('[change-password] Erreur updateUser:', updateError);
+      return logAndRespondAuthError('[change-password] Erreur updateUser:', updateError);
     }
 
     return NextResponse.json({ ok: true });
