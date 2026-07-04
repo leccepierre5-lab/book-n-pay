@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode } from '@/lib/booking-utils';
 import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/lib/staff-assignment';
+import { logAndRespond } from '@/lib/api-error';
 import type { Booking } from '@/lib/database.types';
 
 export async function POST(req: NextRequest) {
@@ -204,7 +205,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ booking, member });
   } catch (error: any) {
-    console.error('[CreateBooking] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[CreateBooking] Erreur:', error);
   }
 }

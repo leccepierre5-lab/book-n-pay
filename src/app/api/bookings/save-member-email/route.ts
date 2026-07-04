@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -39,6 +40,6 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ saved: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return logAndRespond('[SaveMemberEmail] Erreur:', err);
   }
 }

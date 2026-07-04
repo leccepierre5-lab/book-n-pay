@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 const COMBINING_MARKS = /[̀-ͯ]/g;
 
@@ -63,6 +64,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, referral_code: code, referred_by: referredBy });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return logAndRespond('[PostSignup] Erreur:', err);
   }
 }
