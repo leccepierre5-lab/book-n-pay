@@ -39,6 +39,7 @@ export default function EquipeManager({
   const [staffList, setStaffList] = useState<StaffMember[]>(initialStaff);
   const [panel, setPanel] = useState<Panel>('none');
   const [error, setError] = useState('');
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   // Formulaire ajout
   const [addName, setAddName] = useState('');
@@ -119,6 +120,7 @@ export default function EquipeManager({
   const handleDeactivate = async (staffId: string) => {
     if (!confirm('Désactiver ce praticien ? Il ne sera plus proposé aux clients, mais ses réservations passées restent accessibles.')) return;
     setError('');
+    setTogglingId(staffId);
     try {
       const res = await fetch(`/api/pro/staff/${staffId}`, {
         method: 'PATCH',
@@ -129,11 +131,12 @@ export default function EquipeManager({
       if (!res.ok) { setError(data.error || 'Erreur serveur'); return; }
       setStaffList((prev) => prev.map((s) => s.id === staffId ? { ...s, ...data.staff } : s));
       setPanel('none');
-    } catch { setError('Erreur réseau'); }
+    } catch { setError('Erreur réseau'); } finally { setTogglingId(null); }
   };
 
   const handleReactivate = async (staffId: string) => {
     setError('');
+    setTogglingId(staffId);
     try {
       const res = await fetch(`/api/pro/staff/${staffId}`, {
         method: 'PATCH',
@@ -143,7 +146,7 @@ export default function EquipeManager({
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Erreur serveur'); return; }
       setStaffList((prev) => prev.map((s) => s.id === staffId ? { ...s, ...data.staff } : s));
-    } catch { setError('Erreur réseau'); }
+    } catch { setError('Erreur réseau'); } finally { setTogglingId(null); }
   };
 
   const toggleScheduleDay = (day: number) => {
@@ -221,9 +224,10 @@ export default function EquipeManager({
               </button>
               <button
                 onClick={() => handleDeactivate(s.id)}
-                className="px-2.5 py-1.5 rounded-lg text-xs text-red-400 hover:text-red-300 hover:bg-red-500/[0.08] transition-colors"
+                disabled={togglingId === s.id}
+                className="px-2.5 py-1.5 rounded-lg text-xs text-red-400 hover:text-red-300 hover:bg-red-500/[0.08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Désactiver
+                {togglingId === s.id ? '...' : 'Désactiver'}
               </button>
             </div>
           </div>
@@ -360,9 +364,10 @@ export default function EquipeManager({
               </div>
               <button
                 onClick={() => handleReactivate(s.id)}
-                className="px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-mint-400 hover:bg-mint-500/[0.08] transition-colors"
+                disabled={togglingId === s.id}
+                className="px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-mint-400 hover:bg-mint-500/[0.08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Réactiver
+                {togglingId === s.id ? '...' : 'Réactiver'}
               </button>
             </div>
           ))}

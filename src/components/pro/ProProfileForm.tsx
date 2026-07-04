@@ -24,6 +24,7 @@ export default function ProProfileForm({
   const [uploading, setUploading] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleSaveLinks = async () => {
@@ -76,6 +77,7 @@ export default function ProProfileForm({
 
   const handleDelete = async (photoId: string) => {
     setError('');
+    setDeletingId(photoId);
     const res = await fetch('/api/pro/photos', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -87,6 +89,7 @@ export default function ProProfileForm({
       const d = await res.json();
       setError(d.error || 'Erreur suppression');
     }
+    setDeletingId(null);
   };
 
   return (
@@ -181,13 +184,20 @@ export default function ProProfileForm({
                 <Image src={p.url} alt="" fill className="object-cover" sizes="120px" />
                 <button
                   onClick={() => handleDelete(p.id)}
-                  className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  disabled={deletingId === p.id}
+                  className={`absolute inset-0 bg-black/60 transition-opacity flex items-center justify-center disabled:cursor-not-allowed ${
+                    deletingId === p.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  }`}
                   title="Supprimer"
                 >
-                  <svg className="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                    <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-                  </svg>
+                  {deletingId === p.id ? (
+                    <span className="text-xs text-white">...</span>
+                  ) : (
+                    <svg className="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                      <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                    </svg>
+                  )}
                 </button>
               </div>
             ))}

@@ -23,6 +23,7 @@ export default function FlashSlotsManager({
   const [form, setForm] = useState({ service_id: '', date: '', time: '', flash_deposit: '' });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
 
   const selectedService = services.find((s) => s.id === form.service_id);
 
@@ -54,17 +55,21 @@ export default function FlashSlotsManager({
   };
 
   const handleDeactivate = async (id: string) => {
+    setActingId(id);
     await fetch(`/api/flash-slots/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ active: false }),
     });
     setSlots((prev) => prev.filter((s) => s.id !== id));
+    setActingId(null);
   };
 
   const handleDelete = async (id: string) => {
+    setActingId(id);
     await fetch(`/api/flash-slots/${id}`, { method: 'DELETE' });
     setSlots((prev) => prev.filter((s) => s.id !== id));
+    setActingId(null);
   };
 
   return (
@@ -164,15 +169,17 @@ export default function FlashSlotsManager({
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => handleDeactivate(slot.id)}
-                  className="rounded-lg bg-navy-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-navy-700"
+                  disabled={actingId === slot.id}
+                  className="rounded-lg bg-navy-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                 >
-                  Désactiver
+                  {actingId === slot.id ? '...' : 'Désactiver'}
                 </button>
                 <button
                   onClick={() => handleDelete(slot.id)}
-                  className="rounded-lg bg-red-900/50 px-3 py-1.5 text-xs text-red-300 hover:bg-red-900"
+                  disabled={actingId === slot.id}
+                  className="rounded-lg bg-red-900/50 px-3 py-1.5 text-xs text-red-300 hover:bg-red-900 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                 >
-                  Supprimer
+                  {actingId === slot.id ? '...' : 'Supprimer'}
                 </button>
               </div>
             </div>

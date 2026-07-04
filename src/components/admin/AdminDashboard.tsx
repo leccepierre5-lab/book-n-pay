@@ -35,6 +35,7 @@ export default function AdminDashboard({
   const [localBusinesses, setLocalBusinesses] = useState(businesses);
   const [saving, setSaving] = useState<string | null>(null);
   const [freezing, setFreezing] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
 
   // Approval flow state
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -76,6 +77,7 @@ export default function AdminDashboard({
   };
 
   const rejectApplication = async (id: string) => {
+    setRejecting(id);
     const res = await fetch('/api/admin/applications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -84,6 +86,7 @@ export default function AdminDashboard({
     if (res.ok) {
       setLocalApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'rejected' } : a)));
     }
+    setRejecting(null);
   };
 
   const toggleFreeze = async (bizId: string, currentlyFrozen: boolean) => {
@@ -197,15 +200,17 @@ export default function AdminDashboard({
                   <div className="flex gap-2">
                     <button
                       onClick={() => startApproval(app)}
-                      className="rounded-lg bg-mint-500 px-3 py-1.5 text-xs font-medium text-navy-950"
+                      disabled={rejecting === app.id}
+                      className="rounded-lg bg-mint-500 px-3 py-1.5 text-xs font-medium text-navy-950 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                     >
                       Approuver
                     </button>
                     <button
                       onClick={() => rejectApplication(app.id)}
-                      className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs text-red-300"
+                      disabled={rejecting === app.id}
+                      className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs text-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                     >
-                      Rejeter
+                      {rejecting === app.id ? 'Rejet...' : 'Rejeter'}
                     </button>
                   </div>
                 )}

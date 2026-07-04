@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,6 +49,13 @@ export async function POST(req: NextRequest) {
     if (!member.stripe_payment_intent_id) {
       return NextResponse.json({ error: 'Aucun paiement associé à rembourser' }, { status: 400 });
     }
+    // Idempotence : un double-clic (ou une requête rejouée) ne doit jamais
+    // déclencher un second appel à stripe.refunds.create sur le même
+    // paiement — déjà remboursé une fois, on renvoie un succès sans repasser
+    // par Stripe plutôt que de laisser Stripe renvoyer une erreur ambiguë.
+    if (member.status === 'cancelled') {
+      return NextResponse.json({ success: true, alreadyRefunded: true });
+    }
 
     // ⚠️ CORRECTIF SÉCURITÉ (audit) : utilisait toujours la clé live, même
     // en mode_test_paiement — un remboursement pendant un test aurait pu
@@ -75,7 +83,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('[RefundGesture] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[RefundGesture] Erreur:', error);
   }
 }

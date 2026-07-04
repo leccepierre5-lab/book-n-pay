@@ -57,6 +57,7 @@ export default function ProDashboard({
   const [view, setView] = useState<'today' | 'calendar'>('today');
   const [selectedNoShow, setSelectedNoShow] = useState<{ bookingId: string; member: BookingMemberRow } | null>(null);
   const [selectedCaisse, setSelectedCaisse] = useState<{ booking: BookingRow; member: BookingMemberRow } | null>(null);
+  const [markingNoShow, setMarkingNoShow] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -114,11 +115,13 @@ export default function ProDashboard({
   };
 
   const markNoShow = async (bookingId: string, memberId: string) => {
+    setMarkingNoShow(memberId);
     const res = await fetch('/api/bookings/update-member', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bookingId, memberId, updates: { status: 'no_show' } }),
     });
+    setMarkingNoShow(null);
     if (res.ok) {
       setBookings((prev) =>
         prev.map((b) =>
@@ -356,16 +359,18 @@ export default function ProDashboard({
                           <div className="flex gap-2 shrink-0">
                             <button
                               onClick={() => setSelectedCaisse({ booking: b, member: m })}
-                              className="rounded-xl px-3 py-1.5 text-xs font-semibold text-navy-950 transition-all"
+                              disabled={markingNoShow === m.id}
+                              className="rounded-xl px-3 py-1.5 text-xs font-semibold text-navy-950 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                               style={{ background: 'linear-gradient(135deg, #34d399, #6ee7b7)', boxShadow: '0 2px 8px rgba(52,211,153,0.3)' }}
                             >
                               Check-in
                             </button>
                             <button
                               onClick={() => markNoShow(b.id, m.id)}
-                              className="rounded-xl bg-red-500/12 border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                              disabled={markingNoShow === m.id}
+                              className="rounded-xl bg-red-500/12 border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              No-show
+                              {markingNoShow === m.id ? '...' : 'No-show'}
                             </button>
                           </div>
                         )}
