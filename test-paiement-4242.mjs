@@ -6,8 +6,12 @@
 import { chromium } from 'playwright';
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
-const EMAIL = 'testbnp@example.com';
-const PASSWORD = 'TestBnP2024!';
+const EMAIL = process.env.TEST_ACCOUNT_EMAIL || 'testbnp@example.com';
+const PASSWORD = process.env.TEST_ACCOUNT_PASSWORD;
+if (!PASSWORD) {
+  console.error('❌ Variable TEST_ACCOUNT_PASSWORD requise (mot de passe du compte de test).');
+  process.exit(1);
+}
 const SUPABASE_URL = 'https://suyfsuvrbdpnnijxspge.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_klT_ROWDrKKuMfp2RBoTBQ_XqasU7KJ';
 

@@ -1,7 +1,6 @@
 # Book'nPay — Next.js + Supabase + Vercel
 
-Migration depuis Base44. Voir `MIGRATION_SCHEMA.md` (à la racine du livrable
-complet) pour le détail du schéma DB et les choix de migration.
+Migration depuis Base44.
 
 ## ⚠️ Important — lis ça avant de déployer
 
