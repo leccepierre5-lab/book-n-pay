@@ -323,7 +323,18 @@ export default function StepDateTime({
       )}
 
       {/* ── Slot picker(s) ── */}
-      {date && (
+      {date && slots.length === 0 && (
+        <div className="rounded-xl bg-red-500/10 border border-red-500/25 px-4 py-3 mb-4 flex items-start gap-2">
+          <span className="text-red-400 mt-0.5 shrink-0">⚠️</span>
+          <p className="text-xs text-red-300 leading-relaxed">
+            Cet établissement n&apos;a pas encore configuré ses horaires d&apos;ouverture — aucun créneau
+            ne peut être proposé pour le moment. Contactez l&apos;établissement directement, ou réessayez
+            plus tard.
+          </p>
+        </div>
+      )}
+
+      {date && slots.length > 0 && (
         <>
           {participants > 1 && (
             <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-4 py-3 mb-4 flex items-start gap-2">
