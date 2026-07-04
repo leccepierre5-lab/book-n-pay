@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,7 +59,6 @@ export async function POST(req: NextRequest) {
       payoutsEnabled: account.payouts_enabled,
     });
   } catch (error: any) {
-    console.error('[ConnectStatus] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[ConnectStatus] Erreur:', error);
   }
 }

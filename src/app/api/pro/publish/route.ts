@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function POST() {
   const supabase = await createClient();
@@ -38,6 +39,6 @@ export async function POST() {
     .update({ is_published: true })
     .eq('id', profile.biz_id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[Publish] Erreur:', error);
   return NextResponse.json({ ok: true });
 }

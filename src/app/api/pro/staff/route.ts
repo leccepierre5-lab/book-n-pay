@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: authData } = await supabase.auth.getUser();
@@ -26,7 +27,7 @@ export async function GET() {
     .eq('biz_id', bizId)
     .order('created_at', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[Staff] Erreur liste:', error);
   return NextResponse.json({ staff: data ?? [] });
 }
 
@@ -53,6 +54,6 @@ export async function POST(req: NextRequest) {
     .select('id, name, role, emoji, is_active, deactivated_at, created_at')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[Staff] Erreur création:', error);
   return NextResponse.json({ staff: data }, { status: 201 });
 }

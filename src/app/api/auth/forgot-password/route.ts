@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate } from '@/lib/email/send';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -69,7 +70,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('[forgot-password]', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return logAndRespond('[forgot-password]', err);
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: authData } = await supabase.auth.getUser();
@@ -32,7 +33,7 @@ export async function GET(
     .eq('biz_id', bizId)
     .order('day_of_week');
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[StaffSchedule] Erreur liste:', error);
   return NextResponse.json({ schedules: data ?? [] });
 }
 
@@ -91,7 +92,7 @@ export async function PUT(
     }));
 
     const { error } = await admin.from('staff_schedules').insert(rows);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return logAndRespond('[StaffSchedule] Erreur update:', error);
   }
 
   return NextResponse.json({ ok: true });

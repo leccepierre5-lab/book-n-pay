@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { randomUUID } from 'crypto';
+import { logAndRespond } from '@/lib/api-error';
 
 const MAX_PHOTOS = 5;
 
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
     .from('business-photos')
     .upload(path, bytes, { contentType: file.type, upsert: false });
 
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
+  if (uploadError) return logAndRespond('[Photos] Erreur upload:', uploadError);
 
   const { data: urlData } = supabaseAdmin.storage.from('business-photos').getPublicUrl(path);
   const url = urlData.publicUrl;
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) return logAndRespond('[Photos] Erreur insertion:', insertError);
   return NextResponse.json({ photo });
 }
 

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { computeStatut } from '@/lib/booking-utils';
 import { isValidBearerSecret } from '@/lib/constant-time';
+import { logAndRespond } from '@/lib/api-error';
 
 const UPGRADE_MESSAGES: Record<string, { subject: string; body: string }> = {
   Bronze: {
@@ -118,7 +119,6 @@ export async function POST(req: NextRequest) {
       upgraded,
     });
   } catch (error: any) {
-    console.error('[Fidélité] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[Fidélité] Erreur:', error);
   }
 }

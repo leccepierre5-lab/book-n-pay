@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 async function getBizId(): Promise<string | null> {
   const supabase = await createClient();
@@ -25,7 +26,7 @@ export async function GET() {
     .eq('biz_id', bizId)
     .order('created_at');
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[Services] Erreur liste:', error);
   return NextResponse.json(data);
 }
 
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[Services] Erreur création:', error);
   return NextResponse.json(data, { status: 201 });
 }
 
@@ -95,7 +96,7 @@ export async function PATCH(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[Services] Erreur update:', error);
   return NextResponse.json(data);
 }
 
@@ -117,6 +118,6 @@ export async function DELETE(req: NextRequest) {
   if (!existing) return NextResponse.json({ error: 'Service introuvable' }, { status: 404 });
 
   const { error } = await supabase.from('services').delete().eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[Services] Erreur suppression:', error);
   return NextResponse.json({ ok: true });
 }

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { calcFraisGestion, generateQrCode, normalizePhone } from '@/lib/booking-utils';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { logAndRespond } from '@/lib/api-error';
 
 const MAX_GROUP_SIZE = 23;
 const INVITE_DELAY_MS = 30 * 60 * 1000; // 30 minutes
@@ -218,7 +219,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'Action invalide' }, { status: 400 });
   } catch (error: any) {
-    console.error('[joinGroupBooking] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[joinGroupBooking] Erreur:', error);
   }
 }

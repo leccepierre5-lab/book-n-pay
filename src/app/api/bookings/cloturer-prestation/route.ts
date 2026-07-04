@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, escapeHtml } from '@/lib/email/send';
+import { logAndRespond } from '@/lib/api-error';
 
 const MODE_LABEL: Record<string, string> = {
   app: "via l'application Book'nPay",
@@ -96,7 +97,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, paymentMode, emailSent });
   } catch (error: any) {
-    console.error('[Clôture] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[Clôture] Erreur:', error);
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function PATCH(
   req: NextRequest,
@@ -33,7 +34,7 @@ export async function PATCH(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[FlashSlots] Erreur update:', error);
   return NextResponse.json(data);
 }
 
@@ -63,6 +64,6 @@ export async function DELETE(
     .eq('id', id)
     .eq('biz_id', profile.biz_id!);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[FlashSlots] Erreur suppression:', error);
   return NextResponse.json({ success: true });
 }

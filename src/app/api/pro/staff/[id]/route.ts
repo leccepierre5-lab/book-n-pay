@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: authData } = await supabase.auth.getUser();
@@ -53,7 +54,7 @@ export async function PATCH(
     .select('id, name, role, emoji, is_active, deactivated_at')
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[Staff] Erreur update:', error);
   return NextResponse.json({ staff: data });
 }
 
@@ -88,6 +89,6 @@ export async function DELETE(
     .eq('id', id)
     .eq('biz_id', bizId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return logAndRespond('[Staff] Erreur suppression:', error);
   return NextResponse.json({ ok: true });
 }

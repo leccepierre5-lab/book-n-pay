@@ -19,6 +19,7 @@
 // exigeant le rôle pro/admin dès que le statut visé est 'arrived'/'no_show'.
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 const PRO_ONLY_STATUSES = ['arrived', 'no_show'];
 const ALLOWED_FIELDS = ['status'] as const;
@@ -90,7 +91,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, member: updatedMember });
   } catch (error: any) {
-    console.error('[updateBookingMember] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[updateBookingMember] Erreur:', error);
   }
 }

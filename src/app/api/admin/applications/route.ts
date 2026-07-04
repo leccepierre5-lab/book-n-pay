@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { getPlanConfig, getEngagementEndDate } from '@/lib/plans-config';
+import { logAndRespond } from '@/lib/api-error';
 
 function slugify(text: string): string {
   return (text || '')
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
         redirectTo: `${siteUrl}/auth/verify`,
       },
     });
-    if (linkError) return NextResponse.json({ error: linkError.message }, { status: 400 });
+    if (linkError) return logAndRespond('[AdminApplications] Erreur génération lien:', linkError, 400);
 
     const proUserId = linkData.user.id;
     const { hashed_token } = linkData.properties;
@@ -154,7 +155,7 @@ export async function POST(req: NextRequest) {
 
     if (bizError || !biz) {
       await rollback(bizError?.message ?? 'Échec création business');
-      return NextResponse.json({ error: bizError?.message ?? 'Erreur création établissement' }, { status: 500 });
+      return logAndRespond('[AdminApplications] Erreur création business:', bizError ?? new Error('biz introuvable'));
     }
 
     // 4. Mettre à jour app_users : le trigger a déjà créé la ligne (role='client'),
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
 
     if (userError) {
       await rollback(userError.message);
-      return NextResponse.json({ error: userError.message }, { status: 500 });
+      return logAndRespond('[AdminApplications] Erreur app_users:', userError);
     }
 
     // 5. Créer business_settings avec le plan
@@ -192,7 +193,7 @@ export async function POST(req: NextRequest) {
 
     if (settingsError) {
       await rollback(settingsError.message);
-      return NextResponse.json({ error: settingsError.message }, { status: 500 });
+      return logAndRespond('[AdminApplications] Erreur business_settings:', settingsError);
     }
 
     // 6. Marquer la candidature approuvée
@@ -203,7 +204,7 @@ export async function POST(req: NextRequest) {
 
     if (updateError) {
       await rollback(updateError.message);
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+      return logAndRespond('[AdminApplications] Erreur maj candidature:', updateError);
     }
 
     // 7. Email Resend — UN seul email avec le lien d'invitation + détails du plan
@@ -252,7 +253,6 @@ export async function POST(req: NextRequest) {
     console.log(`[AdminApplications] ${app.etablissement} approuvé — bizId=${biz.id} plan=${planKey}`);
     return NextResponse.json({ ok: true, bizId: biz.id, proUserId });
   } catch (err: any) {
-    console.error('[AdminApplications]', err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return logAndRespond('[AdminApplications]', err);
   }
 }

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
+import { logAndRespond } from '@/lib/api-error';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -155,7 +156,6 @@ L'équipe Book'nPay`,
     console.log(`[FreezeBusiness] ${business.name} dégelé — ${notified} client(s) notifié(s)`);
     return NextResponse.json({ success: true, frozen: false, notified });
   } catch (error: any) {
-    console.error('[FreezeBusiness] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[FreezeBusiness] Erreur:', error);
   }
 }

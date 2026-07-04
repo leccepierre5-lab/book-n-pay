@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { logAndRespond } from '@/lib/api-error';
 
 const COMBINING_MARKS = /[̀-ͯ]/g;
 
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
       if (linkError.message?.toLowerCase().includes('already registered')) {
         return NextResponse.json({ error: 'Cet email est déjà utilisé.' }, { status: 409 });
       }
-      return NextResponse.json({ error: linkError.message }, { status: 400 });
+      return logAndRespond('[register] Erreur generateLink:', linkError, 400);
     }
 
     const { hashed_token } = linkData.properties;
@@ -130,7 +131,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, emailSent: true });
   } catch (err: any) {
-    console.error('[register]', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return logAndRespond('[register]', err);
   }
 }

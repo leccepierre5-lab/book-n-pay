@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { JOKERS_LIMITES, JOKERS_PCT } from '@/lib/booking-utils';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -125,7 +126,6 @@ export async function POST(req: NextRequest) {
       jokersUtilises: newJokersUtilises,
     });
   } catch (error: any) {
-    console.error('[Joker] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[Joker] Erreur:', error);
   }
 }

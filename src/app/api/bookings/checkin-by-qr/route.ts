@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -90,7 +91,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, member: updated, booking: member.bookings });
   } catch (error: any) {
-    console.error('[CheckinByQR] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[CheckinByQR] Erreur:', error);
   }
 }

@@ -20,6 +20,7 @@ import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, phonesMatch } from '@/lib/booking-utils';
 import { sendEmail } from '@/lib/email/send';
+import { logAndRespond } from '@/lib/api-error';
 
 const CANCEL_DEADLINE_HOURS = 48;
 
@@ -148,7 +149,6 @@ L'équipe Book'nPay`,
       hoursUntilRdv: Math.round(hoursUntilRdv),
     });
   } catch (error: any) {
-    console.error('[CancelClient] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[CancelClient] Erreur:', error);
   }
 }

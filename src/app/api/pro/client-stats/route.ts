@@ -6,6 +6,7 @@
 // le score reflète la fiabilité du client CHEZ CE PRO, pas en absolu).
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function GET(req: NextRequest) {
   try {
@@ -53,7 +54,6 @@ export async function GET(req: NextRequest) {
       appUser: appUser || null,
     });
   } catch (error: any) {
-    console.error('[ClientStats] Erreur:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[ClientStats] Erreur:', error);
   }
 }

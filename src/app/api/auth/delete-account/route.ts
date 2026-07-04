@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,13 +38,11 @@ export async function POST(req: NextRequest) {
     // Suppression du compte auth → impossible de se reconnecter
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
     if (deleteError) {
-      console.error('[delete-account] deleteUser error:', deleteError.message);
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      return logAndRespond('[delete-account] deleteUser error:', deleteError);
     }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('[delete-account]', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return logAndRespond('[delete-account]', err);
   }
 }

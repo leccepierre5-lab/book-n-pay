@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { computeStaffAvailabilityForDay } from '@/lib/staff-assignment';
+import { logAndRespond } from '@/lib/api-error';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
     .neq('status', 'cancelled');
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return logAndRespond('[Availability] Erreur:', error);
   }
 
   const counts: Record<string, number> = {};
