@@ -106,7 +106,25 @@ export async function POST(req: NextRequest) {
         redirectTo: `${siteUrl}/auth/verify`,
       },
     });
-    if (linkError) return logAndRespondAuthError('[AdminApplications] Erreur génération lien:', linkError);
+    if (linkError) {
+      // Cas fréquent et actionnable : le partenaire a candidaté avec un email
+      // qui a déjà un compte (souvent le sien, en tant que client). Le garde-fou
+      // anti-énumération de logAndRespondAuthError masque ce message sur les
+      // routes PUBLIQUES (empêcher un attaquant de découvrir des comptes) —
+      // mais cette route est déjà protégée par un check role==='admin' plus
+      // haut, donc révéler ce cas précis à l'admin n'est pas une fuite : c'est
+      // l'information dont il a besoin pour traiter la candidature.
+      if ((linkError as { code?: string }).code === 'email_exists') {
+        return NextResponse.json(
+          {
+            error:
+              "Cet email a déjà un compte. Demandez au partenaire d'utiliser une autre adresse email pour son compte professionnel.",
+          },
+          { status: 409 }
+        );
+      }
+      return logAndRespondAuthError('[AdminApplications] Erreur génération lien:', linkError);
+    }
 
     const proUserId = linkData.user.id;
     const { hashed_token } = linkData.properties;
