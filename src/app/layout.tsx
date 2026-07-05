@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import PageTransition from '@/components/PageTransition';
@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   },
   description:
     "Book'nPay connecte les professionnels de Biarritz, Anglet et Bayonne à leurs clients : réservation en ligne, paiement sécurisé, zéro commission.",
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
