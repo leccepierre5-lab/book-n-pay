@@ -2,6 +2,32 @@
 
 Migration depuis Base44.
 
+## Garde-fou git : seul Pierre pousse sur ce repo
+
+Un hook `pre-push` bloque tout `git push` sauf si la variable d'environnement
+`ALLOW_PUSH=1` est posée sur la commande. Objectif : empêcher un push
+automatisé (agent IA ou script) sans action explicite de Pierre.
+
+Le hook lui-même vit dans `scripts/git-hooks/pre-push` (versionné — `.git/hooks/`
+ne l'est jamais, donc un clone frais ne l'a pas tant qu'il n'est pas installé).
+Pour l'activer sur un clone :
+
+```sh
+git config core.hooksPath scripts/git-hooks
+```
+
+ou, en copie manuelle :
+
+```sh
+cp scripts/git-hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+```
+
+Pour pousser une fois le hook actif :
+
+```sh
+ALLOW_PUSH=1 git push
+```
+
 ## ⚠️ Important — lis ça avant de déployer
 
 Ce repo n'a **pas pu être installé (`npm install`) ni buildé** dans
