@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { CGU_VERSION } from '@/lib/legal';
 
 const CATEGORIES = [
   { value: 'beaute', label: 'Beauté', sub: 'Coiffure, esthétique, barber, onglerie…' },
@@ -53,6 +55,7 @@ export default function PartnerApplicationForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [acceptedCgu, setAcceptedCgu] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +65,7 @@ export default function PartnerApplicationForm() {
       return;
     }
     if (!bookingsEstimate) { setError('Sélectionnez votre volume estimé de réservations.'); return; }
+    if (!acceptedCgu) { setError('Vous devez accepter les CGU/CGV pour envoyer votre candidature.'); return; }
     setLoading(true);
     setError(null);
     const supabase = createClient();
@@ -77,6 +81,8 @@ export default function PartnerApplicationForm() {
       category_label: category === 'autre' ? (categoryLabel.trim() || null) : null,
       type: bizType.trim() || null,
       monthly_bookings_estimate: bookingsEstimate,
+      cgu_accepted_at: new Date().toISOString(),
+      cgu_version: CGU_VERSION,
     });
     if (insertError) {
       setError(insertError.message);
@@ -251,6 +257,27 @@ export default function PartnerApplicationForm() {
         <input placeholder="Site web" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} className={inputClass} />
       </section>
 
+      <label className="flex items-start gap-2.5 text-xs text-slate-400 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={acceptedCgu}
+          onChange={(e) => setAcceptedCgu(e.target.checked)}
+          required
+          className="mt-0.5 accent-mint-500"
+        />
+        <span>
+          J&apos;accepte les{' '}
+          <Link
+            href="/cgu"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-mint-400 underline underline-offset-2 hover:text-mint-300"
+          >
+            conditions générales d&apos;utilisation
+          </Link>
+        </span>
+      </label>
+
       {error && (
         <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
@@ -259,12 +286,12 @@ export default function PartnerApplicationForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !acceptedCgu}
         className="w-full rounded-2xl py-4 font-semibold text-navy-950 text-sm transition-all duration-200 disabled:opacity-50 hover:scale-[1.01] active:scale-[0.99]"
         style={{
-          background: loading ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
-          boxShadow: loading ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
-          color: loading ? '#94a3b8' : undefined,
+          background: loading || !acceptedCgu ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
+          boxShadow: loading || !acceptedCgu ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
+          color: loading || !acceptedCgu ? '#94a3b8' : undefined,
         }}
       >
         {loading ? 'Envoi...' : 'Continuer →'}

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -16,11 +17,16 @@ export default function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
+  const [acceptedCgu, setAcceptedCgu] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    if (!acceptedCgu) {
+      setError('Vous devez accepter les CGU/CGV pour créer un compte.');
       return;
     }
     setLoading(true);
@@ -35,6 +41,7 @@ export default function RegisterForm() {
         name: fullName.trim(),
         phone,
         referralCode: referralCode || null,
+        cguAccepted: acceptedCgu,
       }),
     });
 
@@ -128,6 +135,27 @@ export default function RegisterForm() {
         required
         className={inputClass}
       />
+      <label className="flex items-start gap-2.5 text-xs text-slate-400 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={acceptedCgu}
+          onChange={(e) => setAcceptedCgu(e.target.checked)}
+          required
+          className="mt-0.5 accent-mint-500"
+        />
+        <span>
+          J&apos;accepte les{' '}
+          <Link
+            href="/cgu"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-mint-400 underline underline-offset-2 hover:text-mint-300"
+          >
+            conditions générales d&apos;utilisation
+          </Link>
+        </span>
+      </label>
+
       {error && (
         <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
@@ -135,12 +163,12 @@ export default function RegisterForm() {
       )}
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !acceptedCgu}
         className="w-full rounded-2xl py-4 font-semibold text-navy-950 text-sm transition-all duration-200 disabled:opacity-50 hover:scale-[1.01] active:scale-[0.99]"
         style={{
-          background: loading ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
-          boxShadow: loading ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
-          color: loading ? '#94a3b8' : undefined,
+          background: loading || !acceptedCgu ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
+          boxShadow: loading || !acceptedCgu ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
+          color: loading || !acceptedCgu ? '#94a3b8' : undefined,
         }}
       >
         {loading ? 'Création...' : "S'inscrire gratuitement"}

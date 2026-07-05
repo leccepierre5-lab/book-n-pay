@@ -3,6 +3,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond, logAndRespondAuthError } from '@/lib/api-error';
+import { CGU_VERSION } from '@/lib/legal';
 
 const COMBINING_MARKS = /[̀-ͯ]/g;
 
@@ -26,9 +27,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Trop de tentatives, réessaie dans quelques minutes.' }, { status: 429 });
     }
 
-    const { email, password, name, phone, referralCode } = await req.json();
+    const { email, password, name, phone, referralCode, cguAccepted } = await req.json();
     if (!email || !password) {
       return NextResponse.json({ error: 'email et password requis' }, { status: 400 });
+    }
+    if (cguAccepted !== true) {
+      return NextResponse.json({ error: 'Vous devez accepter les CGU/CGV pour créer un compte.' }, { status: 400 });
     }
 
     const supabase = createServiceRoleClient();
@@ -71,6 +75,11 @@ export async function POST(req: NextRequest) {
       .eq('id', userId)
       .maybeSingle();
 
+    const userUpdate: Record<string, unknown> = {
+      cgu_accepted_at: new Date().toISOString(),
+      cgu_version: CGU_VERSION,
+    };
+
     if (existingUser && !existingUser.referral_code) {
       let code = '';
       for (let i = 0; i < 5; i++) {
@@ -94,11 +103,11 @@ export async function POST(req: NextRequest) {
         if (referrer) referredBy = referrer.id;
       }
 
-      await supabase
-        .from('app_users')
-        .update({ referral_code: code, ...(referredBy ? { referred_by: referredBy } : {}) })
-        .eq('id', userId);
+      userUpdate.referral_code = code;
+      if (referredBy) userUpdate.referred_by = referredBy;
     }
+
+    await supabase.from('app_users').update(userUpdate).eq('id', userId);
 
     // Email de confirmation via Resend (domaine book-n-pay.com vérifié, DKIM OK)
     const firstName = ((name || '').trim().split(' ')[0]) || 'toi';
