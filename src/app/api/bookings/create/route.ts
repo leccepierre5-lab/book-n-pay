@@ -4,11 +4,17 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode } from '@/lib/booking-utils';
 import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/lib/staff-assignment';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import type { Booking } from '@/lib/database.types';
 
 export async function POST(req: NextRequest) {
   try {
+    const { allowed } = await checkRateLimit(`bookings-create:${getClientIp(req)}`, 20, 10 * 60);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Trop de tentatives, réessaie dans quelques minutes.' }, { status: 429 });
+    }
+
     const supabase = await createClient();
     const { data: authData } = await supabase.auth.getUser();
 

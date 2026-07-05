@@ -8,11 +8,9 @@ import type { ChatMessage } from '@/lib/database.types';
 export default function ChatThread({
   bookingId,
   senderRole,
-  senderName,
 }: {
   bookingId: string;
   senderRole: 'client' | 'pro';
-  senderName: string;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
@@ -50,7 +48,7 @@ export default function ChatThread({
     const res = await fetch('/api/chat/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookingId, senderRole, senderName, text }),
+      body: JSON.stringify({ bookingId, text }),
     });
     // ⚠️ CORRECTIF (trouvé en audit) : aucun retour visuel en cas d'échec —
     // le texte restait dans le champ sans explication. Ajout d'un message

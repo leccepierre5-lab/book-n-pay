@@ -54,7 +54,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
         </div>
 
         <div className="h-96 overflow-hidden rounded-xl bg-navy-900">
-          <ChatThread bookingId={booking.id} senderRole={senderRole} senderName={profile?.name || 'Vous'} />
+          <ChatThread bookingId={booking.id} senderRole={senderRole} />
         </div>
       </div>
     </div>

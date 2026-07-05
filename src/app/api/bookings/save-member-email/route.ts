@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 
 export async function PATCH(req: NextRequest) {
   try {
+    // memberId n'est pas lié à une session (participants invités sans compte) —
+    // le rate limit borne le brute-force d'IDs plutôt que de bloquer l'accès légitime.
+    const { allowed } = await checkRateLimit(`save-member-email:${getClientIp(req)}`, 20, 10 * 60);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Trop de tentatives, réessaie dans quelques minutes.' }, { status: 429 });
+    }
+
     const { memberId, email } = await req.json();
 
     if (!memberId || typeof memberId !== 'string') {

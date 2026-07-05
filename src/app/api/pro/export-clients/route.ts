@@ -15,9 +15,15 @@ interface ClientAgg {
   lastDate: string;
 }
 
+// Neutralise l'injection de formule tableur (=, +, -, @, tab, CR en tête de
+// cellule sont interprétés comme une formule par Excel/Sheets) en préfixant
+// d'une apostrophe, avant l'échappement CSV classique.
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
 function csvEscape(value: string): string {
-  if (/[;"\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+  const safe = FORMULA_TRIGGER.test(value) ? `'${value}` : value;
+  if (/[;"\n]/.test(safe)) return `"${safe.replace(/"/g, '""')}"`;
+  return safe;
 }
 
 export async function GET() {

@@ -1,7 +1,7 @@
 // src/app/api/chat/send/route.ts
-// Combine l'insertion du message (RLS protège déjà l'accès) et la
-// notification email — port de base44/functions/notifyNewChatMessage/entry.ts,
-// mais appelé explicitement après l'insert plutôt que via une automation DB.
+// Combine l'insertion du message et la notification email — port de
+// base44/functions/notifyNewChatMessage/entry.ts, mais appelé explicitement
+// après l'insert plutôt que via une automation DB.
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
@@ -10,10 +10,45 @@ import { logAndRespond } from '@/lib/api-error';
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { bookingId, senderRole, senderName, text } = await req.json();
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
 
-    if (!bookingId || !senderRole || !text) {
+    const { bookingId, text } = await req.json();
+    if (!bookingId || !text) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 });
+    }
+
+    // senderRole/senderName ne sont jamais pris depuis le body (auto-déclarables
+    // par le client) : dérivés côté serveur de la relation réelle entre l'user
+    // authentifié et la réservation, pour empêcher toute usurpation (ex: un
+    // client qui s'attribuerait senderRole:'pro' pour se faire passer pour
+    // l'établissement).
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('biz_id, client_id, client_name, biz_name')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });
+
+    let senderRole: 'client' | 'pro';
+    let senderName: string;
+
+    if (booking.client_id === authData.user.id) {
+      senderRole = 'client';
+      senderName = booking.client_name || 'Client';
+    } else {
+      const { data: proProfile } = await supabase
+        .from('app_users')
+        .select('name, role, biz_id')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      if (!proProfile || proProfile.biz_id !== booking.biz_id || !['pro', 'admin'].includes(proProfile.role)) {
+        return NextResponse.json({ error: 'Accès interdit' }, { status: 403 });
+      }
+      senderRole = 'pro';
+      senderName = proProfile.name || booking.biz_name || 'Professionnel';
     }
 
     const { data: message, error } = await supabase
