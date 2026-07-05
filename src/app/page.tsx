@@ -124,10 +124,10 @@ function CGULine() {
 /* ── Bandeau utilisateur déjà connecté ──
    Remplace l'ancien redirect forcé au montage (cassait le bouton retour, cf. 02/07/2026) :
    la home reste affichée et navigable, ce bandeau propose juste un raccourci. */
-function ConnectedBanner({ href }: { href: string }) {
+function ConnectedBanner({ href, firstName }: { href: string; firstName: string | null }) {
   return (
     <div className="w-full bg-navy-900/90 backdrop-blur border-b border-emerald-500/15 px-4 py-2.5 flex items-center justify-center gap-2 text-xs sm:text-sm text-center">
-      <span className="text-slate-300">Vous êtes déjà connecté</span>
+      <span className="text-slate-300">{firstName ? `Bonjour ${firstName}` : 'Vous êtes déjà connecté'}</span>
       <Link
         href={href}
         className="font-semibold text-emerald-400 hover:text-emerald-300 transition-colors whitespace-nowrap"
@@ -138,11 +138,30 @@ function ConnectedBanner({ href }: { href: string }) {
   );
 }
 
+/* ── Loader affiché pendant la résolution de session (évite un flash de div vide) ── */
+function SessionLoader() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-dvh gap-3">
+      <Image
+        src="/logo.jpg"
+        alt="Book'nPay"
+        width={64}
+        height={64}
+        className="rounded-2xl ring-2 ring-mint-500/20 shadow-[0_0_32px_rgba(52,211,153,0.25)] animate-pulse"
+        priority
+      />
+      <div className="w-6 h-6 rounded-full border-2 border-emerald-500/25 border-t-emerald-400 animate-spin" />
+    </div>
+  );
+}
+
 export default function HomePage() {
   // null = vérification de session en cours (évite un flash onboarding pour les utilisateurs connectés)
   const [slide, setSlide] = useState<number | null>(null);
   // Destination du bandeau si connecté (null = déconnecté, ou statut pas encore résolu)
   const [connectedSpace, setConnectedSpace] = useState<string | null>(null);
+  // Prénom pour l'accueil personnalisé (null = pas de nom exploitable, ex. fallback email)
+  const [firstName, setFirstName] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -158,11 +177,15 @@ export default function HomePage() {
       if (data.session) {
         const { data: appUser } = await supabase
           .from('app_users')
-          .select('role')
+          .select('role, name')
           .eq('id', data.session.user.id)
           .single();
         const role = appUser?.role;
         setConnectedSpace(role === 'admin' ? '/admin' : role === 'pro' ? '/pro' : '/recherche');
+        // app_users.name retombe sur l'email si aucun nom n'a été fourni à l'inscription
+        // (trigger handle_new_user) — ne jamais afficher "Bonjour pierre@gmail.com".
+        const rawName = appUser?.name?.trim();
+        setFirstName(rawName && !rawName.includes('@') ? rawName.split(' ')[0] : null);
         setSlide(3);
       } else {
         setSlide(0);
@@ -177,13 +200,13 @@ export default function HomePage() {
     else setSlide(3);
   };
 
-  if (slide === null) return <div className="min-h-dvh" />;
+  if (slide === null) return <SessionLoader />;
 
   /* ── Écran auth Particulier ── */
   if (slide === 4) {
     return (
       <div className="flex flex-col min-h-dvh">
-        {connectedSpace && <ConnectedBanner href={connectedSpace} />}
+        {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
@@ -219,7 +242,7 @@ export default function HomePage() {
   if (slide === 5) {
     return (
       <div className="flex flex-col min-h-dvh">
-        {connectedSpace && <ConnectedBanner href={connectedSpace} />}
+        {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
@@ -255,7 +278,7 @@ export default function HomePage() {
   if (slide === 3) {
     return (
       <div className="flex flex-col min-h-dvh">
-        {connectedSpace && <ConnectedBanner href={connectedSpace} />}
+        {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(2)} />
@@ -310,7 +333,7 @@ export default function HomePage() {
 
   return (
     <>
-      {connectedSpace && <ConnectedBanner href={connectedSpace} />}
+      {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
       <div className="relative flex flex-col min-h-dvh overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(52,211,153,0.07)_0%,transparent_65%)] pointer-events-none" />
 
