@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Recherche' };
-import { searchBusinesses, CATEGORIES, type SearchFilters } from '@/lib/queries/catalog';
+import { searchBusinesses, getAvailableCities, CATEGORIES, type SearchFilters } from '@/lib/queries/catalog';
 import type { FlashSlot } from '@/lib/database.types';
 import { SearchResults } from './_components/SearchResults';
+import { CityAutocomplete } from './_components/CityAutocomplete';
 
 export default async function SearchPage({
   searchParams,
@@ -28,7 +29,7 @@ export default async function SearchPage({
   const today = new Date().toISOString().split('T')[0];
   const serviceRole = createServiceRoleClient();
 
-  const [businesses, { data: flashSlots }] = await Promise.all([
+  const [businesses, { data: flashSlots }, cities] = await Promise.all([
     searchBusinesses(filters),
     serviceRole
       .from('flash_slots')
@@ -37,6 +38,7 @@ export default async function SearchPage({
       .gte('date', today)
       .order('date', { ascending: true })
       .limit(5),
+    getAvailableCities(),
   ]);
 
   // Sous-catégories : dérivées des résultats déjà filtrés par catégorie (pas de requête
@@ -86,18 +88,7 @@ export default async function SearchPage({
             </button>
           </div>
 
-          <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
-            </svg>
-            <input
-              type="text"
-              name="city"
-              defaultValue={params.city}
-              placeholder="Filtrer par ville..."
-              className="w-full rounded-xl bg-navy-900 border border-white/[0.08] pl-10 pr-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-mint-500/40 focus:ring-2 focus:ring-mint-500/15 transition-all duration-200"
-            />
-          </div>
+          <CityAutocomplete cities={cities} defaultValue={params.city} />
 
           <div className="flex gap-2 overflow-x-auto pb-1">
             {CATEGORIES.map((cat) => (

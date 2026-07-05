@@ -97,6 +97,31 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
   return results;
 }
 
+// Villes réellement représentées par au moins un établissement publié — pour
+// l'autocomplétion du filtre ville (jamais une ville "morte"). Dédupliquée et
+// triée ici (côté serveur) pour renvoyer une liste déjà propre au composant
+// client, plutôt que de lui faire refaire ce travail.
+export async function getAvailableCities(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('city')
+    .eq('frozen', false)
+    .eq('is_published', true);
+
+  if (error) {
+    console.error('[getAvailableCities]', error.message);
+    return [];
+  }
+
+  const cities = new Set<string>();
+  for (const row of data as { city: string | null }[]) {
+    const city = row.city?.trim();
+    if (city) cities.add(city);
+  }
+  return Array.from(cities).sort((a, b) => a.localeCompare(b, 'fr'));
+}
+
 export async function getBusinessBySlug(slug: string): Promise<BusinessWithDetails | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
