@@ -134,7 +134,13 @@ export default function StepDateTime({
   staff: Staff | null;
   onSelect: (date: string, slots: string[], participants: number) => void;
 }) {
-  const maxPersons = service.allow_group !== false ? (service.max_persons || 8) : 1;
+  // `max_persons` NULL = "Illimité" côté pro (PrestationsManager.tsx) : ne
+  // doit pas être plafonné à une valeur arbitraire. Le vrai plafond du
+  // système reste 23 (voir create-group/route.ts, "Groupe limité à 23
+  // personnes maximum") — inutile d'en proposer plus dans le sélecteur,
+  // ça échouerait de toute façon à la création du groupe.
+  const maxPersons = service.allow_group !== false ? (service.max_persons ?? 23) : 1;
+  const isCollective = service.allow_group === true;
 
   const now = new Date();
   const [calYear, setCalYear] = useState(now.getFullYear());
@@ -173,7 +179,12 @@ export default function StepDateTime({
       if (staff) return !staffAvailability[slot]?.freeStaffIds.includes(staff.id);
       return (staffAvailability[slot]?.freeCount ?? 0) === 0;
     }
-    return (occupancy[slot] || 0) >= maxPersons;
+    // Clé composite pour les services collectifs — doit correspondre à celle
+    // construite côté serveur (availability/route.ts) : isole la séance par
+    // praticien choisi (ou "" si aucun) pour ne pas se mélanger avec une
+    // autre séance du même service donnée par un autre instructeur.
+    const key = isCollective ? `${slot}::${staff?.id ?? ''}` : slot;
+    return (occupancy[key] || 0) >= maxPersons;
   };
 
   const handleParticipantsChange = (n: number) => {
