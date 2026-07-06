@@ -116,11 +116,15 @@ $$;
 -- Durcissement : par défaut Postgres accorde EXECUTE à PUBLIC sur une nouvelle
 -- fonction. Cette fonction est SECURITY DEFINER et n'est appelée que depuis
 -- create/route.ts via le client service_role (jamais une clé anon/authenticated
--- exposée côté client) — on retire l'accès public par prudence, même si le
--- risque réel est faible tant que la clé service_role reste côté serveur.
+-- exposée côté client) — on retire l'accès par prudence. REVOKE FROM PUBLIC
+-- seul ne suffit PAS : Supabase accorde par défaut des GRANT EXECUTE explicites
+-- aux rôles anon et authenticated (indépendamment de PUBLIC), donc il faut les
+-- cibler nommément ici pour qu'un rejeu de cette migration sur un nouvel
+-- environnement reproduise le même état qu'en prod (vérifié en base : seuls
+-- service_role et postgres ont EXECUTE).
 REVOKE EXECUTE ON FUNCTION assign_staff_and_create_booking(
   uuid, text, uuid, text, date, time, int, uuid[], uuid, text, text, text
-) FROM PUBLIC;
+) FROM anon, authenticated, PUBLIC;
 
 GRANT EXECUTE ON FUNCTION assign_staff_and_create_booking(
   uuid, text, uuid, text, date, time, int, uuid[], uuid, text, text, text

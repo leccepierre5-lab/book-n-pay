@@ -4,6 +4,22 @@
 -- ⚠️ Comme les migrations précédentes, à exécuter manuellement dans le
 -- Supabase SQL Editor.
 --
+-- ⚠️ Fichier réécrit le 06/07/2026 pour correspondre EXACTEMENT à la fonction
+-- réellement déployée (12 arguments, confirmé par sonde PostgREST : un appel
+-- incluant p_group_ref/p_payment_deadline renvoie PGRST202 "fonction
+-- introuvable"). La version précédente de ce fichier (commit 4a644f0)
+-- déclarait 14 arguments (avec p_group_ref text, p_payment_deadline
+-- timestamptz) et un corps avec RETURN; — ni l'un ni l'autre n'a jamais été
+-- réellement exécuté tel quel dans le SQL Editor : la prod a été déployée
+-- avec seulement 12 arguments, puis son corps a été modifié directement en
+-- base (RETURN; → RAISE EXCEPTION, voir plus bas) sans jamais revenir dans ce
+-- fichier. Le fichier ne fait donc plus référence à group_ref/payment_deadline
+-- — s'ils redeviennent nécessaires (ex. pour create-group/route.ts), il
+-- faudra une vraie nouvelle migration, avec un DROP FUNCTION explicite de la
+-- signature 12-arg si on veut éviter de créer une deuxième surcharge
+-- (CREATE OR REPLACE ne remplace pas une fonction dont la liste de types
+-- d'arguments diffère — il crée une fonction distincte à côté).
+--
 -- Problème corrigé : la branche "service collectif" de
 -- src/app/api/bookings/create/route.ts (et la boucle d'insertion de
 -- src/app/api/bookings/create-group/route.ts) insère directement dans
@@ -47,9 +63,7 @@ CREATE OR REPLACE FUNCTION create_booking_with_capacity_check(
   p_client_id uuid,
   p_client_phone text,
   p_client_name text,
-  p_client_email text,
-  p_group_ref text DEFAULT NULL,
-  p_payment_deadline timestamptz DEFAULT NULL
+  p_client_email text
 )
 RETURNS SETOF bookings
 LANGUAGE plpgsql
@@ -100,19 +114,26 @@ BEGIN
       AND b.status != 'cancelled';
 
     IF v_current_count >= v_max_persons THEN
-      RETURN; -- 0 ligne = capacité atteinte, l'appelant traite ça comme un 409
+      -- Exception dédiée plutôt qu'un RETURN vide : contrairement à
+      -- assign_staff_and_create_booking (0024, qui renvoie 0 ligne pour
+      -- "aucun candidat libre"), ici on lève explicitement pour que
+      -- l'appelant distingue sans ambiguïté "capacité pleine" de tout autre
+      -- cas de SETOF vide. Code SQLSTATE P0001 (générique plpgsql) + message
+      -- fixe 'capacity_full' : l'appelant (helper JS) matche sur ce message
+      -- exact, jamais sur le texte libre d'une erreur Postgres arbitraire.
+      RAISE EXCEPTION 'capacity_full' USING ERRCODE = 'P0001';
     END IF;
   END IF;
 
   RETURN QUERY
   INSERT INTO bookings (
     biz_id, biz_name, service_id, service_name, staff_id, staff_name,
-    date, time, status, group_ref, payment_deadline,
+    date, time, status,
     client_id, client_phone, client_name, client_email
   )
   VALUES (
     p_biz_id, p_biz_name, p_service_id, p_service_name, p_staff_id, p_staff_name,
-    p_date, p_time, 'active', p_group_ref, p_payment_deadline,
+    p_date, p_time, 'active',
     p_client_id, p_client_phone, p_client_name, p_client_email
   )
   RETURNING *;
@@ -128,13 +149,15 @@ CREATE INDEX IF NOT EXISTS idx_bookings_service_date_time
   ON bookings (service_id, date, time)
   WHERE status != 'cancelled';
 
--- Durcissement : comme 0024, retire l'accès PUBLIC par défaut. Fonction
--- SECURITY DEFINER appelée uniquement depuis create/route.ts et
--- create-group/route.ts via le client service_role.
+-- Durcissement : comme 0024, retire l'accès par défaut. Fonction SECURITY
+-- DEFINER appelée uniquement depuis create/route.ts et create-group/route.ts
+-- via le client service_role. REVOKE FROM PUBLIC seul ne suffit pas — anon et
+-- authenticated ont des GRANT EXECUTE explicites par défaut sur Supabase,
+-- indépendants de PUBLIC — donc ils sont ciblés nommément ici aussi.
 REVOKE EXECUTE ON FUNCTION create_booking_with_capacity_check(
-  uuid, text, uuid, text, uuid, text, date, time, uuid, text, text, text, text, timestamptz
-) FROM PUBLIC;
+  uuid, text, uuid, text, uuid, text, date, time, uuid, text, text, text
+) FROM anon, authenticated, PUBLIC;
 
 GRANT EXECUTE ON FUNCTION create_booking_with_capacity_check(
-  uuid, text, uuid, text, uuid, text, date, time, uuid, text, text, text, text, timestamptz
+  uuid, text, uuid, text, uuid, text, date, time, uuid, text, text, text
 ) TO service_role;
