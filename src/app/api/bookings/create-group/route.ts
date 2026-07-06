@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode, generateGroupRef, normalizePhone } from '@/lib/booking-utils';
+import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
@@ -93,40 +94,48 @@ export async function POST(req: NextRequest) {
         ? (clientPhone || null)
         : (mode === 'b' ? normalizePhone(guests[guestIdx]?.phone || '') : null);
 
-      const { data: booking, error: bookingError } = await supabaseService
-        .from('bookings')
-        .insert({
-          biz_id: bizId,
-          biz_name: bizName,
-          service_id: serviceId,
-          service_name: serviceName,
-          staff_id: staffId || null,
-          staff_name: staffName || null,
+      // Passe par la RPC anti-surbooking (migration 0026) : verrou + re-
+      // vérification de services.max_persons + insertion, dans une seule
+      // transaction Postgres — au lieu d'un insert direct non protégé.
+      let booking: { id: string };
+      try {
+        const rpcBooking = await createBookingWithCapacityCheck(supabaseService, {
+          bizId,
+          bizName,
+          serviceId,
+          serviceName,
+          staffId: staffId || null,
+          staffName: staffName || null,
           date,
           time: slots[i],
-          status: 'active',
-          group_ref: groupRef,
-          payment_deadline: paymentDeadline,
-          client_id: isOrganizer ? (authData.user?.id || null) : null,
-          client_phone: participantPhone,
-          client_name: participantName,
-          client_email: isOrganizer ? clientEmail : null,
-        })
-        .select('id')
-        .single();
+          clientId: isOrganizer ? (authData.user?.id || null) : null,
+          clientPhone: participantPhone,
+          clientName: participantName,
+          clientEmail: isOrganizer ? clientEmail : null,
+          groupRef,
+          paymentDeadline,
+        });
 
-      if (bookingError) {
+        if (!rpcBooking) {
+          throw Object.assign(
+            new Error(`Le créneau ${slots[i]} vient d'atteindre sa capacité maximale. Merci de réessayer.`),
+            { isSlotConflict: true }
+          );
+        }
+        booking = rpcBooking;
+      } catch (err: any) {
+        if (err?.isSlotConflict) throw err;
         // Violation de bookings_staff_slot_unique (migration 0023) — collision
         // réelle sur ce praticien/créneau, pas une erreur inattendue. Message
         // ciblé sur le créneau en cause, construit ici pendant qu'on a slots[i]
-        // sous la main (plus dispo dans le catch).
-        if (bookingError.code === '23505') {
+        // sous la main (plus dispo dans le catch englobant).
+        if (err?.code === '23505') {
           throw Object.assign(
             new Error(`Le créneau ${slots[i]} n'est plus disponible pour ce praticien. Merci de réessayer.`),
             { isSlotConflict: true }
           );
         }
-        throw bookingError;
+        throw err;
       }
       createdBookingIds.push(booking.id);
 

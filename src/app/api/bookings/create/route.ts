@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode } from '@/lib/booking-utils';
 import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/lib/staff-assignment';
+import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import type { Booking } from '@/lib/database.types';
@@ -150,29 +151,31 @@ export async function POST(req: NextRequest) {
       // Déjà inséré par assign_staff_and_create_booking (RETURNING *).
       booking = rpcBooking;
     } else {
-      // Service collectif, ou business sans staff actif — chemin inchangé.
-      const { data: insertedBooking, error: bookingError } = await supabaseService
-        .from('bookings')
-        .insert({
-          biz_id: bizId,
-          biz_name: bizName,
-          service_id: serviceId,
-          service_name: serviceName,
-          staff_id: staffId || null,
-          staff_name: staffName || null,
-          date,
-          time,
-          status: 'active',
-          client_id: authData.user?.id || null,
-          client_phone: clientPhone,
-          client_name: clientName,
-          client_email: clientEmail,
-        })
-        .select()
-        .single();
+      // Service collectif, ou business sans staff actif — passe par la RPC
+      // anti-surbooking (migration 0026) : verrou + re-vérification de
+      // services.max_persons + insertion dans une seule transaction Postgres.
+      const capacityBooking = await createBookingWithCapacityCheck(supabaseService, {
+        bizId,
+        bizName,
+        serviceId,
+        serviceName,
+        staffId: staffId || null,
+        staffName: staffName || null,
+        date,
+        time,
+        clientId: authData.user?.id || null,
+        clientPhone: clientPhone || null,
+        clientName,
+        clientEmail: clientEmail || null,
+      });
 
-      if (bookingError) throw bookingError;
-      booking = insertedBooking;
+      if (!capacityBooking) {
+        return NextResponse.json(
+          { error: 'Ce créneau vient d\'atteindre sa capacité maximale. Merci de choisir un autre créneau.' },
+          { status: 409 }
+        );
+      }
+      booking = capacityBooking;
     }
 
     // Nom du parrain (si le client a été parrainé) — dénormalisé pour le pro
