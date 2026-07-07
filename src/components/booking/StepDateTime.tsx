@@ -132,16 +132,19 @@ export default function StepDateTime({
   business: BusinessWithDetails;
   service: Service;
   staff: Staff | null;
-  onSelect: (date: string, slots: string[], participants: number) => void;
+  onSelect: (date: string, slots: string[], participants: number, staffChoices: (string | null)[]) => void;
 }) {
   // `max_persons` NULL = "Illimité" côté pro (PrestationsManager.tsx) : ne
   // doit pas être plafonné à une valeur arbitraire. Le vrai plafond du
   // système reste 23 (voir create-group/route.ts, "Groupe limité à 23
   // personnes maximum") — inutile d'en proposer plus dans le sélecteur,
   // ça échouerait de toute façon à la création du groupe.
+  // `staff === null` obligatoire : un praticien précis déjà choisi à
+  // l'étape service doit rester mono-personne, sinon la soumission finit
+  // toujours en 409 (staffId unique envoyé à tout le groupe, cf. CONCEPTION_CAS2_STAFF_GROUPE.md étape 3).
   const maxPersons = service.allow_group === true
     ? (service.max_persons ?? 23)
-    : (business.staff.length >= 2 ? business.staff.length : 1);
+    : (staff === null && business.staff.length >= 2 ? business.staff.length : 1);
   const isCollective = service.allow_group === true;
 
   const now = new Date();
@@ -150,6 +153,11 @@ export default function StepDateTime({
   const [date, setDate] = useState<string | null>(null);
   const [participants, setParticipants] = useState(1);
   const [selectedSlots, setSelectedSlots] = useState<(string | null)[]>([null]);
+  // Choix praticien par personne (CAS 2 uniquement) — même indexation que
+  // `selectedSlots`, `null` = "peu importe". N'existe que pour les services
+  // individuels multi-praticiens (participants > 1 ⟹ staff === null,
+  // garanti par le gating de maxPersons ci-dessus).
+  const [staffChoices, setStaffChoices] = useState<(string | null)[]>([null]);
   const [occupancy, setOccupancy] = useState<Record<string, number>>({});
   const [staffAvailability, setStaffAvailability] = useState<StaffAvailability | null>(null);
 
@@ -196,20 +204,29 @@ export default function StepDateTime({
 
   const handleParticipantsChange = (n: number) => {
     setParticipants(n);
-    setSelectedSlots((prev) => {
-      // Flow collectif (staffAvailability absent) : comportement inchangé,
-      // reset intégral — hors scope cas 2.
-      if (!staffAvailability) return Array(n).fill(null);
-      // Cas 2 : on conserve les créneaux déjà choisis, sauf ceux dont le
-      // freeCount ne couvre plus le nouveau nombre de participants (l'utilisateur
-      // voit alors ce créneau se dé-surligner, plutôt qu'un bouton "Continuer"
-      // grisé sans explication — voir CONCEPTION_CAS2_STAFF_GROUPE.md, étape 2).
-      return Array.from({ length: n }, (_, i) => {
-        const slot = prev[i] ?? null;
-        if (slot && (staffAvailability[slot]?.freeCount ?? 0) < n) return null;
-        return slot;
-      });
+    // Flow collectif (staffAvailability absent) : comportement inchangé,
+    // reset intégral — hors scope cas 2.
+    if (!staffAvailability) {
+      setSelectedSlots(Array(n).fill(null));
+      setStaffChoices(Array(n).fill(null));
+      return;
+    }
+    // Cas 2 : on conserve les créneaux déjà choisis, sauf ceux dont le
+    // freeCount ne couvre plus le nouveau nombre de participants (l'utilisateur
+    // voit alors ce créneau se dé-surligner, plutôt qu'un bouton "Continuer"
+    // grisé sans explication — voir CONCEPTION_CAS2_STAFF_GROUPE.md, étape 2).
+    // Lu depuis les valeurs de state courantes (fermeture du handler, pas de
+    // course possible : géré par un seul clic synchrone).
+    const nextSlots = Array.from({ length: n }, (_, i) => {
+      const slot = selectedSlots[i] ?? null;
+      if (slot && (staffAvailability[slot]?.freeCount ?? 0) < n) return null;
+      return slot;
     });
+    // Le choix praticien d'une personne ne survit que si son créneau survit
+    // aussi — sinon il référencerait un slot qu'elle n'a plus.
+    const nextChoices = Array.from({ length: n }, (_, i) => (nextSlots[i] ? (staffChoices[i] ?? null) : null));
+    setSelectedSlots(nextSlots);
+    setStaffChoices(nextChoices);
   };
 
   const handleSlotSelect = (personIdx: number, slot: string) => {
@@ -218,10 +235,83 @@ export default function StepDateTime({
       next[personIdx] = slot;
       return next;
     });
+    // Changement de créneau pour cette personne : son choix praticien précis
+    // ne survit que s'il reste valide sur le NOUVEAU créneau (praticien
+    // réellement libre à ce créneau, et pas déjà pris par un autre
+    // participant déjà positionné dessus) — sinon retour à "peu importe".
+    // "Peu importe" lui-même reste toujours valide, rien à faire.
+    // Lu depuis `selectedSlots`/`staffAvailability` de la fermeture du
+    // handler : les entrées des AUTRES personnes n'ont pas bougé (seul
+    // personIdx change de créneau ici), donc leurs valeurs sont à jour.
+    setStaffChoices((prev) => {
+      const current = prev[personIdx];
+      if (current === null) return prev;
+      const freeAtNewSlot = staffAvailability?.[slot]?.freeStaffIds ?? [];
+      const takenByOthersAtNewSlot = new Set(
+        prev.filter((choice, i) => i !== personIdx && choice !== null && selectedSlots[i] === slot)
+      );
+      const stillValid = freeAtNewSlot.includes(current) && !takenByOthersAtNewSlot.has(current);
+      if (stillValid) return prev;
+      const next = [...prev];
+      next[personIdx] = null;
+      return next;
+    });
+  };
+
+  const handleStaffChoiceSelect = (personIdx: number, staffId: string | null) => {
+    setStaffChoices((prev) => {
+      const next = [...prev];
+      next[personIdx] = staffId;
+      return next;
+    });
+  };
+
+  // Praticiens libres à un créneau donné, moins ceux déjà choisis
+  // précisément par une AUTRE personne sur ce MÊME créneau — l'anti-collision
+  // est indispensable ici (pas du confort) : le back ne dé-doublonne jamais
+  // les choix précis entre eux (candidateStaffIds = [staffChoice] sans
+  // filtre côté assign_staff_and_create_booking), donc deux personnes qui
+  // valideraient le même praticien précis au même créneau obtiendraient
+  // systématiquement un 409 sur la 2e. Une personne à un autre créneau n'est
+  // jamais concurrente : pas de conflit horaire réel possible.
+  const getStaffOptionsFor = (personIdx: number): Staff[] => {
+    const slot = selectedSlots[personIdx];
+    if (!slot || !staffAvailability) return [];
+    const free = staffAvailability[slot]?.freeStaffIds ?? [];
+    const takenAtSameSlot = new Set(
+      staffChoices
+        .filter((choice, i) => i !== personIdx && choice !== null && selectedSlots[i] === slot)
+    );
+    return free
+      .filter((id) => !takenAtSameSlot.has(id))
+      .map((id) => business.staff.find((s) => s.id === id))
+      .filter((s): s is Staff => !!s);
   };
 
   const chosenCount = selectedSlots.filter(Boolean).length;
   const allChosen = chosenCount === participants;
+  // Cas 2 uniquement : les lignes de choix praticien s'affichent seulement
+  // pour le groupe individuel multi-praticiens (jamais en flow collectif).
+  const showStaffChoiceRows = !isCollective && participants > 1 && !!staffAvailability;
+
+  // Pré-check souple par créneau : purement du confort, le vrai garde-fou
+  // reste le 409 du back (voir CONCEPTION_CAS2_STAFF_GROUPE.md étape 3 — ne
+  // couvre pas le cas résiduel d'exclusion globale du back entre créneaux
+  // différents, accepté comme limite connue).
+  const slotCapacityIssues: { slot: string; free: number; needed: number }[] = [];
+  if (showStaffChoiceRows) {
+    const bySlot = new Map<string, { precise: number; auto: number }>();
+    selectedSlots.forEach((slot, i) => {
+      if (!slot) return;
+      const entry = bySlot.get(slot) ?? { precise: 0, auto: 0 };
+      if (staffChoices[i] !== null) entry.precise += 1; else entry.auto += 1;
+      bySlot.set(slot, entry);
+    });
+    for (const [slot, { precise, auto }] of bySlot) {
+      const free = staffAvailability?.[slot]?.freeStaffIds.length ?? 0;
+      if (auto > free - precise) slotCapacityIssues.push({ slot, free, needed: precise + auto });
+    }
+  }
 
   const prevMonth = () => {
     if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
@@ -289,6 +379,7 @@ export default function StepDateTime({
                 onClick={() => {
                   setDate(iso);
                   setSelectedSlots(Array(participants).fill(null));
+                  setStaffChoices(Array(participants).fill(null));
                   setOccupancy({});
                   setStaffAvailability(null);
                 }}
@@ -402,6 +493,48 @@ export default function StepDateTime({
                 selected={selectedSlots[personIdx]}
                 onSelect={(s) => handleSlotSelect(personIdx, s)}
               />
+
+              {showStaffChoiceRows && selectedSlots[personIdx] && (
+                <div className="mt-3">
+                  <p className="mb-2 text-[11px] text-slate-500 uppercase tracking-widest font-medium">
+                    Praticien
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleStaffChoiceSelect(personIdx, null)}
+                      className={`rounded-xl px-3 py-2 text-xs font-medium transition-all duration-150 border ${
+                        staffChoices[personIdx] === null
+                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                          : 'bg-navy-900 border-white/[0.08] text-slate-400 hover:border-white/20 hover:text-white'
+                      }`}
+                    >
+                      🎲 Peu importe
+                    </button>
+                    {getStaffOptionsFor(personIdx).map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleStaffChoiceSelect(personIdx, s.id)}
+                        className={`rounded-xl px-3 py-2 text-xs font-medium transition-all duration-150 border ${
+                          staffChoices[personIdx] === s.id
+                            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                            : 'bg-navy-900 border-white/[0.08] text-slate-400 hover:border-white/20 hover:text-white'
+                        }`}
+                      >
+                        {s.emoji} {s.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {slotCapacityIssues.map(({ slot, free, needed }) => (
+            <div key={slot} className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 mb-4 flex items-center gap-2">
+              <span className="text-lg shrink-0">⚠️</span>
+              <p className="text-xs text-amber-300">
+                Pas assez de praticiens disponibles à {slot} pour tout le monde ({free} libre{free > 1 ? 's' : ''} pour {needed} personne{needed > 1 ? 's' : ''}).
+              </p>
             </div>
           ))}
 
@@ -418,14 +551,14 @@ export default function StepDateTime({
       )}
 
       <button
-        disabled={!date || !allChosen || (date !== null && participants === 0)}
+        disabled={!date || !allChosen || (date !== null && participants === 0) || slotCapacityIssues.length > 0}
         onClick={() => {
-          if (date && allChosen) {
-            onSelect(date, selectedSlots as string[], participants);
+          if (date && allChosen && slotCapacityIssues.length === 0) {
+            onSelect(date, selectedSlots as string[], participants, staffChoices);
           }
         }}
         className="w-full rounded-2xl py-4 font-semibold text-sm transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]"
-        style={date && allChosen ? {
+        style={date && allChosen && slotCapacityIssues.length === 0 ? {
           background: 'linear-gradient(135deg, #34d399, #6ee7b7)',
           boxShadow: '0 4px 24px rgba(52,211,153,0.4)',
           color: '#0a1224',

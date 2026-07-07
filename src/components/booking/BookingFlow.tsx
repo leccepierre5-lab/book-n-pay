@@ -24,6 +24,7 @@ export default function BookingFlow({
   const [date, setDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<string[]>([]);   // one per participant
   const [participants, setParticipants] = useState(1);
+  const [staffChoices, setStaffChoices] = useState<(string | null)[]>([]);   // CAS 2 : un choix par participant, null = "peu importe"
   const [needsAuth, setNeedsAuth] = useState(false);
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
@@ -42,10 +43,11 @@ export default function BookingFlow({
     setStep(1);
   };
 
-  const handleDateTimeSelect = async (d: string, s: string[], p: number) => {
+  const handleDateTimeSelect = async (d: string, s: string[], p: number, sc: (string | null)[]) => {
     setDate(d);
     setSlots(s);
     setParticipants(p);
+    setStaffChoices(sc);
     // isAuthed est déjà connu via useEffect — évite un double getSession() qui peut
     // renvoyer null si la nouvelle instance n'a pas encore rechargé les cookies.
     if (isAuthed) {
@@ -137,6 +139,7 @@ export default function BookingFlow({
                   date={date}
                   slots={slots}
                   participants={participants}
+                  staffChoices={staffChoices}
                 />
               </>
             )}

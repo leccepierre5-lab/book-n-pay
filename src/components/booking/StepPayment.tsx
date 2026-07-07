@@ -48,12 +48,20 @@ interface GuestInfo {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function RecapBox({
-  service, business, staff, date, slots, participants,
+  service, business, staff, date, slots, participants, staffChoices,
 }: {
   service: Service; business: BusinessWithDetails; staff: Staff | null;
-  date: string; slots: string[]; participants: number;
+  date: string; slots: string[]; participants: number; staffChoices: (string | null)[];
 }) {
   const slotsLabel = slots.length > 1 ? slots.join(' → ') : slots[0];
+  // CAS 2 uniquement (service individuel multi-praticiens) : un praticien
+  // par personne au lieu d'un praticien unique pour tout le groupe. À ce
+  // stade (avant la création des réservations), on affiche le CHOIX de
+  // chacun (précis ou "peu importe") — pas l'assignation réelle, qui n'est
+  // tranchée qu'à la création (assign_staff_and_create_booking), voir
+  // CONCEPTION_CAS2_STAFF_GROUPE.md étape 4.
+  const showPerPersonStaff = service.allow_group !== true && participants > 1 && staffChoices.length === participants;
+
   return (
     <div className="rounded-2xl bg-navy-900 border border-white/[0.08] px-4 py-4 mb-5">
       <p className="text-sm font-semibold text-white mb-2">
@@ -74,6 +82,21 @@ function RecapBox({
             <span className="text-slate-500 ml-2">· {slotsLabel}</span>
           )}
         </p>
+      )}
+      {showPerPersonStaff && (
+        <div className="mt-2 space-y-1">
+          {staffChoices.map((choice, i) => {
+            const chosen = choice ? business.staff.find((s) => s.id === choice) : null;
+            return (
+              <p key={i} className="text-xs text-slate-500">
+                {i === 0 ? 'Vous' : `Personne ${i + 1}`} :{' '}
+                <span className="text-slate-300">
+                  {chosen ? `${chosen.emoji ?? ''} ${chosen.name}`.trim() : '🎲 Peu importe'}
+                </span>
+              </p>
+            );
+          })}
+        </div>
       )}
       {participants > 1 && (
         <p className="text-sm text-emerald-400 font-medium mt-1">
@@ -150,11 +173,11 @@ function ModeSelection({
 // ── Mode A: pay for all ───────────────────────────────────────────────────────
 
 function ModeAPayment({
-  service, business, staff, date, slots, participants,
+  service, business, staff, date, slots, participants, staffChoices,
   onBack,
 }: {
   service: Service; business: BusinessWithDetails; staff: Staff | null;
-  date: string; slots: string[]; participants: number;
+  date: string; slots: string[]; participants: number; staffChoices: (string | null)[];
   onBack: () => void;
 }) {
   const [loading, setLoading] = useState(false);
@@ -196,6 +219,7 @@ function ModeAPayment({
           staffName: staff?.name,
           date,
           slots,
+          staffChoices: staffChoices.length > 0 ? staffChoices : undefined,
           guestNames: guestNames.map((n, i) => n || (i === 0 ? profile?.name || 'Vous' : `Personne ${i + 1}`)),
           mode: 'a',
           clientName: profile?.name || authData.user?.email || 'Client',
@@ -416,11 +440,11 @@ function ModeAPayment({
 // ── Mode B: share links ───────────────────────────────────────────────────────
 
 function ModeBPayment({
-  service, business, staff, date, slots, participants,
+  service, business, staff, date, slots, participants, staffChoices,
   onBack,
 }: {
   service: Service; business: BusinessWithDetails; staff: Staff | null;
-  date: string; slots: string[]; participants: number;
+  date: string; slots: string[]; participants: number; staffChoices: (string | null)[];
   onBack: () => void;
 }) {
   const [loading, setLoading] = useState(false);
@@ -474,6 +498,7 @@ function ModeBPayment({
           staffName: staff?.name,
           date,
           slots,
+          staffChoices: staffChoices.length > 0 ? staffChoices : undefined,
           guests: normalizedGuests,
           mode: 'b',
           clientName: profile?.name || authData.user?.email || 'Client',
@@ -878,7 +903,7 @@ function SoloPayment({
 // ── Root component ────────────────────────────────────────────────────────────
 
 export default function StepPayment({
-  business, service, staff, date, slots, participants,
+  business, service, staff, date, slots, participants, staffChoices,
 }: {
   business: BusinessWithDetails;
   service: Service;
@@ -886,6 +911,7 @@ export default function StepPayment({
   date: string;
   slots: string[];
   participants: number;
+  staffChoices: (string | null)[];
 }) {
   const [mode, setMode] = useState<PayMode>(null);
 
@@ -898,7 +924,7 @@ export default function StepPayment({
   if (mode === null) {
     return (
       <div>
-        <RecapBox business={business} service={service} staff={staff} date={date} slots={slots} participants={participants} />
+        <RecapBox business={business} service={service} staff={staff} date={date} slots={slots} participants={participants} staffChoices={staffChoices} />
         <ModeSelection service={service} participants={participants} onSelect={setMode} />
       </div>
     );
@@ -909,7 +935,7 @@ export default function StepPayment({
     return (
       <ModeAPayment
         business={business} service={service} staff={staff}
-        date={date} slots={slots} participants={participants}
+        date={date} slots={slots} participants={participants} staffChoices={staffChoices}
         onBack={() => setMode(null)}
       />
     );
@@ -919,7 +945,7 @@ export default function StepPayment({
   return (
     <ModeBPayment
       business={business} service={service} staff={staff}
-      date={date} slots={slots} participants={participants}
+      date={date} slots={slots} participants={participants} staffChoices={staffChoices}
       onBack={() => setMode(null)}
     />
   );
