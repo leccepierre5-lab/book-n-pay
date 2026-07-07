@@ -7,8 +7,10 @@
 // collectif ou business sans staff actif, groupRef/paymentDeadline omis =
 // NULL) et create-group/route.ts (boucle par créneau, valeurs réelles),
 // c'est-à-dire tous les chemins qui ne passent pas déjà par
-// assignStaffAndCreateBooking (staff-assignment.ts, migration 0024 — celle-ci
-// ne pose PAS group_ref/payment_deadline, non concernée par 0027).
+// assignStaffAndCreateBooking (staff-assignment.ts, migration 0024 — depuis
+// 0028, celle-ci pose aussi group_ref/payment_deadline atomiquement, dans son
+// propre INSERT). Les deux RPC posent donc désormais ces colonnes de façon
+// atomique, chacune par son propre chemin.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Booking } from './database.types';
 
