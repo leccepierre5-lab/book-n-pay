@@ -1,11 +1,14 @@
 // src/lib/booking-capacity.ts
 // Appel de la fonction Postgres atomique create_booking_with_capacity_check
-// (voir supabase/migrations/0026_capacity_check_booking.sql) — verrou +
-// re-vérification de services.max_persons + insertion, dans une seule
-// transaction Postgres. Utilisé par create/route.ts (service collectif ou
-// business sans staff actif) et create-group/route.ts (boucle par créneau),
+// (voir supabase/migrations/0026_capacity_check_booking.sql +
+// 0027_capacity_check_group_meta.sql) — verrou + re-vérification de
+// services.max_persons + insertion (group_ref/payment_deadline inclus),
+// dans une seule transaction Postgres. Utilisé par create/route.ts (service
+// collectif ou business sans staff actif, groupRef/paymentDeadline omis =
+// NULL) et create-group/route.ts (boucle par créneau, valeurs réelles),
 // c'est-à-dire tous les chemins qui ne passent pas déjà par
-// assignStaffAndCreateBooking (staff-assignment.ts, migration 0024).
+// assignStaffAndCreateBooking (staff-assignment.ts, migration 0024 — celle-ci
+// ne pose PAS group_ref/payment_deadline, non concernée par 0027).
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Booking } from './database.types';
 

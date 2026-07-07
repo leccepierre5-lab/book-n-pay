@@ -93,6 +93,8 @@ export interface AssignStaffParams {
   clientPhone: string | null;
   clientName: string | null;
   clientEmail: string | null;
+  groupRef?: string | null; // NULL pour une réservation individuelle (create/route.ts)
+  paymentDeadline?: string | null;
 }
 
 // Verrouille les candidats, re-vérifie leur dispo sous verrou et insère la
@@ -116,6 +118,8 @@ export async function assignStaffAndCreateBooking(
     p_client_phone: params.clientPhone,
     p_client_name: params.clientName,
     p_client_email: params.clientEmail,
+    p_group_ref: params.groupRef ?? null,
+    p_payment_deadline: params.paymentDeadline ?? null,
   });
 
   if (error) throw error;
