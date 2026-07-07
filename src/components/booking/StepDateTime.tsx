@@ -139,7 +139,9 @@ export default function StepDateTime({
   // système reste 23 (voir create-group/route.ts, "Groupe limité à 23
   // personnes maximum") — inutile d'en proposer plus dans le sélecteur,
   // ça échouerait de toute façon à la création du groupe.
-  const maxPersons = service.allow_group !== false ? (service.max_persons ?? 23) : 1;
+  const maxPersons = service.allow_group === true
+    ? (service.max_persons ?? 23)
+    : (business.staff.length >= 2 ? business.staff.length : 1);
   const isCollective = service.allow_group === true;
 
   const now = new Date();
@@ -177,7 +179,12 @@ export default function StepDateTime({
   const isSlotFull = (slot: string): boolean => {
     if (staffAvailability) {
       if (staff) return !staffAvailability[slot]?.freeStaffIds.includes(staff.id);
-      return (staffAvailability[slot]?.freeCount ?? 0) === 0;
+      // "Peu importe" (cas 2, staffChoices absent) : le créneau doit pouvoir
+      // couvrir tout le groupe, pas juste avoir 1 praticien libre — sinon un
+      // slot affiché "Libre" pour participants=3 avec freeCount=1 échouerait
+      // au paiement avec un 409 (voir CONCEPTION_CAS2_STAFF_GROUPE.md, étape 2).
+      // Cas mono-personne inchangé : freeCount < 1 ⟺ freeCount === 0.
+      return (staffAvailability[slot]?.freeCount ?? 0) < participants;
     }
     // Clé composite pour les services collectifs — doit correspondre à celle
     // construite côté serveur (availability/route.ts) : isole la séance par
@@ -189,7 +196,20 @@ export default function StepDateTime({
 
   const handleParticipantsChange = (n: number) => {
     setParticipants(n);
-    setSelectedSlots(Array(n).fill(null));
+    setSelectedSlots((prev) => {
+      // Flow collectif (staffAvailability absent) : comportement inchangé,
+      // reset intégral — hors scope cas 2.
+      if (!staffAvailability) return Array(n).fill(null);
+      // Cas 2 : on conserve les créneaux déjà choisis, sauf ceux dont le
+      // freeCount ne couvre plus le nouveau nombre de participants (l'utilisateur
+      // voit alors ce créneau se dé-surligner, plutôt qu'un bouton "Continuer"
+      // grisé sans explication — voir CONCEPTION_CAS2_STAFF_GROUPE.md, étape 2).
+      return Array.from({ length: n }, (_, i) => {
+        const slot = prev[i] ?? null;
+        if (slot && (staffAvailability[slot]?.freeCount ?? 0) < n) return null;
+        return slot;
+      });
+    });
   };
 
   const handleSlotSelect = (personIdx: number, slot: string) => {
