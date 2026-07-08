@@ -7,6 +7,7 @@ import { searchBusinesses, getAvailableCities, CATEGORIES, type SearchFilters } 
 import type { FlashSlot } from '@/lib/database.types';
 import { SearchResults } from './_components/SearchResults';
 import { CityAutocomplete } from './_components/CityAutocomplete';
+import { BusinessNameAutocomplete } from './_components/BusinessNameAutocomplete';
 
 export default async function SearchPage({
   searchParams,
@@ -67,19 +68,7 @@ export default async function SearchPage({
         {/* Search bar */}
         <form className="mb-5 space-y-3" action="/recherche" method="get">
           <div className="flex gap-2">
-            <div className="relative flex-1">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input
-                type="text"
-                name="q"
-                defaultValue={params.q}
-                placeholder="Coiffeur, barbier, massage..."
-                className="w-full rounded-xl bg-navy-900 border border-white/[0.08] pl-10 pr-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-mint-500/40 focus:ring-2 focus:ring-mint-500/15 transition-all duration-200"
-              />
-            </div>
+            <BusinessNameAutocomplete defaultValue={params.q} />
             <button
               type="submit"
               className="rounded-xl bg-mint-500 px-4 py-3 text-sm font-semibold text-navy-950 shadow-[0_0_16px_rgba(52,211,153,0.3)] hover:shadow-[0_0_20px_rgba(52,211,153,0.45)] transition-all duration-200"
