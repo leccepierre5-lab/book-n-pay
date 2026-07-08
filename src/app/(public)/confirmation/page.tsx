@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import ShareGroupLink from '@/components/group/ShareGroupLink';
 import ShareGuestLinks from '@/components/group/ShareGuestLinks';
 
@@ -17,6 +17,25 @@ export default async function ConfirmationPage({
 
   const isGroupBooking =
     (booking as any)?.services?.max_persons && (booking as any).services.max_persons > 1;
+
+  // Récap groupe (participants + praticien assigné) : group_ref ne sert JAMAIS
+  // de clé d'accès — il n'est lu que si `booking` (déjà chargé sous RLS ci-
+  // dessus) prouve que l'utilisateur courant EST l'organisateur de ce booking
+  // précis (client_id = son propre auth.uid()). Un pro/admin qui pourrait par
+  // ailleurs lire cette ligne via RLS (owns_biz/is_admin) ne matche pas ce
+  // filtre et ne déclenche donc aucun élargissement. Voir mémoire pitfall #35.
+  const { data: { user } } = await supabase.auth.getUser();
+  const isProvenOrganizer =
+    !!user && !!(booking as any)?.group_ref && (booking as any).client_id === user.id;
+
+  const { data: groupParticipants } = isProvenOrganizer
+    ? await createServiceRoleClient()
+        .from('bookings')
+        .select('id, client_name, staff_name, status')
+        .eq('group_ref', (booking as any).group_ref)
+        .neq('status', 'cancelled')
+        .order('time', { ascending: true })
+    : { data: null };
 
   const isModeB = mode === 'b' && !!guestsParam;
   const guestMemberIds = isModeB
@@ -76,6 +95,26 @@ export default async function ConfirmationPage({
             </p>
           )}
         </div>
+
+        {/* Récap groupe — participants + praticien, organisateur uniquement */}
+        {isProvenOrganizer && groupParticipants && groupParticipants.length > 0 && (
+          <div className="mb-5 rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
+            <p className="text-xs font-semibold text-slate-200 mb-2.5">Votre groupe</p>
+            <div className="space-y-1.5">
+              {groupParticipants.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-3 text-xs">
+                  <span className="text-slate-300 truncate">
+                    {p.client_name || 'Invité'}
+                    {p.id === bookingId && <span className="text-slate-600 font-normal"> (vous)</span>}
+                  </span>
+                  {p.staff_name && (
+                    <span className="text-slate-500 shrink-0">avec {p.staff_name}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Email reminder */}
         <div className="mb-5 rounded-2xl bg-navy-900 border border-white/[0.08] p-4 flex items-start gap-3">
