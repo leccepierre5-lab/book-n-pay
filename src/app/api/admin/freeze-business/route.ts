@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
           'id, client_email, service_name, date, time, booking_members(id, phone, name, status, email, deposit, stripe_payment_intent_id)'
         )
         .eq('biz_id', bizId)
-        .eq('status', 'active')
+        .neq('status', 'cancelled')
         .gte('date', today);
 
       let cancelledCount = 0;

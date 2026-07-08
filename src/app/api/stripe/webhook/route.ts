@@ -216,17 +216,27 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       const activeMembers = (allMembers ?? []).filter(m => m.status !== 'cancelled');
-      const wasAlreadyComplete = bookingRow?.status === 'complete';
+      // ⚠️ 'completed' est la seule valeur valide de l'enum booking_status
+      // (active/cancelled/completed) — 'complete' (sans d) était utilisé ici
+      // par erreur, ce qui faisait échouer l'update silencieusement à chaque
+      // fois (aucune inspection de { error }) et rendait wasAlreadyComplete
+      // structurellement toujours false, cassant la protection anti-double-
+      // facturation hors-forfait ci-dessous.
+      const wasAlreadyComplete = bookingRow?.status === 'completed';
       if (activeMembers.length > 0 && activeMembers.every(m => m.status === 'paid')) {
-        await supabase
+        const { error: completeError } = await supabase
           .from('bookings')
-          .update({ status: 'complete' })
+          .update({ status: 'completed' })
           .eq('id', bookingId);
-        console.log(`[Webhook] ✅ Booking ${bookingId} → complete (tous les membres ont payé)`);
+        if (completeError) {
+          console.error(`[Webhook] ❌ Échec update status=completed — booking ${bookingId}:`, completeError.message);
+        } else {
+          console.log(`[Webhook] ✅ Booking ${bookingId} → completed (tous les membres ont payé)`);
+        }
 
         // ── Hors-forfait pro ────────────────────────────────────────────────
         // Idempotence : on ne compte la réservation qu'une seule fois, à la
-        // toute première bascule vers 'complete' (le webhook peut être rejoué).
+        // toute première bascule vers 'completed' (le webhook peut être rejoué).
         if (!wasAlreadyComplete && bookingRow?.biz_id) {
           await maybeCreateOverageCharge(supabase, bookingRow.biz_id, bookingId);
         }
@@ -238,7 +248,7 @@ export async function POST(req: NextRequest) {
       if (bookingRow?.group_ref) {
         const { data: groupBookings } = await supabase
           .from('bookings')
-          .select('id, status, client_email, biz_name, service_name, date, time, booking_members(id, name, status, email, deposit, qr_code)')
+          .select('id, status, client_email, biz_name, service_name, staff_name, date, time, booking_members(id, name, status, email, deposit, qr_code)')
           .eq('group_ref', bookingRow.group_ref);
 
         const allGroupBookings = groupBookings ?? [];
@@ -250,12 +260,18 @@ export async function POST(req: NextRequest) {
         );
 
         if (allGroupPaid) {
-          // Marquer tous les bookings du groupe comme complete
+          // Marquer tous les bookings du groupe comme completed
           const incompleteIds = allGroupBookings
-            .filter((b: any) => b.status !== 'complete' && b.status !== 'cancelled')
+            .filter((b: any) => b.status !== 'completed' && b.status !== 'cancelled')
             .map((b: any) => b.id);
           if (incompleteIds.length > 0) {
-            await supabase.from('bookings').update({ status: 'complete' }).in('id', incompleteIds);
+            const { error: completeGroupError } = await supabase
+              .from('bookings')
+              .update({ status: 'completed' })
+              .in('id', incompleteIds);
+            if (completeGroupError) {
+              console.error(`[Webhook] ❌ Échec update status=completed — groupe ${bookingRow.group_ref}, ids ${incompleteIds.join(',')}:`, completeGroupError.message);
+            }
           }
 
           // Email de confirmation à chaque participant (via booking_members.email ou booking.client_email)
@@ -274,7 +290,7 @@ export async function POST(req: NextRequest) {
               await sendEmail({
                 to: email,
                 subject: `🎉 Groupe complet — ${(bk as any).biz_name}`,
-                text: `Bonne nouvelle !\n\nVotre groupe est complet : ${totalParticipants} participant${totalParticipants > 1 ? 's ont' : ' a'} confirmé.\n\n📍 Établissement : ${(bk as any).biz_name}\n💆 Prestation : ${(bk as any).service_name}\n📅 Date : ${dateFormatted}\n🕐 Créneau : ${(bk as any).time}\n\nVotre place est réservée. À bientôt !\nL'équipe Book'nPay`,
+                text: `Bonne nouvelle !\n\nVotre groupe est complet : ${totalParticipants} participant${totalParticipants > 1 ? 's ont' : ' a'} confirmé.\n\n📍 Établissement : ${(bk as any).biz_name}\n💆 Prestation : ${(bk as any).service_name}${(bk as any).staff_name ? `\n👤 Praticien : ${(bk as any).staff_name}` : ''}\n📅 Date : ${dateFormatted}\n🕐 Créneau : ${(bk as any).time}\n\nVotre place est réservée. À bientôt !\nL'équipe Book'nPay`,
               }).catch(() => {});
             }
           }

@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   if (!groupRef) {
     return NextResponse.json({ error: 'Réservation hors groupe' }, { status: 400 });
   }
-  if (targetBooking?.status !== 'active') {
+  if (targetBooking?.status === 'cancelled') {
     return NextResponse.json({ error: 'Réservation non active' }, { status: 410 });
   }
   const deadline = targetBooking?.payment_deadline;

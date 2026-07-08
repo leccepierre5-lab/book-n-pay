@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const { data: bookings } = await supabase
     .from('bookings')
     .select('id, biz_name, date, time, booking_members(id, status)')
-    .eq('status', 'active')
+    .neq('status', 'cancelled')
     .gte('date', sevenDaysAgoStr)
     .lte('date', todayStr);
 

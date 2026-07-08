@@ -1,0 +1,31 @@
+diff --git a/src/lib/stripe/overageCharge.ts b/src/lib/stripe/overageCharge.ts
+index cecb5cb..c211b33 100644
+--- a/src/lib/stripe/overageCharge.ts
++++ b/src/lib/stripe/overageCharge.ts
+@@ -95,6 +95,17 @@ export async function attemptOverageCharge(
+ 
+   const stripe = await getStripeClient(supabase);
+ 
++  // Idempotence Stripe : clé stable sur (booking_id, tentative). Protège le
++  // débit lui-même si cette fonction est invoquée deux fois pour la même
++  // tentative (cron retry-overage-charges déclenché deux fois, chevauchement
++  // avec un webhook, etc.) — Stripe renvoie alors le PaymentIntent déjà créé
++  // au lieu d'en émettre un 2e. Scopée par attempt_count (pas juste
++  // charge.id) pour qu'un VRAI retry à +24h après un échec (nextAttemptCount
++  // différent) obtienne bien un nouveau PaymentIntent, pas celui, raté, de la
++  // tentative précédente. Fallback sur charge.id si booking_id est absent
++  // (nullable en base) pour rester unique dans tous les cas.
++  const idempotencyKey = `overage-charge-${charge.booking_id ?? charge.id}-attempt-${nextAttemptCount}`;
++
+   try {
+     const pi = await stripe.paymentIntents.create({
+       amount: Math.round(charge.amount_ht * 100),
+@@ -104,7 +115,7 @@ export async function attemptOverageCharge(
+       off_session: true,
+       confirm: true,
+       metadata: { overageChargeId: charge.id, bizId: charge.biz_id },
+-    });
++    }, { idempotencyKey });
+ 
+     await supabase
+       .from('overage_charges')

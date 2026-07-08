@@ -65,7 +65,7 @@ function GroupCard({
 
   // Collect all members across all bookings in the group
   const allMembers = groupBookings.flatMap((b) =>
-    b.booking_members.map((m) => ({ ...m, _bookingDate: b.date, _bookingTime: b.time, _bookingId: b.id }))
+    b.booking_members.map((m) => ({ ...m, _bookingDate: b.date, _bookingTime: b.time, _bookingId: b.id, _staffName: b.staff_name }))
   );
   const activeMembers = allMembers.filter((m) => m.status !== 'cancelled');
   const paidCount = activeMembers.filter((m) => m.status === 'paid' || m.status === 'arrived').length;
@@ -189,6 +189,9 @@ function GroupCard({
                     <span className={`text-xs truncate ${isMe ? 'text-white font-medium' : 'text-slate-400'}`}>
                       {m.name || 'Invité'}
                       {isMe && <span className="text-slate-600 font-normal"> (moi)</span>}
+                      {(m as any)._staffName && (
+                        <span className="text-slate-600 font-normal"> · avec {(m as any)._staffName}</span>
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 flex-none ml-2">

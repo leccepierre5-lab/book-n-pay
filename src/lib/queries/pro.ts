@@ -99,7 +99,7 @@ export async function getProStats(bizId: string): Promise<ProStats> {
   let upcomingCount = 0;
 
   for (const b of bookings || []) {
-    if (b.date >= today && b.status === 'active') upcomingCount++;
+    if (b.date >= today && b.status !== 'cancelled') upcomingCount++;
     for (const m of b.booking_members || []) {
       if (m.status === 'paid' || m.status === 'arrived' || m.status === 'no_show') {
         totalMembers++;

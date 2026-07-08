@@ -203,7 +203,7 @@ export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
           </div>
         </div>
 
-        {activeMembers.length < hardLimit && booking.status === 'active' && (
+        {activeMembers.length < hardLimit && booking.status !== 'cancelled' && (
           <form onSubmit={handleJoin} className="space-y-3 rounded-xl bg-navy-900 p-4">
             <p className="text-sm font-medium text-white">Rejoindre le groupe</p>
             <input
@@ -232,7 +232,7 @@ export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
           </form>
         )}
 
-        {booking.status !== 'active' && (
+        {booking.status === 'cancelled' && (
           <p className="text-center text-sm text-white/40">Cette réservation n'est plus disponible.</p>
         )}
       </div>

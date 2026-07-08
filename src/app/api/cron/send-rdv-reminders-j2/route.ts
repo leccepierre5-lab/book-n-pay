@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     .from('bookings')
     .select('*, booking_members(*)')
     .eq('date', targetDateStr)
-    .eq('status', 'active');
+    .neq('status', 'cancelled');
 
   console.log(`[Rappels J-2] ${bookings?.length || 0} RDV dans 2 jours (${targetDateStr})`);
 

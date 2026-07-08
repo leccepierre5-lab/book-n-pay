@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     .from('bookings')
     .select('*, booking_members(*)')
     .eq('date', tomorrowStr)
-    .eq('status', 'active');
+    .neq('status', 'cancelled');
 
   console.log(`[Rappels] ${bookings?.length || 0} RDV demain (${tomorrowStr})`);
 

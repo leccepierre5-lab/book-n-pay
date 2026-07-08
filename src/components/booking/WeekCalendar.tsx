@@ -16,7 +16,7 @@ function getDotColor(bookingsOnDay: EnrichedBooking[]): 'green' | 'grey' | 'blue
   if (!bookingsOnDay.length) return null;
   const hasActive = bookingsOnDay.some((b) => {
     const m = b._myMember;
-    return m?.status === 'paid' || m?.status === 'arrived' || (!m && b.status === 'active');
+    return m?.status === 'paid' || m?.status === 'arrived' || (!m && b.status !== 'cancelled');
   });
   const hasCancelled = bookingsOnDay.every((b) => b._myMember?.status === 'cancelled');
   if (hasCancelled) return 'grey';
