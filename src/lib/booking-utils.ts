@@ -35,11 +35,14 @@ export function phonesMatch(
   return normalizePhone(a) === normalizePhone(b);
 }
 
+// Anciennement 6 caractères Math.random() (~31 bits) — bien trop faible pour
+// un identifiant qui finit par circuler comme clé de jointure sur des lignes
+// `bookings` d'autrui (voir mémoire pitfall #35). crypto.randomUUID() est
+// natif (Node ≥ 19 et Web Crypto, aucune dépendance ajoutée) et cryptographiquement
+// fort (~122 bits, largement suffisant). Colonne `bookings.group_ref` vérifiée
+// sans contrainte de longueur (testé empiriquement, accepte 40+ caractères).
 export function generateGroupRef(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let r = '';
-  for (let i = 0; i < 6; i++) r += chars[Math.floor(Math.random() * chars.length)];
-  return r;
+  return crypto.randomUUID();
 }
 
 export function generateQrCode(): string {

@@ -260,7 +260,7 @@ function ModeAPayment({
             clientPhone: profile?.phone || '',
             clientEmail: authData.user?.email || '',
           },
-          successUrl: `${window.location.origin}/confirmation?booking=${primaryBookingId}&groupRef=${groupRef}`,
+          successUrl: `${window.location.origin}/confirmation?booking=${primaryBookingId}`,
           cancelUrl: window.location.href,
         }),
       });
@@ -539,7 +539,7 @@ function ModeBPayment({
             clientPhone: profile?.phone || '',
             clientEmail: authData.user?.email || '',
           },
-          successUrl: `${window.location.origin}/confirmation?booking=${primaryBookingId}&groupRef=${groupRef}&mode=b&guests=${encodeURIComponent((guestMemberIds || []).join(','))}`,
+          successUrl: `${window.location.origin}/confirmation?booking=${primaryBookingId}&mode=b&guests=${encodeURIComponent((guestMemberIds || []).join(','))}`,
           cancelUrl: window.location.href,
         }),
       });
