@@ -61,6 +61,13 @@ export default async function ConfirmationPage({
               <span className="text-mint-400 font-medium">{formatDate(booking.date)}</span>
               <span className="text-slate-500"> à </span>
               <span className="text-mint-400 font-medium">{booking.time}</span>
+              {booking.staff_name && (
+                <>
+                  <br />
+                  <span className="text-slate-500">avec </span>
+                  <span className="text-slate-300 font-medium">{booking.staff_name}</span>
+                </>
+              )}
             </p>
           ) : (
             <p className="text-slate-400 text-sm leading-relaxed">
