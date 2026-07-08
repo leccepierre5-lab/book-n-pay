@@ -59,7 +59,11 @@ export async function maybeCreateOverageCharge(
     .single();
 
   if (insertError || !charge) {
-    console.error('[overageCharge] Création de la charge échouée:', insertError?.message);
+    if (insertError?.code === '23505') {
+      console.log(`[overageCharge] Réservation ${bookingId} déjà traitée (charge existante, contrainte unique) — aucun débit tenté`);
+    } else {
+      console.error('[overageCharge] Création de la charge échouée:', insertError?.message);
+    }
     return;
   }
 
