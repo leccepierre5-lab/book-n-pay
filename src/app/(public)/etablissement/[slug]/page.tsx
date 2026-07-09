@@ -1,8 +1,9 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getBusinessBySlug } from '@/lib/queries/catalog';
+import { getBusinessBySlug, isNonRealBusiness, CATEGORIES } from '@/lib/queries/catalog';
 import BookingFlow from '@/components/booking/BookingFlow';
 import FavoriteButton from '@/components/public/FavoriteButton';
 
@@ -16,6 +17,46 @@ const CATEGORY_ICONS: Record<string, string> = {
   creatif: '🎨',
   services: '🔧',
 };
+
+const formatType = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+const lowerFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const business = await getBusinessBySlug(slug);
+  if (!business) return {};
+
+  // Pas un vrai business (owner_id NULL : jamais passé par le vrai flux
+  // d'approbation partenaire — seed de démo ou anciennes fiches vitrine, voir
+  // isNonRealBusiness) ou fiche gelée par l'admin (répond en 200 mais n'affiche
+  // plus le contenu réel, cf. plus bas) : jamais indexable. Un vrai business
+  // (owner_id non-null, publié, non gelé) reste indexable par défaut, sans
+  // condition à ajouter le jour où un vrai pro s'inscrit.
+  const robots =
+    isNonRealBusiness(business) || business.frozen ? { index: false, follow: false } : undefined;
+
+  const categoryLabel = CATEGORIES.find((c) => c.id === business.category)?.label;
+  const activity = business.type?.trim() ? formatType(business.type) : categoryLabel;
+  const city = business.city?.trim() || undefined;
+
+  const titleSuffix = activity && city ? `${activity} à ${city}` : activity || city;
+  const title = titleSuffix ? `${business.name} — ${titleSuffix}` : business.name;
+
+  const descSuffix =
+    activity && city ? `${lowerFirst(activity)} à ${city}`
+    : activity ? lowerFirst(activity)
+    : city ? `à ${city}`
+    : null;
+  const description = descSuffix
+    ? `Réservez en ligne chez ${business.name}, ${descSuffix}. Paiement sécurisé, confirmation instantanée sur Book'nPay.`
+    : `Réservez en ligne chez ${business.name} sur Book'nPay. Paiement sécurisé, confirmation instantanée.`;
+
+  return { title, description, robots };
+}
 
 export default async function EtablissementPage({
   params,

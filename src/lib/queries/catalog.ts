@@ -159,6 +159,20 @@ export const CATEGORIES = [
   { id: 'autre', label: 'Autre' },
 ];
 
+// Distingue un vrai business (jamais indexable ni listé dans le sitemap si faux).
+// Critère : owner_id — posé de façon non conditionnelle par le SEUL point de
+// création réel du code (src/app/api/admin/applications/route.ts, "owner_id:
+// proUserId" à l'approbation d'une candidature partenaire). NULL signifie donc
+// que la fiche n'a jamais traversé ce flux : seed de démo (slug "demo-*") ou
+// anciennes fiches vitrine générées en masse (owner_id NULL, même created_at à
+// la milliseconde près pour toutes — vérifié, ce ne sont PAS de vrais pros
+// malgré leur apparence, un commentaire SQL antérieur les décrivait à tort
+// comme "vraies fiches"). Les slugs "test-*" sont un résidu de QA distinct
+// (owner_id non-null car créés via un vrai compte de test) — exclus à part.
+export function isNonRealBusiness(business: { slug: string; owner_id: string | null }): boolean {
+  return business.owner_id === null || business.slug.startsWith('test-');
+}
+
 export const BAB_CITIES = [
   'Biarritz', 'Anglet', 'Bayonne', 'Saint-Jean-de-Luz', 'Hendaye',
   'Tarnos', 'Ondres', 'Boucau', 'Bidart', 'Guéthary', 'Ciboure',
