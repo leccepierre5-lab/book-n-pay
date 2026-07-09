@@ -421,6 +421,24 @@ L'équipe Book'nPay`,
       // charges hors-forfait encore en retry_scheduled/failed du mois écoulé.
       if (settings) {
         await invoiceUnpaidOverageCharges(supabase, settings.biz_id);
+
+        // ── Reset mensuel du compteur de réservations ──────────────────────
+        // Uniquement sur un vrai renouvellement de cycle (pas subscription_create
+        // ni subscription_update), et seulement APRÈS avoir facturé les
+        // dépassements en attente ci-dessus — sinon un dépassement du mois
+        // écoulé se retrouverait compté sur le nouveau mois qui démarre à 0.
+        if (invoice.billing_reason === 'subscription_cycle') {
+          const { error: resetError } = await supabase
+            .from('business_settings')
+            .update({ monthly_bookings_count: 0 })
+            .eq('biz_id', settings.biz_id);
+
+          if (resetError) {
+            console.error(`[Webhook] ❌ Échec reset monthly_bookings_count — biz ${settings.biz_id}:`, resetError);
+          } else {
+            console.log(`[Webhook] 🔄 Compteur mensuel remis à 0 — biz ${settings.biz_id}`);
+          }
+        }
       }
     }
   }
