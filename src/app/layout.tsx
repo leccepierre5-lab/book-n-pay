@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     template: "%s | Book'nPay",
   },
   description:
-    "Book'nPay connecte les professionnels de Biarritz, Anglet et Bayonne à leurs clients : réservation en ligne, paiement sécurisé, zéro commission.",
+    "Book'nPay connecte les professionnels indépendants du Pays Basque, du Béarn et des Landes à leurs clients : réservation en ligne, paiement sécurisé, 0% de commission. Gardez la main sur votre activité.",
 };
 
 export const viewport: Viewport = {
