@@ -16,6 +16,22 @@ export interface OverageChargeRow {
   attempt_count: number;
 }
 
+// Protègent respectivement le débit unitaire (anti-double-débit) et le
+// regroupement en facture (anti-double-facture) contre un rejeu — voir les
+// commentaires d'usage plus bas pour le détail de la fenêtre de garantie.
+// Extraites en fonctions pures pour être testables sans Stripe/DB.
+export function buildOverageChargeIdempotencyKey(
+  bookingId: string | null,
+  chargeId: string,
+  attemptCount: number
+): string {
+  return `overage-charge-${bookingId ?? chargeId}-attempt-${attemptCount}`;
+}
+
+export function buildOverageInvoiceIdempotencyKey(bizId: string, chargeIds: string[]): string {
+  return `overage-invoice-${bizId}-${[...chargeIds].sort().join('-')}`;
+}
+
 // ⚠️ Le customer/payment method d'un pro sont créés via /api/pro/setup-billing,
 // qui respecte déjà app_config.mode_test_paiement — on doit construire le
 // client Stripe de la même façon ici, sinon "No such customer" en prod dès
@@ -108,7 +124,7 @@ export async function attemptOverageCharge(
   // différent) obtienne bien un nouveau PaymentIntent, pas celui, raté, de la
   // tentative précédente. Fallback sur charge.id si booking_id est absent
   // (nullable en base) pour rester unique dans tous les cas.
-  const idempotencyKey = `overage-charge-${charge.booking_id ?? charge.id}-attempt-${nextAttemptCount}`;
+  const idempotencyKey = buildOverageChargeIdempotencyKey(charge.booking_id, charge.id, nextAttemptCount);
 
   try {
     const pi = await stripe.paymentIntents.create({
@@ -193,7 +209,7 @@ export async function invoiceUnpaidOverageCharges(supabase: SupabaseClient, bizI
   // Fenêtre de garantie Stripe : clés retenues 24h — au-delà, seul le filtre
   // de statut ('retry_scheduled'/'failed' ci-dessus) protège, suffisant si
   // l'UPDATE a fini par passer.
-  const chargeIdsKey = unpaidCharges.map((c) => c.id).sort().join('-');
+  const invoiceIdempotencyKey = buildOverageInvoiceIdempotencyKey(bizId, unpaidCharges.map((c) => c.id));
 
   try {
     for (const charge of unpaidCharges) {
@@ -215,7 +231,7 @@ export async function invoiceUnpaidOverageCharges(supabase: SupabaseClient, bizI
       collection_method: 'charge_automatically',
       auto_advance: true,
       pending_invoice_items_behavior: 'include',
-    }, { idempotencyKey: `overage-invoice-${bizId}-${chargeIdsKey}` });
+    }, { idempotencyKey: invoiceIdempotencyKey });
 
     // Sur rejeu (FIX 3), Stripe honore la clé d'idempotence en renvoyant la
     // réponse mise en cache de l'appel create() ORIGINAL — figée à l'état
