@@ -38,6 +38,9 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
             <p className="text-xs text-white/50">
               {booking.service_name} · {booking.date} à {booking.time}
             </p>
+            {booking.staff_name && (
+              <p className="text-xs text-white/40">avec {booking.staff_name}</p>
+            )}
           </div>
         </div>
 

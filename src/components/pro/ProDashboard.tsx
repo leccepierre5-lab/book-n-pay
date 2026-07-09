@@ -102,7 +102,8 @@ export default function ProDashboard({
     } else if (data.alreadyCheckedIn) {
       setScanFeedback('Ce client est déjà enregistré comme arrivé.');
     } else {
-      setScanFeedback(`✓ Check-in : ${data.member.name}`);
+      const staffName = data.booking?.staff_name;
+      setScanFeedback(`✓ Check-in : ${data.member.name}${staffName ? ` · avec ${staffName}` : ''}`);
       setBookings((prev) =>
         prev.map((b) =>
           b.id === data.booking?.id

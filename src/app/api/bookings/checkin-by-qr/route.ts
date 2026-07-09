@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     const { data: member } = await supabase
       .from('booking_members')
-      .select('*, bookings(id, biz_name, service_name, date, time, biz_id)')
+      .select('*, bookings(id, biz_name, service_name, staff_name, date, time, biz_id)')
       .eq('qr_code', qrCode)
       .maybeSingle();
 
