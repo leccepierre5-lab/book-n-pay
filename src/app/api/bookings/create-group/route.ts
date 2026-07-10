@@ -3,6 +3,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode, generateGroupRef, normalizePhone } from '@/lib/booking-utils';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { assignStaffAndCreateBooking } from '@/lib/staff-assignment';
+import { normalizeStaffChoice, orderExplicitFirst, getCandidateStaffIds } from '@/lib/staff-group-order';
 import { logAndRespond } from '@/lib/api-error';
 import type { Booking } from '@/lib/database.types';
 
@@ -165,17 +166,14 @@ export async function POST(req: NextRequest) {
       const validStaffIds = new Set(staffRows.map((s) => s.id));
       const normalized = participantsMeta.map((p) => ({
         ...p,
-        staffChoice: p.staffChoice && validStaffIds.has(p.staffChoice) ? p.staffChoice : null,
+        staffChoice: normalizeStaffChoice(p.staffChoice, validStaffIds),
       }));
 
-      const explicit = normalized.filter((p) => p.staffChoice !== null);
-      const auto = normalized.filter((p) => p.staffChoice === null);
       const assignedStaffIds = new Set<string>();
+      const allStaffIds = staffRows.map((s) => s.id);
 
-      for (const p of [...explicit, ...auto]) {
-        const candidateStaffIds = p.staffChoice
-          ? [p.staffChoice]
-          : staffRows.map((s) => s.id).filter((id) => !assignedStaffIds.has(id));
+      for (const p of orderExplicitFirst(normalized)) {
+        const candidateStaffIds = getCandidateStaffIds(p.staffChoice, allStaffIds, assignedStaffIds);
 
         let assigned: Booking | null;
         try {
