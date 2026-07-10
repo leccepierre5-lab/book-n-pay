@@ -11,11 +11,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Book'nPay",
+    default: "Book'nPay — Réservation en ligne beauté & bien-être",
     template: "%s | Book'nPay",
   },
   description:
-    "Book'nPay connecte les professionnels indépendants du Pays Basque, du Béarn et des Landes à leurs clients : réservation en ligne, paiement sécurisé, 0% de commission. Gardez la main sur votre activité.",
+    "Réservez en ligne auprès d'indépendants beauté & bien-être du Pays Basque, Béarn et Landes. Paiement sécurisé, 0% de commission pour les pros.",
 };
 
 export const viewport: Viewport = {

@@ -4,7 +4,14 @@
 // contractuellement Book'nPay envers ses utilisateurs ; je ne me permets
 // aucune liberté de paraphrase ici). Seule la navigation a changé
 // (react-router-dom → next/link).
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: "Conditions Générales d'Utilisation et de Vente",
+  description:
+    "Conditions générales d'utilisation et de vente de Book'nPay : frais de réservation, annulation, réservations de groupe et données personnelles.",
+};
 
 export default function CGUPage() {
   return (

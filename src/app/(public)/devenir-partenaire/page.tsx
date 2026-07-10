@@ -1,5 +1,12 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import PartnerApplicationForm from '@/components/partner/PartnerApplicationForm';
+
+export const metadata: Metadata = {
+  title: 'Devenir partenaire — 0% de commission',
+  description:
+    "Rejoignez Book'nPay : abonnement fixe, zéro commission sur vos ventes, réservation en ligne et paiement sécurisé pour indépendants beauté & bien-être.",
+};
 
 export default function DevenirPartenairePage() {
   return (
