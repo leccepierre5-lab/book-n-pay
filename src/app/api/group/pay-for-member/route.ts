@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   const deposit = target.deposit ?? 0;
   if (deposit <= 0) {
-    return NextResponse.json({ error: 'Montant d\'acompte invalide' }, { status: 400 });
+    return NextResponse.json({ error: 'Montant des frais de réservation invalide' }, { status: 400 });
   }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
           unit_amount: Math.round(deposit * 100),
           product_data: {
             name: `Place de ${target.name} — ${targetBooking.service_name}`,
-            description: `Acompte payé par un autre membre du groupe`,
+            description: `Frais de réservation payés par un autre membre du groupe`,
           },
         },
         quantity: 1,

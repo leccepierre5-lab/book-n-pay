@@ -179,7 +179,7 @@ export default function StepService({
                   {service.price > 0 ? `${service.price}€` : 'Gratuit'}
                 </p>
                 {service.deposit > 0 && (
-                  <p className="text-[10px] text-slate-600 mt-0.5">acompte {service.deposit}€</p>
+                  <p className="text-[10px] text-slate-600 mt-0.5">frais résa {service.deposit}€</p>
                 )}
               </div>
             </button>

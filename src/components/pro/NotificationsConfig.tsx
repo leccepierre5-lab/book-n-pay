@@ -35,7 +35,7 @@ const NOTIF_ITEMS = [
     items: [
       { key: 'newBooking', emoji: '✅', label: 'Nouvelle réservation', desc: 'Quand un client confirme un RDV' },
       { key: 'cancelBooking', emoji: '❌', label: 'Annulation', desc: 'Quand un client annule' },
-      { key: 'paymentReceived', emoji: '💳', label: 'Acompte reçu', desc: 'Quand un paiement est validé' },
+      { key: 'paymentReceived', emoji: '💳', label: 'Frais de réservation reçus', desc: 'Quand un paiement est validé' },
       { key: 'groupPending', emoji: '👥', label: 'Groupe incomplet', desc: "Quand un membre du groupe n'a pas encore payé" },
     ],
   },

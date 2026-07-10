@@ -197,7 +197,7 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
                   {s.duration_minutes} min
                 </span>
                 <span className="text-mint-400 font-medium">{s.price > 0 ? `${s.price}€` : 'Gratuit'}</span>
-                {s.deposit > 0 && <span>acompte {s.deposit}€</span>}
+                {s.deposit > 0 && <span>frais résa {s.deposit}€</span>}
                 {s.max_persons && <span>max {s.max_persons} pers.</span>}
               </div>
             </div>
@@ -312,7 +312,7 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] text-slate-500 uppercase tracking-widest mb-1.5">Acompte (€)</label>
+                <label className="block text-[10px] text-slate-500 uppercase tracking-widest mb-1.5">Frais de réservation (€)</label>
                 <input
                   type="number"
                   min="0"

@@ -247,7 +247,7 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
                 { label: 'Total', value: dayStats.total, color: '#f8fafc' },
                 { label: 'Arrivés', value: dayStats.arrived, color: '#059669' },
                 { label: 'Confirmés', value: dayStats.paid, color: '#3B82F6' },
-                { label: 'Acomptes', value: `${dayStats.deposits}€`, color: '#7C3AED' },
+                { label: 'Frais résa', value: `${dayStats.deposits}€`, color: '#7C3AED' },
               ].map((k) => (
                 <div key={k.label} className="py-2.5 text-center">
                   <p className="text-[15px] font-bold" style={{ color: k.color }}>

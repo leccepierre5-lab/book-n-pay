@@ -69,7 +69,7 @@ const SLIDES = [
   {
     icon: <ClockIcon />,
     title: 'Réservez en\n30 secondes',
-    desc: "Trouvez le bon professionnel près de chez vous, choisissez votre créneau et payez l'acompte instantanément.",
+    desc: "Trouvez le bon professionnel près de chez vous, choisissez votre créneau et payez les frais de réservation instantanément.",
     btn: 'Suivant',
     showPasser: true,
   },
