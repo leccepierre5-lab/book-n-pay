@@ -21,7 +21,7 @@ export const BNP_PLANS: PlanConfig[] = [
     label: 'Starter',
     priceHT: 79,
     engagementMonths: 3,
-    quota: 80,
+    quota: 120,
     nextPlan: 'business',
     stripePriceEnvKey: 'STRIPE_PRICE_STARTER',
   },

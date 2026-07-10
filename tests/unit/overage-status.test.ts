@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { getOverageStatus } from '@/lib/booking-utils';
 
 describe('getOverageStatus', () => {
-  describe('plan starter (quota 80)', () => {
+  describe('plan starter (quota 120)', () => {
     it('count=0 → included, aucun dépassement', () => {
       const r = getOverageStatus(0, 'starter');
       expect(r.status).toBe('included');
@@ -16,38 +16,38 @@ describe('getOverageStatus', () => {
       expect(r.nextPlanLabel).toBe('Business');
     });
 
-    it('count=79 → included, juste sous le quota', () => {
-      const r = getOverageStatus(79, 'starter');
+    it('count=119 → included, juste sous le quota', () => {
+      const r = getOverageStatus(119, 'starter');
       expect(r.status).toBe('included');
       expect(r.overageCount).toBe(0);
     });
 
-    it('count=80 → included, pile au quota (boundary overage=0)', () => {
-      const r = getOverageStatus(80, 'starter');
+    it('count=120 → included, pile au quota (boundary overage=0)', () => {
+      const r = getOverageStatus(120, 'starter');
       expect(r.status).toBe('included');
       expect(r.overageCount).toBe(0);
     });
 
-    it('count=81 → grace_period, premier dépassement encore gratuit', () => {
-      const r = getOverageStatus(81, 'starter');
+    it('count=121 → grace_period, premier dépassement encore gratuit', () => {
+      const r = getOverageStatus(121, 'starter');
       expect(r.status).toBe('grace_period');
       expect(r.overageCount).toBe(1);
     });
 
-    it('count=85 → grace_period, dernière unité de la marge de grâce', () => {
-      const r = getOverageStatus(85, 'starter');
+    it('count=125 → grace_period, dernière unité de la marge de grâce', () => {
+      const r = getOverageStatus(125, 'starter');
       expect(r.status).toBe('grace_period');
       expect(r.overageCount).toBe(5);
     });
 
-    it('count=86 → overage, premier dépassement facturé (bascule critique)', () => {
-      const r = getOverageStatus(86, 'starter');
+    it('count=126 → overage, premier dépassement facturé (bascule critique)', () => {
+      const r = getOverageStatus(126, 'starter');
       expect(r.status).toBe('overage');
       expect(r.overageCount).toBe(6);
     });
 
-    it('count=100 → overage, progression linéaire au-delà de la grâce', () => {
-      const r = getOverageStatus(100, 'starter');
+    it('count=140 → overage, progression linéaire au-delà de la grâce', () => {
+      const r = getOverageStatus(140, 'starter');
       expect(r.status).toBe('overage');
       expect(r.overageCount).toBe(20);
     });

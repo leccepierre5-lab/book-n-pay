@@ -14,16 +14,16 @@ const FEE_BRACKETS = [
 const PLANS = [
   {
     key: 'starter',
-    badge: 'Solo & Freelance',
+    badge: 'Pour Démarrer',
     title: 'STARTER',
     price: '79',
     engagement: '3 mois',
-    promise: 'Pour ne plus perdre une réservation sur cinq.',
+    promise: 'Pour lancer votre activité sur de bonnes bases.',
     accentColor: 'text-blue-400',
     borderColor: 'border-blue-500/30',
     glowColor: 'rgba(59,130,246,0.12)',
     features: [
-      '80 réservations protégées / mois',
+      '120 réservations protégées / mois',
       'Vos frais encaissés directement',
       'Check-in QR + fiabilité clients',
       'Apple Pay & Google Pay',
@@ -41,7 +41,7 @@ const PLANS = [
     title: 'BUSINESS',
     price: '139',
     engagement: '6 mois',
-    promise: 'Pour un planning à plusieurs qui ne craque jamais.',
+    promise: 'Pour les pros qui tournent à plein régime.',
     accentColor: 'text-mint-400',
     borderColor: 'border-mint-500/40',
     glowColor: 'rgba(52,211,153,0.12)',
@@ -61,7 +61,7 @@ const PLANS = [
   },
   {
     key: 'scale',
-    badge: 'Grandes Structures',
+    badge: 'Gros Volume',
     title: 'SCALE',
     price: '299',
     engagement: '12 mois',

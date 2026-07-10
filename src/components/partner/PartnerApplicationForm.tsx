@@ -33,8 +33,8 @@ const TYPE_PLACEHOLDERS: Partial<Record<(typeof CATEGORIES)[number]['value'], st
 };
 
 const BOOKINGS_ESTIMATES = [
-  { value: '0-80', label: 'Moins de 80 / mois', hint: 'Plan Starter — 79 € HT' },
-  { value: '81-300', label: '81 à 300 / mois', hint: 'Plan Business — 139 € HT' },
+  { value: '0-80', label: 'Moins de 120 / mois', hint: 'Plan Starter — 79 € HT' },
+  { value: '81-300', label: '121 à 300 / mois', hint: 'Plan Business — 139 € HT' },
   { value: '300+', label: 'Plus de 300 / mois', hint: 'Plan Scale — 299 € HT' },
 ] as const;
 
