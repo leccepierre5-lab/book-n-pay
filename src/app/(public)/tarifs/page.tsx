@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { calcFraisGestion } from '@/lib/booking-utils';
-import { BNP_PLANS, OVERAGE_GRACE, OVERAGE_FEE_HT } from '@/lib/plans-config';
+import { BNP_PLANS, OVERAGE_FEE_HT } from '@/lib/plans-config';
 
 const FEE_BRACKETS = [
   { label: '≤ 50 €', fee: calcFraisGestion(30) },
@@ -255,12 +255,8 @@ export default function TarifsPage() {
               </div>
               <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 px-3 py-3 space-y-1.5 text-xs text-slate-400">
                 <p>
-                  <span className="text-white font-medium">Droit à l'erreur :</span>{' '}
-                  les {OVERAGE_GRACE} réservations au-delà du quota sont gratuites.
-                </p>
-                <p>
-                  <span className="text-white font-medium">Au-delà :</span>{' '}
-                  {OVERAGE_FEE_HT.toFixed(2).replace('.', ',')} € HT / réservation supplémentaire, prélevés immédiatement + proposition de montée de plan.
+                  <span className="text-white font-medium">Au-delà du quota :</span>{' '}
+                  {OVERAGE_FEE_HT.toFixed(2).replace('.', ',')} € HT / réservation supplémentaire dès le 1er dépassement, prélevés immédiatement + proposition de montée de plan.
                 </p>
               </div>
             </div>

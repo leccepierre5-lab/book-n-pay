@@ -246,6 +246,10 @@ export function getOverageStatus(bookingCountThisMonth: number, planKey: PlanKey
   const overage = bookingCountThisMonth - plan.quota;
 
   if (overage <= 0) return { status: 'included', overageCount: 0, currentPlanLabel, nextPlanLabel };
+  // Avec OVERAGE_GRACE=0, cette branche est inatteignable : on est ici parce
+  // que overage>0, et overage<=OVERAGE_GRACE(0) ne peut alors jamais être vrai.
+  // Conservée volontairement (risque de régression minimal si la grâce est un
+  // jour réintroduite) plutôt que supprimée avec le statut 'grace_period'.
   if (overage <= OVERAGE_GRACE) return { status: 'grace_period', overageCount: overage, currentPlanLabel, nextPlanLabel };
   return { status: 'overage', overageCount: overage, currentPlanLabel, nextPlanLabel };
 }

@@ -28,25 +28,19 @@ describe('getOverageStatus', () => {
       expect(r.overageCount).toBe(0);
     });
 
-    it('count=121 → grace_period, premier dépassement encore gratuit', () => {
+    it('count=121 → overage, premier dépassement facturé dès la 1ère résa hors quota (OVERAGE_GRACE=0)', () => {
       const r = getOverageStatus(121, 'starter');
-      expect(r.status).toBe('grace_period');
+      expect(r.status).toBe('overage');
       expect(r.overageCount).toBe(1);
     });
 
-    it('count=125 → grace_period, dernière unité de la marge de grâce', () => {
-      const r = getOverageStatus(125, 'starter');
-      expect(r.status).toBe('grace_period');
-      expect(r.overageCount).toBe(5);
-    });
-
-    it('count=126 → overage, premier dépassement facturé (bascule critique)', () => {
-      const r = getOverageStatus(126, 'starter');
+    it('count=130 → overage, overageCount égale exactement le nombre de résa hors quota (plus de décalage grâce)', () => {
+      const r = getOverageStatus(130, 'starter');
       expect(r.status).toBe('overage');
-      expect(r.overageCount).toBe(6);
+      expect(r.overageCount).toBe(10);
     });
 
-    it('count=140 → overage, progression linéaire au-delà de la grâce', () => {
+    it('count=140 → overage, progression linéaire sans palier de grâce', () => {
       const r = getOverageStatus(140, 'starter');
       expect(r.status).toBe('overage');
       expect(r.overageCount).toBe(20);
@@ -60,16 +54,10 @@ describe('getOverageStatus', () => {
       expect(r.overageCount).toBe(0);
     });
 
-    it('count=305 → grace_period, dernière unité de la marge de grâce', () => {
-      const r = getOverageStatus(305, 'business');
-      expect(r.status).toBe('grace_period');
-      expect(r.overageCount).toBe(5);
-    });
-
-    it('count=306 → overage, bascule facturable', () => {
-      const r = getOverageStatus(306, 'business');
+    it('count=301 → overage, bascule facturable dès la 1ère résa hors quota (OVERAGE_GRACE=0)', () => {
+      const r = getOverageStatus(301, 'business');
       expect(r.status).toBe('overage');
-      expect(r.overageCount).toBe(6);
+      expect(r.overageCount).toBe(1);
       expect(r.nextPlanLabel).toBe('Scale');
     });
   });

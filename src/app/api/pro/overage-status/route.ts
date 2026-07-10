@@ -1,7 +1,7 @@
 // src/app/api/pro/overage-status/route.ts
 // Statut hors-forfait du pro connecté — consommé par OverageBanner.
 // "urgent" (bandeau rouge) dès qu'au moins une charge est passée en 'failed'
-// (retry cron épuisé) ; sinon bandeau informatif si en grace_period/overage.
+// (retry cron épuisé) ; sinon bandeau informatif si en overage (OVERAGE_GRACE=0).
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getOverageStatus } from '@/lib/booking-utils';

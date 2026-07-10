@@ -1,8 +1,9 @@
 'use client';
 // Bandeau hors-forfait pro — consomme /api/pro/overage-status.
 // Rouge/urgent dès qu'une charge hors-forfait est passée en 'failed' (retry
-// cron épuisé, voir 0020_overage_charges.sql) ; ambre sinon (grace_period/overage
-// en cours, informatif) — voir OVERAGE_GRACE dans src/lib/plans-config.ts.
+// cron épuisé, voir 0020_overage_charges.sql) ; ambre sinon (overage en cours,
+// informatif) — OVERAGE_GRACE=0 dans src/lib/plans-config.ts, facturé dès la
+// 1ère résa hors quota, le statut 'grace_period' n'est plus jamais atteint.
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 
@@ -68,7 +69,7 @@ export default function OverageBanner() {
         <span className="flex-none w-2 h-2 rounded-full bg-amber-400" />
         <span className="text-xs font-medium flex-1 min-w-0">
           Vous dépassez votre quota {data.currentPlanLabel} de {data.overageCount} réservation{data.overageCount > 1 ? 's' : ''} ce mois-ci
-          {data.status === 'overage' ? ' — facturé 3,99€HT/réservation au-delà de la marge de grâce' : ' (marge de grâce)'}
+          {data.status === 'overage' ? ' — facturé 3,99€HT/réservation au-delà du quota' : ''}
         </span>
         {data.nextPlanLabel && (
           <Link

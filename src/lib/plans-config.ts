@@ -46,7 +46,11 @@ export const BNP_PLANS: PlanConfig[] = [
 ];
 
 // Hors-forfait — ne s'applique qu'aux plans avec quota (starter, business)
-export const OVERAGE_GRACE = 5;       // réservations gratuites au-delà du quota
+// OVERAGE_GRACE=0 : aucune marge de grâce, facturé dès la 1ère réservation
+// au-delà du quota. Le statut 'grace_period' de getOverageStatus() devient
+// alors inatteignable (overage>0 implique toujours overage>OVERAGE_GRACE) —
+// laissé en place volontairement plutôt que retiré, voir booking-utils.ts.
+export const OVERAGE_GRACE = 0;       // réservations gratuites au-delà du quota
 export const OVERAGE_FEE_HT = 3.99;  // €HT par réservation en dépassement réel
 
 // Renouvellement — délai de notification avant fin d'engagement (loi Chatel : entre J-90 et J-30)
