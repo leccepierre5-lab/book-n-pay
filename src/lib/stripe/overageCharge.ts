@@ -4,8 +4,8 @@
 // retry-overage-charges (tentative à +24h).
 import Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getOverageStatus } from '@/lib/booking-utils';
-import { OVERAGE_FEE_HT, type PlanKey } from '@/lib/plans-config';
+import { buildCapTiers } from '@/lib/booking-utils';
+import { OVERAGE_FEE_HT, OVERAGE_CAP_MARGIN, STRIPE_MIN_CHARGE_HT, getPlanConfig } from '@/lib/plans-config';
 
 export interface OverageChargeRow {
   id: string;
@@ -50,41 +50,74 @@ async function getStripeClient(supabase: SupabaseClient): Promise<Stripe> {
 // Incrémente le compteur mensuel du pro et crée une charge hors-forfait si la
 // réservation qui vient d'être payée dépasse le quota + marge de grâce.
 // Appelé une fois par réservation confirmée (webhook checkout.session.completed).
+// Depuis la migration 0030, increment + calcul du plafond + insertion de la
+// charge sont faits en un seul appel RPC atomique (voir 0030_overage_cap.sql)
+// — plus de fenêtre entre l'increment et l'insert où deux webhooks concurrents
+// pourraient tous deux dépasser le plafond.
 export async function maybeCreateOverageCharge(
   supabase: SupabaseClient,
   bizId: string,
   bookingId: string
 ): Promise<void> {
+  const { data: settings } = await supabase
+    .from('business_settings')
+    .select('plan_key')
+    .eq('biz_id', bizId)
+    .maybeSingle();
+
+  const plan = getPlanConfig(settings?.plan_key ?? 'starter');
+  if (!plan) {
+    console.error(`[overageCharge] Plan inconnu — biz ${bizId}, plan_key ${settings?.plan_key}`);
+    return;
+  }
+
   const { data: rpcResult, error: rpcError } = await supabase
-    .rpc('increment_booking_count', { p_biz_id: bizId })
+    .rpc('increment_booking_count_and_charge', {
+      p_biz_id: bizId,
+      p_booking_id: bookingId,
+      p_fee_ht: OVERAGE_FEE_HT,
+      p_stripe_min_ht: STRIPE_MIN_CHARGE_HT,
+      p_quota: plan.quota,
+      p_current_price: plan.priceHT,
+      p_cap_tiers: buildCapTiers(plan.key),
+      p_cap_margin: OVERAGE_CAP_MARGIN,
+    })
     .single();
 
   if (rpcError || !rpcResult) {
-    console.error('[overageCharge] increment_booking_count a échoué:', rpcError?.message);
+    console.error('[overageCharge] increment_booking_count_and_charge a échoué:', rpcError?.message);
     return;
   }
 
-  const { new_count, plan_key } = rpcResult as { new_count: number; plan_key: PlanKey };
-  const overage = getOverageStatus(new_count, plan_key);
-  if (overage.status !== 'overage') return;
+  const { new_count, charge_amount, charge_id, overage_status } = rpcResult as {
+    new_count: number | null;
+    charge_amount: number;
+    charge_id: string | null;
+    overage_status: 'already_processed' | 'included' | 'capped' | 'overage';
+  };
 
-  const { data: charge, error: insertError } = await supabase
-    .from('overage_charges')
-    .insert({ biz_id: bizId, booking_id: bookingId, amount_ht: OVERAGE_FEE_HT, status: 'pending' })
-    .select()
-    .single();
-
-  if (insertError || !charge) {
-    if (insertError?.code === '23505') {
-      console.log(`[overageCharge] Réservation ${bookingId} déjà traitée (charge existante, contrainte unique) — aucun débit tenté`);
-    } else {
-      console.error('[overageCharge] Création de la charge échouée:', insertError?.message);
-    }
+  if (overage_status === 'already_processed') {
+    console.log(`[overageCharge] Réservation ${bookingId} déjà traitée — aucun débit tenté`);
     return;
   }
+
+  if (overage_status === 'capped') {
+    console.log(`[overageCharge] Plafond atteint — biz ${bizId}, réservation ${bookingId} offerte (${new_count}e du mois)`);
+    return;
+  }
+
+  if (overage_status !== 'overage') return;
 
   console.log(`[overageCharge] Dépassement quota — biz ${bizId}, réservation ${bookingId} (${new_count}e du mois)`);
-  await attemptOverageCharge(supabase, charge as OverageChargeRow);
+
+  await attemptOverageCharge(supabase, {
+    id: charge_id!,
+    biz_id: bizId,
+    booking_id: bookingId,
+    amount_ht: charge_amount,
+    status: 'pending',
+    attempt_count: 0,
+  });
 }
 
 // Tente de débiter le moyen de paiement enregistré du pro pour une charge

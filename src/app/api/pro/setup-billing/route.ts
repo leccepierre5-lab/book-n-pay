@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       engagement_end_date: engagementEnd,
       next_billing_date: nextBilling,
       monthly_bookings_count: 0,
-      bookings_count_reset_at: startDate,
+      bookings_count_reset_at: now.toISOString(),
     }).eq('biz_id', profile.biz_id);
 
     return NextResponse.json({ ok: true });

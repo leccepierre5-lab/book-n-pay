@@ -430,7 +430,7 @@ L'équipe Book'nPay`,
         if (invoice.billing_reason === 'subscription_cycle') {
           const { error: resetError } = await supabase
             .from('business_settings')
-            .update({ monthly_bookings_count: 0 })
+            .update({ monthly_bookings_count: 0, bookings_count_reset_at: new Date().toISOString() })
             .eq('biz_id', settings.biz_id);
 
           if (resetError) {

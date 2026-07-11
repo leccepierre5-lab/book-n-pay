@@ -53,6 +53,21 @@ export const BNP_PLANS: PlanConfig[] = [
 export const OVERAGE_GRACE = 0;       // réservations gratuites au-delà du quota
 export const OVERAGE_FEE_HT = 3.99;  // €HT par réservation en dépassement réel
 
+// Montant minimum facturable par Stripe (0,50€) — voir migration 0030 et
+// increment_booking_count_and_charge : si le reste sous le plafond tombe
+// en-dessous, la réservation est tracée à 0€ (statut 'capped') plutôt que
+// de tenter une charge Stripe vouée à l'échec.
+export const STRIPE_MIN_CHARGE_HT = 0.5;
+
+// Plafond des frais de dépassement mensuels — protège contre un montant punitif
+// (ex. Starter à 200 résa/mois = 79€ + 319,20€ sans plafond, pire que Scale).
+// Formule (voir getOverageStatus) : plafond = prix du palier correspondant au
+// VOLUME RÉEL du mois + OVERAGE_CAP_MARGIN, moins l'abonnement actuel. Le palier
+// de base est le plus petit plan de BNP_PLANS dont le quota couvre le volume
+// réel (business si volume≤300, scale au-delà) — jamais de palier au-dessus de
+// Scale, donc jamais de plafond au-dessus de Scale+OVERAGE_CAP_MARGIN.
+export const OVERAGE_CAP_MARGIN = 20; // €HT au-dessus du palier de base
+
 // Renouvellement — délai de notification avant fin d'engagement (loi Chatel : entre J-90 et J-30)
 // À valider juridiquement avant mise en prod.
 export const ENGAGEMENT_NOTICE_DAYS = 30;

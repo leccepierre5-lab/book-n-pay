@@ -1,5 +1,5 @@
 // src/lib/booking-utils.ts
-import { BNP_PLANS, OVERAGE_GRACE, type PlanKey } from './plans-config';
+import { BNP_PLANS, OVERAGE_GRACE, OVERAGE_CAP_MARGIN, type PlanKey } from './plans-config';
 // Port direct de src/lib/bookingUtils.js (Base44) — logique métier pure,
 // sans dépendance au client de persistance. Les fonctions Base44.entities.*
 // sont remplacées par de vraies requêtes Supabase dans src/lib/queries/*.
@@ -231,6 +231,32 @@ export interface OverageResult {
   overageCount: number;
   currentPlanLabel: string;
   nextPlanLabel: string | null;
+  capHt: number | null; // plafond €HT du cycle en cours — null si non applicable (included)
+}
+
+export interface CapTier {
+  quota: number | null; // null = toujours couvrant (dernier palier, ex. Scale)
+  price: number;
+}
+
+// Paliers strictement au-dessus de planKey, ordre croissant, construits
+// depuis BNP_PLANS (source de vérité unique des prix/quotas) — passés tels
+// quels en p_cap_tiers à la RPC increment_booking_count_and_charge (voir
+// migration 0030). Aucune duplication des prix en dur côté SQL, donc aucune
+// migration nécessaire si les tarifs changent.
+export function buildCapTiers(planKey: PlanKey | string): CapTier[] {
+  const idx = BNP_PLANS.findIndex((p) => p.key === planKey);
+  if (idx === -1) return [];
+  return BNP_PLANS.slice(idx + 1).map((p) => ({ quota: p.quota, price: p.priceHT }));
+}
+
+// Meme logique d'escalade que la boucle FOR de increment_booking_count_and_charge
+// (migration 0030) : premier palier (ordre croissant) dont le quota couvre le
+// volume reel du mois, quota null = toujours couvrant.
+function calcCapHt(volumeThisMonth: number, tiers: CapTier[], currentPrice: number): number | null {
+  const tier = tiers.find((t) => t.quota === null || t.quota >= volumeThisMonth);
+  if (!tier) return null;
+  return tier.price + OVERAGE_CAP_MARGIN - currentPrice;
 }
 
 export function getOverageStatus(bookingCountThisMonth: number, planKey: PlanKey | string): OverageResult {
@@ -238,20 +264,23 @@ export function getOverageStatus(bookingCountThisMonth: number, planKey: PlanKey
   const currentPlanLabel = plan?.label ?? planKey;
 
   if (!plan || plan.quota === null) {
-    return { status: 'included', overageCount: 0, currentPlanLabel, nextPlanLabel: null };
+    return { status: 'included', overageCount: 0, currentPlanLabel, nextPlanLabel: null, capHt: null };
   }
 
   const nextPlan = plan.nextPlan ? BNP_PLANS.find((p) => p.key === plan.nextPlan) : null;
   const nextPlanLabel = nextPlan?.label ?? null;
   const overage = bookingCountThisMonth - plan.quota;
 
-  if (overage <= 0) return { status: 'included', overageCount: 0, currentPlanLabel, nextPlanLabel };
+  if (overage <= 0) return { status: 'included', overageCount: 0, currentPlanLabel, nextPlanLabel, capHt: null };
+
+  const capHt = calcCapHt(bookingCountThisMonth, buildCapTiers(plan.key), plan.priceHT);
+
   // Avec OVERAGE_GRACE=0, cette branche est inatteignable : on est ici parce
   // que overage>0, et overage<=OVERAGE_GRACE(0) ne peut alors jamais être vrai.
   // Conservée volontairement (risque de régression minimal si la grâce est un
   // jour réintroduite) plutôt que supprimée avec le statut 'grace_period'.
-  if (overage <= OVERAGE_GRACE) return { status: 'grace_period', overageCount: overage, currentPlanLabel, nextPlanLabel };
-  return { status: 'overage', overageCount: overage, currentPlanLabel, nextPlanLabel };
+  if (overage <= OVERAGE_GRACE) return { status: 'grace_period', overageCount: overage, currentPlanLabel, nextPlanLabel, capHt };
+  return { status: 'overage', overageCount: overage, currentPlanLabel, nextPlanLabel, capHt };
 }
 
 // ── Fidélité "Sérénité" — paliers et jokers ──────────────────────────────────
