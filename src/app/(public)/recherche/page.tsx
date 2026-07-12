@@ -68,7 +68,7 @@ export default async function SearchPage({
         {/* Search bar */}
         <form className="mb-5 space-y-3" action="/recherche" method="get">
           <div className="flex gap-2">
-            <BusinessNameAutocomplete defaultValue={params.q} />
+            <BusinessNameAutocomplete defaultValue={params.q} businesses={businesses} />
             <button
               type="submit"
               className="rounded-xl bg-mint-500 px-4 py-3 text-sm font-semibold text-navy-950 shadow-[0_0_16px_rgba(52,211,153,0.3)] hover:shadow-[0_0_20px_rgba(52,211,153,0.45)] transition-all duration-200"
