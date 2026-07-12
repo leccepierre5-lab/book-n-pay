@@ -8,11 +8,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { isValidBearerSecret } from '@/lib/constant-time';
+import { JOKERS_LIMITES } from '@/lib/booking-utils';
 
 const JOURS_ALERTE_DOUCE = 45;
 const JOURS_ALERTE_URGENCE = 55;
 const JOURS_DECLASSEMENT = 60;
-const JOKERS_PAR_STATUT: Record<string, number> = { Standard: 1, Bronze: 1, Argent: 2, Gold: 3 };
 const STATUT_EMOJI: Record<string, string> = { Gold: '🏆', Argent: '🥈', Bronze: '🥉' };
 
 export async function GET(req: NextRequest) {
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
     if (joursInactivite >= JOURS_ALERTE_DOUCE) {
       alertesDouces++;
       const joursRestants = JOURS_DECLASSEMENT - joursInactivite;
-      const nbJokers = JOKERS_PAR_STATUT[user.statut] || 1;
+      const nbJokers = JOKERS_LIMITES[user.statut] || 1;
 
       if (email) {
         await sendEmail({

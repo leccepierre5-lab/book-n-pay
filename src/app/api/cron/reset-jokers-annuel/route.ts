@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { isValidBearerSecret } from '@/lib/constant-time';
+import { JOKERS_LIMITES } from '@/lib/booking-utils';
 
-const JOKERS_BY_STATUT: Record<string, number> = { Standard: 1, Bronze: 1, Argent: 2, Gold: 3 };
 const DOWNGRADE: Record<string, string> = { Gold: 'Argent', Argent: 'Bronze', Bronze: 'Standard' };
 const MIN_RDV_ANNUEL = 5;
 
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const newJokers = JOKERS_BY_STATUT[statutFinal] || 1;
+    const newJokers = JOKERS_LIMITES[statutFinal] || 1;
     const rdvUpdate = statutFinal === 'Standard' && statut !== 'Standard' ? { rdv_honores: 0 } : {};
 
     await supabase
