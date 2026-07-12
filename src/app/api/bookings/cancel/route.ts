@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, phonesMatch } from '@/lib/booking-utils';
+import { depositRefundAmountCents } from '@/lib/refunds';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 
@@ -86,6 +87,11 @@ export async function POST(req: NextRequest) {
         const stripe = new Stripe(stripeKey);
         await stripe.refunds.create({
           payment_intent: member.stripe_payment_intent_id,
+          // Ne rembourse que les frais de réservation — les frais de gestion
+          // Book'nPay restent acquis (CGV Art. 3, déjà annoncé dans l'email
+          // ci-dessous ; sans `amount` explicite Stripe rembourse tout le
+          // PaymentIntent par défaut, gestion incluse).
+          amount: depositRefundAmountCents(member.deposit),
           reason: 'requested_by_customer',
         });
         refundDone = true;

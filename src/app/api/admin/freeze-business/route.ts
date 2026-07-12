@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
+import { depositRefundAmountCents } from '@/lib/refunds';
 import { logAndRespond } from '@/lib/api-error';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -80,6 +81,9 @@ export async function POST(req: NextRequest) {
             try {
               await stripe.refunds.create({
                 payment_intent: member.stripe_payment_intent_id,
+                // Ne rembourse que les frais de réservation — les frais de
+                // gestion Book'nPay restent acquis même sur un gel d'établissement.
+                amount: depositRefundAmountCents(member.deposit),
                 metadata: { reason: 'business_frozen', biz_id: bizId },
               });
               await serviceSupabase
