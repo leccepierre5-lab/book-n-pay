@@ -23,11 +23,16 @@ export async function POST(req: NextRequest) {
     const { data: authData } = await supabase.auth.getUser();
     if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
 
-    const { phone, bookingId, memberId, fraisReservation, paymentIntentId } = await req.json();
+    // ⚠️ CORRECTIF SÉCURITÉ (audit) : fraisReservation et paymentIntentId
+    // étaient auparavant lus directement du body — un appelant pouvait
+    // gonfler le montant remboursé ou cibler le PaymentIntent de quelqu'un
+    // d'autre. Les deux sont maintenant recalculés depuis targetMember
+    // ci-dessous, jamais depuis une valeur transmise par le client.
+    const { phone, bookingId, memberId } = await req.json();
 
-    if (!phone || !bookingId || !memberId || !fraisReservation) {
+    if (!phone || !bookingId || !memberId) {
       return NextResponse.json(
-        { error: 'Paramètres manquants: phone, bookingId, memberId, fraisReservation requis' },
+        { error: 'Paramètres manquants: phone, bookingId, memberId requis' },
         { status: 400 }
       );
     }
@@ -52,13 +57,22 @@ export async function POST(req: NextRequest) {
     // d'autre dans le même booking de groupe.
     const { data: targetMember } = await serviceSupabase
       .from('booking_members')
-      .select('phone')
+      .select('phone, status, deposit, stripe_payment_intent_id')
       .eq('id', memberId)
       .eq('booking_id', bookingId)
       .maybeSingle();
 
     if (!targetMember || targetMember.phone !== phone) {
       return NextResponse.json({ error: 'Ce membre ne correspond pas au profil authentifié' }, { status: 403 });
+    }
+
+    // Empêche de rejouer un Joker sur un membre déjà annulé/remboursé (double
+    // remboursement Stripe) ou dans un état où ça n'a pas de sens (jamais payé).
+    if (targetMember.status !== 'paid') {
+      return NextResponse.json(
+        { error: "Ce membre n'est pas dans un état permettant un remboursement Joker" },
+        { status: 400 }
+      );
     }
 
     const { data: user } = await serviceSupabase
@@ -87,14 +101,17 @@ export async function POST(req: NextRequest) {
     }
 
     const pct = JOKERS_PCT[statut];
+    // Source unique du montant : le dépôt réellement enregistré en base,
+    // jamais une valeur transmise par le client.
+    const fraisReservation = targetMember.deposit || 0;
     const montantRembourse = Math.round(fraisReservation * pct * 100) / 100;
 
     let refundId: string | null = null;
-    if (paymentIntentId) {
+    if (targetMember.stripe_payment_intent_id) {
       const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_SECRET_KEY!;
       const stripe = new Stripe(stripeKey);
       const refund = await stripe.refunds.create({
-        payment_intent: paymentIntentId,
+        payment_intent: targetMember.stripe_payment_intent_id,
         amount: Math.round(montantRembourse * 100),
         reason: 'requested_by_customer',
         metadata: { joker: 'true', statut, phone, bookingId, memberId },
