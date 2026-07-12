@@ -12,8 +12,6 @@ import { sendEmail } from '@/lib/email/send';
 import { depositRefundAmountCents } from '@/lib/refunds';
 import { logAndRespond } from '@/lib/api-error';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -43,6 +41,20 @@ export async function POST(req: NextRequest) {
     if (!business) return NextResponse.json({ error: 'Établissement introuvable' }, { status: 404 });
 
     if (action === 'freeze') {
+      // Instanciation paresseuse (comme refund-gesture/route.ts) : évite un
+      // crash au chargement du module si STRIPE_SECRET_KEY est absente d'un
+      // environnement (ex: Preview Vercel, où seule la clé Production est
+      // configurée) — l'ancien `new Stripe(...)` au niveau module plantait le
+      // build même sur des routes jamais appelées. Respecte aussi
+      // mode_test_paiement, comme les autres routes de remboursement.
+      const { data: testModeConfig } = await serviceSupabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'mode_test_paiement')
+        .maybeSingle();
+      const isTestMode = testModeConfig?.value === 'true';
+      const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+
       await serviceSupabase
         .from('businesses')
         .update({ frozen: true, frozen_reason: reason || null })
