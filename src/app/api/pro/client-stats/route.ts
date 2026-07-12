@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
     const { data: appUser } = await supabase
       .from('app_users')
-      .select('statut, jokers_disponibles, rdv_honores')
+      .select('statut, jokers_disponibles, jokers_utilises, rdv_honores')
       .eq('phone', phone)
       .maybeSingle();
 

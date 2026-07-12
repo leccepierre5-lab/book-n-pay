@@ -4,6 +4,7 @@
 // décision pour le pro face à un no-show : rembourser ou retenir les frais,
 // basé sur l'historique de fiabilité du client CHEZ CE business.
 import { useEffect, useState } from 'react';
+import { JOKERS_LIMITES } from '@/lib/booking-utils';
 
 const STATUT_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
   Standard: { icon: '⚪', color: '#64748b', bg: '#f1f5f9' },
@@ -32,6 +33,7 @@ export default function FicheClientIntelligente({
   const [appUser, setAppUser] = useState<{
     statut: string;
     jokers_disponibles: number;
+    jokers_utilises: number;
     rdv_honores: number;
   } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -76,7 +78,8 @@ export default function FicheClientIntelligente({
   const statut = appUser?.statut || 'Standard';
   const sc = STATUT_CONFIG[statut] || STATUT_CONFIG.Standard;
   const jokers = appUser?.jokers_disponibles ?? 1;
-  const maxJokers = appUser ? ((appUser.rdv_honores ?? 0) >= 51 ? 3 : (appUser.rdv_honores ?? 0) >= 31 ? 2 : 1) : 1;
+  const jokersUtilises = appUser?.jokers_utilises ?? 0;
+  const maxJokers = JOKERS_LIMITES[statut] ?? 1;
 
   return (
     <div className="space-y-3 rounded-xl border border-white/10 bg-navy-900 p-4">
@@ -103,7 +106,7 @@ export default function FicheClientIntelligente({
       {appUser && (
         <div className="flex items-center justify-between rounded-xl bg-navy-800 px-3 py-2">
           <div>
-            <p className="text-[10px] text-white/40">Jokers disponibles</p>
+            <p className="text-[10px] text-white/40">Jokers ({jokersUtilises}/{maxJokers} utilisés)</p>
             <div className="mt-0.5 flex gap-1">
               {Array.from({ length: maxJokers }).map((_, i) => (
                 <span key={i} className={`text-base ${i < jokers ? 'opacity-100' : 'opacity-20'}`}>
