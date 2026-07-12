@@ -3,10 +3,10 @@ import { useState } from 'react';
 import type { AppUser } from '@/lib/database.types';
 
 const TIERS = [
-  { key: 'Standard', rdv: 0, jokers: 1, pct: 50 },
-  { key: 'Bronze',   rdv: 16, jokers: 1, pct: 100 },
-  { key: 'Argent',   rdv: 31, jokers: 2, pct: 100 },
-  { key: 'Gold',     rdv: 51, jokers: 3, pct: 100 },
+  { key: 'Standard', rdv: 0, jokers: 1, pct: 100 },
+  { key: 'Bronze',   rdv: 16, jokers: 2, pct: 100 },
+  { key: 'Argent',   rdv: 31, jokers: 3, pct: 100 },
+  { key: 'Gold',     rdv: 51, jokers: 4, pct: 100 },
 ] as const;
 
 const TIER_ICON: Record<string, string> = { Bronze: '🥉', Argent: '🥈', Gold: '🏆' };
@@ -123,7 +123,7 @@ export default function LoyaltyCard({ profile }: { profile: AppUser }) {
   const statut = profile.statut || 'Standard';
   const jokersDispo = profile.jokers_disponibles ?? 0;
   const jokersUtilises = profile.jokers_utilises ?? 0;
-  const remboursementPct = statut === 'Standard' ? 50 : 100;
+  const remboursementPct = 100;
 
   const currentTierIdx = TIERS.findIndex((t) => t.key === statut);
   const nextTier = currentTierIdx < TIERS.length - 1 ? TIERS[currentTierIdx + 1] : null;
@@ -133,6 +133,7 @@ export default function LoyaltyCard({ profile }: { profile: AppUser }) {
     ? Math.round(((rdv - currentTierRdv) / (nextTier.rdv - currentTierRdv)) * 100)
     : 100;
   const rdvToNext = nextTier ? nextTier.rdv - rdv : 0;
+  const jokersGagnes = nextTier ? nextTier.jokers - (TIERS[currentTierIdx]?.jokers ?? 0) : 0;
 
   return (
     <>
@@ -247,8 +248,11 @@ export default function LoyaltyCard({ profile }: { profile: AppUser }) {
                 <strong>
                   {TIER_ICON[nextTier.key]} {nextTier.key}
                 </strong>{' '}
-                et débloquer votre garantie remboursement{' '}
-                <strong className="text-emerald-400">100% !</strong>
+                et gagner{' '}
+                <strong className="text-emerald-400">
+                  {jokersGagnes} joker{jokersGagnes > 1 ? 's' : ''} supplémentaire{jokersGagnes > 1 ? 's' : ''}
+                </strong>{' '}
+                !
               </p>
               <div className="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden">
                 <div
