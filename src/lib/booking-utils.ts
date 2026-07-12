@@ -314,21 +314,21 @@ export function getOverageStatus(bookingCountThisMonth: number, planKey: PlanKey
 // Port de calculerStatutFidelite (Base44 Edge Function)
 export const JOKERS_LIMITES: Record<string, number> = {
   Standard: 1,
-  Bronze: 1,
-  Argent: 2,
-  Gold: 3,
+  Bronze: 2,
+  Argent: 3,
+  Gold: 4,
 };
 
 export const JOKERS_PCT: Record<string, number> = {
-  Standard: 0.5,
+  Standard: 1.0,
   Bronze: 1.0,
   Argent: 1.0,
   Gold: 1.0,
 };
 
 export function computeStatut(rdvHonores: number): { statut: string; jokers: number } {
-  if (rdvHonores >= 51) return { statut: 'Gold', jokers: 3 };
-  if (rdvHonores >= 31) return { statut: 'Argent', jokers: 2 };
-  if (rdvHonores >= 16) return { statut: 'Bronze', jokers: 1 };
+  if (rdvHonores >= 51) return { statut: 'Gold', jokers: 4 };
+  if (rdvHonores >= 31) return { statut: 'Argent', jokers: 3 };
+  if (rdvHonores >= 16) return { statut: 'Bronze', jokers: 2 };
   return { statut: 'Standard', jokers: 1 };
 }
