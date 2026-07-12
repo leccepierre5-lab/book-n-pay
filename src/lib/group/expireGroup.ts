@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email/send';
+import { depositRefundAmountCents } from '@/lib/refunds';
 
 export async function expireGroupByRef(
   ref: string,
@@ -45,6 +46,9 @@ export async function expireGroupByRef(
         try {
           await stripe.refunds.create({
             payment_intent: member.stripe_payment_intent_id,
+            // Ne rembourse que les frais de réservation — les frais de
+            // gestion Book'nPay restent acquis même sur une expiration de groupe.
+            amount: depositRefundAmountCents(member.deposit),
             metadata: { reason: 'group_expired', group_ref: ref },
           });
           await supabase

@@ -19,7 +19,6 @@ interface BookingForCaisse {
   services?: { price: number } | null;
 }
 
-const FRAIS_BNP = 1.99;
 const MODE_LABEL: Record<string, string> = { app: "📱 via l'App", tpe: '💳 par TPE', especes: '💵 en Espèces' };
 
 export default function CaisseEncaissement({
@@ -43,9 +42,7 @@ export default function CaisseEncaissement({
   const prixTotal = discountPct > 0
     ? Math.round(prixOriginal * (1 - discountPct / 100) * 100) / 100
     : prixOriginal;
-  const totalPaye = member.deposit || 0;
-  const includesFrais = Math.round(totalPaye * 100) % 100 === 99;
-  const fraisReservation = includesFrais ? Math.round((totalPaye - FRAIS_BNP) * 100) / 100 : totalPaye;
+  const fraisReservation = member.deposit || 0;
   const solde = Math.max(0, prixTotal - fraisReservation);
 
   const handleCloture = async (paymentMode: string) => {
