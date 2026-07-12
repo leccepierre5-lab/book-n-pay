@@ -116,7 +116,7 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
           <input type="text" placeholder="Nom et prénom" value={fullName} onChange={(e) => setFullName(e.target.value)} required className={inputClass} />
         )}
         {mode === 'signup' && (
-          <input type="tel" placeholder="Téléphone (rappels SMS)" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+          <input type="tel" placeholder="Téléphone" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
         )}
         <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
         <input type="password" placeholder="Mot de passe (6 min.)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className={inputClass} />

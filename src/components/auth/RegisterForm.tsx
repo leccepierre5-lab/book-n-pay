@@ -105,7 +105,7 @@ export default function RegisterForm() {
       />
       <input
         type="tel"
-        placeholder="Téléphone (rappels SMS)"
+        placeholder="Téléphone"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
         className={inputClass}
