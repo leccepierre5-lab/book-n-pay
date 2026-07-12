@@ -71,6 +71,34 @@ function overlaps(startA: number, endA: number, startB: number, endB: number): b
   return startA < endB && startB < endA;
 }
 
+export interface WorkingRange {
+  start_time: string;
+  end_time: string;
+}
+
+// Résout les plages travaillées d'un praticien pour un jour donné — extrait
+// de computeStaffAvailability pour être réutilisable telle quelle par
+// l'endpoint agenda (AgendaView a besoin des plages elles-mêmes, pas
+// seulement d'un booléen "couvert"). Toute divergence entre les deux appelants
+// serait un bug silencieux (l'agenda afficherait des horaires différents de
+// ceux réellement appliqués à la réservation) — une seule implémentation.
+export function resolveWorkingRanges(
+  staffSchedules: StaffScheduleRow[], // déjà filtré sur le staff_id concerné
+  dayOfWeek: number,
+  businessOpenTime: string,
+  businessCloseTime: string
+): WorkingRange[] {
+  if (staffSchedules.length === 0) {
+    // Aucun horaire configuré pour ce praticien → fallback horaires business (décision actée)
+    return [{ start_time: businessOpenTime, end_time: businessCloseTime }];
+  }
+  // [] = a des horaires configurés, mais pas ce jour-là → jour off.
+  // Plusieurs entrées possibles (horaires coupés, migration 0031).
+  return staffSchedules
+    .filter((s) => s.day_of_week === dayOfWeek)
+    .map((s) => ({ start_time: s.open_time, end_time: s.close_time }));
+}
+
 export function computeStaffAvailability(
   params: StaffAvailabilityParams
 ): Record<string, SlotAvailability> {
@@ -130,26 +158,16 @@ export function computeStaffAvailability(
 
       for (const st of staff) {
         const staffSchedules = schedulesByStaff.get(st.id) ?? [];
+        const workingRanges = resolveWorkingRanges(staffSchedules, dayOfWeek, businessOpenTime, businessCloseTime);
+        if (workingRanges.length === 0) continue; // jour off
 
-        let covered: boolean;
-
-        if (staffSchedules.length === 0) {
-          // Aucun horaire configuré pour ce praticien → fallback horaires business (décision actée)
-          const workStart = toMinutes(businessOpenTime);
-          const workEnd = toMinutes(businessCloseTime);
-          covered = slotStart >= workStart && slotEnd <= workEnd;
-        } else {
-          const todayRanges = staffSchedules.filter((s) => s.day_of_week === dayOfWeek);
-          if (todayRanges.length === 0) continue; // a des horaires configurés, mais pas ce jour-là → jour off
-          // Horaires coupés (ex. 9h-12h / 14h-18h) : le créneau doit tenir
-          // entièrement dans AU MOINS UNE des plages du jour, pas à cheval
-          // sur deux (ex. 11h30-12h30 sur une pause déjeuner 12h-14h n'est
-          // couvert par aucune des deux plages prise isolément).
-          covered = todayRanges.some(
-            (r) => slotStart >= toMinutes(r.open_time) && slotEnd <= toMinutes(r.close_time)
-          );
-        }
-
+        // Horaires coupés (ex. 9h-12h / 14h-18h) : le créneau doit tenir
+        // entièrement dans AU MOINS UNE des plages du jour, pas à cheval sur
+        // deux (ex. 11h30-12h30 sur une pause déjeuner 12h-14h n'est couvert
+        // par aucune des deux plages prise isolément).
+        const covered = workingRanges.some(
+          (r) => slotStart >= toMinutes(r.start_time) && slotEnd <= toMinutes(r.end_time)
+        );
         if (!covered) continue;
 
         const staffAbsences = absencesByStaff.get(st.id) ?? [];

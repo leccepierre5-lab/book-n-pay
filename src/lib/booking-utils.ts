@@ -120,16 +120,43 @@ export function calcTrustScore(
   return { score, total, honored, noShows, level, levelColor, levelIcon };
 }
 
-// ── Timezone helpers (Vercel tourne en UTC, les dates stockées sont heure de Paris) ──
+// ── Timezone helpers (les dates stockées sont heure de Paris) ──
 // Interprète "YYYY-MM-DD" + "HH:MM" comme heure Europe/Paris et renvoie un Date UTC.
+//
+// ⚠️ Doit rester correct QUEL QUE SOIT le fuseau système du runtime qui
+// l'exécute — Vercel tourne en UTC, mais depuis que cette fonction est aussi
+// appelée côté navigateur (EquipeManager.tsx, AgendaView.tsx), le fuseau
+// d'exécution est celui de l'utilisateur, typiquement Europe/Paris pour un
+// pro français. L'ancienne implémentation (`toLocaleString` puis
+// `new Date(chaîne)`) supposait implicitement que le fuseau système était
+// UTC — `new Date()` sur une chaîne sans offset explicite est interprétée
+// dans le fuseau LOCAL du runtime, pas en UTC. Résultat : correcte sur
+// Vercel par coïncidence, silencieusement fausse (aucun décalage appliqué)
+// dans un navigateur réglé sur Europe/Paris. `Intl.DateTimeFormat` avec un
+// `timeZone` explicite ne dépend jamais du fuseau système — c'est la seule
+// primitive fiable ici, donc utilisée pour lire l'offset réel plutôt que de
+// le déduire d'un re-parsing de chaîne.
 export function parseParisDatetime(date: string, time: string): Date {
   const [year, month, day] = date.split('-').map(Number);
   const [hour, minute] = time.split(':').map(Number);
-  const utcCandidate = new Date(Date.UTC(year, month - 1, day, hour, minute));
-  const parisCandidate = new Date(
-    utcCandidate.toLocaleString('en-US', { timeZone: 'Europe/Paris' })
-  );
-  return new Date(utcCandidate.getTime() + (utcCandidate.getTime() - parisCandidate.getTime()));
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute));
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris',
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(utcGuess);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)!.value);
+  // Intl rend parfois l'heure 24 pour minuit selon l'environnement — normalisé à 0.
+  const parisHour = get('hour') % 24;
+  const parisWallClockAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), parisHour, get('minute'), get('second'));
+
+  // Écart entre l'heure murale Paris de cet instant et l'heure murale UTC
+  // devinée au départ = décalage horaire réel à ce moment (+2h CEST été,
+  // +1h CET hiver). Appliqué en sens inverse pour obtenir le vrai instant UTC.
+  const offsetMs = parisWallClockAsUtc - utcGuess.getTime();
+  return new Date(utcGuess.getTime() - offsetMs);
 }
 
 // Renvoie la date de demain au format "YYYY-MM-DD" selon l'heure de Paris.

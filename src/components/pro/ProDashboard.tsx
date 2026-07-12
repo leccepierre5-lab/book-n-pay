@@ -174,6 +174,12 @@ export default function ProDashboard({
               Prestations
             </Link>
             <Link
+              href="/pro/planning"
+              className="flex items-center gap-1.5 rounded-xl bg-navy-900 border border-white/[0.08] px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:border-white/15 transition-all"
+            >
+              Planning
+            </Link>
+            <Link
               href="/pro/equipe"
               className="flex items-center gap-1.5 rounded-xl bg-navy-900 border border-white/[0.08] px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:border-white/15 transition-all"
             >
