@@ -49,7 +49,7 @@ export default function RegisterForm() {
 
     if (!res.ok) {
       if (res.status === 409) {
-        setError('Cet email est déjà associé à un compte.');
+        setError(data.error || 'Ce compte existe déjà. Connectez-vous ou utilisez un autre email.');
         setLoading(false);
         setTimeout(() => router.push(`/connexion?email=${encodeURIComponent(email)}`), 1800);
         return;

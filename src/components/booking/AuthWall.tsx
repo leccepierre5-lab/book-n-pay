@@ -36,7 +36,7 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
         const body = await res.json();
         if (!res.ok) {
           if (res.status === 409) {
-            setError('Cet email est déjà associé à un compte.');
+            setError(body.error || 'Ce compte existe déjà. Connectez-vous ou utilisez un autre email.');
             setMode('login');
             setPassword('');
           } else {

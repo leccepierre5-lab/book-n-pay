@@ -57,9 +57,21 @@ export async function POST(req: NextRequest) {
     });
 
     if (linkError) {
-      // Si l'email est déjà enregistré et confirmé, on renvoie une erreur claire
-      if (linkError.message?.toLowerCase().includes('already registered')) {
-        return NextResponse.json({ error: 'Cet email est déjà utilisé.' }, { status: 409 });
+      // Si l'email est déjà enregistré, on renvoie une erreur claire plutôt que de
+      // laisser tomber sur le générique de logAndRespondAuthError. `.code` est le
+      // contrat structuré de GoTrue (voir node_modules/@supabase/auth-js/dist/module/lib/error-codes.d.ts) —
+      // plus fiable que le message texte, dont le libellé exact ("already been
+      // registered", pas juste "already registered") faisait échouer l'ancien
+      // `.includes('already registered')` et retombait sur le message générique.
+      const isEmailExists =
+        linkError.code === 'email_exists' ||
+        linkError.code === 'user_already_exists' ||
+        linkError.message?.toLowerCase().includes('already registered');
+      if (isEmailExists) {
+        return NextResponse.json(
+          { error: 'Ce compte existe déjà. Connectez-vous ou utilisez un autre email.' },
+          { status: 409 }
+        );
       }
       return logAndRespondAuthError('[register] Erreur generateLink:', linkError);
     }
