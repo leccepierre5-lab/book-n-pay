@@ -103,21 +103,26 @@ export function computeStaffAvailability(
       for (const st of staff) {
         const staffSchedules = schedulesByStaff.get(st.id) ?? [];
 
-        let workStart: number;
-        let workEnd: number;
+        let covered: boolean;
 
         if (staffSchedules.length === 0) {
           // Aucun horaire configuré pour ce praticien → fallback horaires business (décision actée)
-          workStart = toMinutes(businessOpenTime);
-          workEnd = toMinutes(businessCloseTime);
+          const workStart = toMinutes(businessOpenTime);
+          const workEnd = toMinutes(businessCloseTime);
+          covered = slotStart >= workStart && slotEnd <= workEnd;
         } else {
-          const today = staffSchedules.find((s) => s.day_of_week === dayOfWeek);
-          if (!today) continue; // a des horaires configurés, mais pas ce jour-là → jour off
-          workStart = toMinutes(today.open_time);
-          workEnd = toMinutes(today.close_time);
+          const todayRanges = staffSchedules.filter((s) => s.day_of_week === dayOfWeek);
+          if (todayRanges.length === 0) continue; // a des horaires configurés, mais pas ce jour-là → jour off
+          // Horaires coupés (ex. 9h-12h / 14h-18h) : le créneau doit tenir
+          // entièrement dans AU MOINS UNE des plages du jour, pas à cheval
+          // sur deux (ex. 11h30-12h30 sur une pause déjeuner 12h-14h n'est
+          // couvert par aucune des deux plages prise isolément).
+          covered = todayRanges.some(
+            (r) => slotStart >= toMinutes(r.open_time) && slotEnd <= toMinutes(r.close_time)
+          );
         }
 
-        if (slotStart < workStart || slotEnd > workEnd) continue;
+        if (!covered) continue;
 
         const staffBookings = bookingsByStaff.get(st.id) ?? [];
         const isBusy = staffBookings.some((b) => {

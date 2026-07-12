@@ -157,8 +157,22 @@ export default function EquipeManager({
     });
   };
 
-  const updateScheduleTime = (day: number, field: 'open_time' | 'close_time', value: string) => {
-    setSchedules((prev) => prev.map((s) => s.day_of_week === day ? { ...s, [field]: value } : s));
+  // Cible une plage précise par son index dans schedules (pas par day_of_week
+  // seul, qui n'identifie plus une plage unique depuis les horaires coupés).
+  const updateScheduleTime = (index: number, field: 'open_time' | 'close_time', value: string) => {
+    setSchedules((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+  };
+
+  // Ajoute une 2e (ou 3e...) plage pour un jour déjà actif — ex. pause
+  // déjeuner. Défaut volontairement distinct de la 1ère plage (09:00 par
+  // défaut) pour ne pas créer un chevauchement immédiat que le pro devrait
+  // corriger avant de pouvoir enregistrer quoi que ce soit.
+  const addScheduleRange = (day: number) => {
+    setSchedules((prev) => [...prev, { day_of_week: day, open_time: '14:00', close_time: '18:00' }]);
+  };
+
+  const removeScheduleRange = (index: number) => {
+    setSchedules((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveSchedules = async (staffId: string) => {
@@ -325,15 +339,41 @@ export default function EquipeManager({
                   );
                 })}
               </div>
-              {/* Horaires par jour */}
+              {/* Horaires par jour — plusieurs plages possibles (ex. horaires coupés) */}
               {JOURS.filter(({ value }) => schedules.some((s) => s.day_of_week === value)).map(({ label, value }) => {
-                const sched = schedules.find((s) => s.day_of_week === value)!;
+                // Trié par heure de début à l'affichage, indépendamment de
+                // l'ordre de saisie (le pro peut ajouter 14h-18h avant 9h-12h).
+                const dayRanges = schedules
+                  .map((s, index) => ({ ...s, index }))
+                  .filter((s) => s.day_of_week === value)
+                  .sort((a, b) => a.open_time.localeCompare(b.open_time));
                 return (
-                  <div key={value} className="flex items-center gap-3">
-                    <span className="w-8 text-xs text-slate-400 text-center">{label}</span>
-                    <input type="time" value={sched.open_time} onChange={(e) => updateScheduleTime(value, 'open_time', e.target.value)} className="flex-1 rounded-xl bg-white/[0.06] border border-white/[0.08] px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-mint-500/40" />
-                    <span className="text-slate-600 text-xs">→</span>
-                    <input type="time" value={sched.close_time} onChange={(e) => updateScheduleTime(value, 'close_time', e.target.value)} className="flex-1 rounded-xl bg-white/[0.06] border border-white/[0.08] px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-mint-500/40" />
+                  <div key={value} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400">{label}</span>
+                      <button
+                        type="button"
+                        onClick={() => addScheduleRange(value)}
+                        className="text-xs text-mint-400 hover:text-mint-300 transition-colors"
+                      >
+                        + Ajouter une plage
+                      </button>
+                    </div>
+                    {dayRanges.map((r) => (
+                      <div key={r.index} className="flex items-center gap-3">
+                        <input type="time" value={r.open_time} onChange={(e) => updateScheduleTime(r.index, 'open_time', e.target.value)} className="flex-1 rounded-xl bg-white/[0.06] border border-white/[0.08] px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-mint-500/40" />
+                        <span className="text-slate-600 text-xs">→</span>
+                        <input type="time" value={r.close_time} onChange={(e) => updateScheduleTime(r.index, 'close_time', e.target.value)} className="flex-1 rounded-xl bg-white/[0.06] border border-white/[0.08] px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-mint-500/40" />
+                        <button
+                          type="button"
+                          onClick={() => removeScheduleRange(r.index)}
+                          className="px-1.5 text-red-400 hover:text-red-300 text-xs transition-colors"
+                          title="Supprimer cette plage"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 );
               })}

@@ -37,8 +37,13 @@ export async function GET(
   return NextResponse.json({ schedules: data ?? [] });
 }
 
+const DAY_LABELS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+
 // PUT /api/pro/staff/[id]/schedule — remplace tous les horaires d'un praticien
 // Body : { schedules: [{ day_of_week: 1, open_time: "09:00", close_time: "18:00" }, ...] }
+// Plusieurs plages par jour sont autorisées (horaires coupés, ex. pause
+// déjeuner) depuis la migration 0031 — d'où la validation anti-chevauchement
+// ci-dessous, absente avant qu'un même jour ne puisse porter qu'une plage.
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -65,6 +70,31 @@ export async function PUT(
     }
     if (s.open_time >= s.close_time) {
       return NextResponse.json({ error: 'open_time doit être avant close_time' }, { status: 400 });
+    }
+  }
+
+  // Anti-chevauchement : deux plages du même jour ne doivent pas se recouper
+  // (ex. 9h-12h et 11h-14h). Erreur explicite nommant les deux plages en
+  // conflit — pas de fusion automatique, le pro corrige lui-même.
+  const rangesByDay = new Map<number, { open_time: string; close_time: string }[]>();
+  for (const s of schedules) {
+    const list = rangesByDay.get(s.day_of_week) ?? [];
+    list.push(s);
+    rangesByDay.set(s.day_of_week, list);
+  }
+  for (const [day, ranges] of rangesByDay) {
+    const sorted = [...ranges].sort((a, b) => a.open_time.localeCompare(b.open_time));
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const curr = sorted[i];
+      if (curr.open_time < prev.close_time) {
+        return NextResponse.json(
+          {
+            error: `Le ${DAY_LABELS[day]} : les plages ${prev.open_time}-${prev.close_time} et ${curr.open_time}-${curr.close_time} se chevauchent`,
+          },
+          { status: 400 }
+        );
+      }
     }
   }
 
