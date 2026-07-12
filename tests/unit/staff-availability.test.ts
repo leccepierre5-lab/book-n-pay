@@ -6,7 +6,8 @@
 // dispo calculée par praticien plutôt qu'un horaire global d'établissement
 // (pendant que l'un mange, un autre continue de travailler).
 import { describe, it, expect } from 'vitest';
-import { computeStaffAvailability, type StaffScheduleRow, type StaffAvailabilityParams } from '@/lib/staff-availability';
+import { computeStaffAvailability, type StaffScheduleRow, type StaffAbsenceRow, type StaffAvailabilityParams } from '@/lib/staff-availability';
+import { parseParisDatetime } from '@/lib/booking-utils';
 
 const DATE = '2026-07-13';
 const DAY_OF_WEEK = new Date(DATE + 'T12:00:00').getDay();
@@ -22,6 +23,7 @@ function baseParams(overrides: Partial<StaffAvailabilityParams> = {}): StaffAvai
     staff: [],
     schedules: [],
     existingBookings: [],
+    absences: [],
     ...overrides,
   };
 }
@@ -121,5 +123,126 @@ describe('computeStaffAvailability — pauses décalées entre praticiens (scén
     const result = computeStaffAvailability(baseParams({ staff, schedules, durationMinutes: 30 }));
     expect(result['10:00'].freeCount).toBe(2);
     expect([...result['10:00'].freeStaffIds].sort()).toEqual(['A', 'B']);
+  });
+});
+
+describe('computeStaffAvailability — congés/absences ponctuelles (staff_absences, migration 0032)', () => {
+  // Praticien 'a' sans staff_schedules configuré → fallback horaires business
+  // (09:00-18:00, voir describe précédent). Absence plage horaire précise :
+  // 13h00 → 15h00 Paris sur DATE. Construite via parseParisDatetime (le même
+  // helper que computeStaffAvailability utilise en interne) plutôt qu'un ISO
+  // écrit à la main, pour ne pas dépendre d'un décalage UTC/Paris supposé
+  // (CEST l'été, CET l'hiver).
+  const absenceApresMidi: StaffAbsenceRow[] = [
+    {
+      staff_id: 'a',
+      start_at: parseParisDatetime(DATE, '13:00').toISOString(),
+      end_at: parseParisDatetime(DATE, '15:00').toISOString(),
+    },
+  ];
+
+  it('créneau avant l\'absence → disponible', () => {
+    const result = computeStaffAvailability(
+      baseParams({ staff: [{ id: 'a', name: 'A' }], absences: absenceApresMidi, durationMinutes: 30 })
+    );
+    expect(result['12:00'].freeStaffIds).toEqual(['a']);
+  });
+
+  it('créneau pendant l\'absence → indisponible', () => {
+    const result = computeStaffAvailability(
+      baseParams({ staff: [{ id: 'a', name: 'A' }], absences: absenceApresMidi, durationMinutes: 30 })
+    );
+    expect(result['13:00'].freeStaffIds).toEqual([]);
+  });
+
+  it('créneau après l\'absence (démarre pile à la fin) → disponible', () => {
+    const result = computeStaffAvailability(
+      baseParams({ staff: [{ id: 'a', name: 'A' }], absences: absenceApresMidi, durationMinutes: 30 })
+    );
+    expect(result['15:00'].freeStaffIds).toEqual(['a']);
+  });
+
+  it('créneau à cheval sur le DÉBUT de l\'absence (démarre avant, déborde dedans) → indisponible', () => {
+    // 60 min à partir de 12h30 → 12h30-13h30, chevauche le début (13h00) de l'absence.
+    const result = computeStaffAvailability(
+      baseParams({ staff: [{ id: 'a', name: 'A' }], absences: absenceApresMidi, durationMinutes: 60 })
+    );
+    expect(result['12:30'].freeStaffIds).toEqual([]);
+  });
+
+  it('créneau à cheval sur la FIN de l\'absence (démarre dedans, déborde après) → indisponible', () => {
+    // 60 min à partir de 14h30 → 14h30-15h30, chevauche la fin (15h00) de l'absence.
+    const result = computeStaffAvailability(
+      baseParams({ staff: [{ id: 'a', name: 'A' }], absences: absenceApresMidi, durationMinutes: 60 })
+    );
+    expect(result['14:30'].freeStaffIds).toEqual([]);
+  });
+
+  it('absence "journée entière" (00:00 → 23:59 Paris) → tous les créneaux du jour indisponibles', () => {
+    const absenceJourneeEntiere: StaffAbsenceRow[] = [
+      {
+        staff_id: 'a',
+        start_at: parseParisDatetime(DATE, '00:00').toISOString(),
+        end_at: parseParisDatetime(DATE, '23:59').toISOString(),
+      },
+    ];
+    const result = computeStaffAvailability(
+      baseParams({ staff: [{ id: 'a', name: 'A' }], absences: absenceJourneeEntiere, durationMinutes: 30 })
+    );
+    expect(result['09:00'].freeStaffIds).toEqual([]);
+    expect(result['17:00'].freeStaffIds).toEqual([]);
+  });
+
+  it('absence multi-jours qui chevauche minuit (commence la veille, finit le lendemain) → jour intermédiaire entièrement indisponible', () => {
+    // Valide la raison d'être de start_at/end_at en TIMESTAMPTZ plutôt qu'en
+    // minutes locales : une période qui traverse minuit doit rester détectée.
+    const veille = parseParisDatetime(DATE, '00:00');
+    veille.setUTCDate(veille.getUTCDate() - 1);
+    const lendemain = parseParisDatetime(DATE, '00:00');
+    lendemain.setUTCDate(lendemain.getUTCDate() + 2);
+    const absenceMultiJours: StaffAbsenceRow[] = [
+      { staff_id: 'a', start_at: veille.toISOString(), end_at: lendemain.toISOString() },
+    ];
+    const result = computeStaffAvailability(
+      baseParams({ staff: [{ id: 'a', name: 'A' }], absences: absenceMultiJours, durationMinutes: 30 })
+    );
+    expect(result['09:00'].freeStaffIds).toEqual([]);
+  });
+
+  it('un seul praticien absent parmi deux → l\'autre reste proposé (au moins 1 libre suffit)', () => {
+    const staff = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+    const result = computeStaffAvailability(
+      baseParams({ staff, absences: absenceApresMidi, durationMinutes: 30 })
+    );
+    expect(result['13:00'].freeStaffIds).toEqual(['b']);
+    expect(result['13:00'].freeCount).toBe(1);
+  });
+
+  it('verrou anti-débordement de fuseau : "journée entière le 15 août" (Paris, été → UTC+2) ne déborde ni sur le 14 ni sur le 16', () => {
+    // Reproduit exactement la saisie du pro dans EquipeManager.tsx : le
+    // toggle "Journée entière" pré-remplit 00:00 → 23:59 en heure de Paris,
+    // converti en UTC via parseParisDatetime avant stockage. En août (CEST,
+    // UTC+2), ça donne 14/08 22:00 UTC → 15/08 21:59 UTC — si le code
+    // comparait par erreur en UTC naïf (sans repasser par parseParisDatetime
+    // côté créneau), ce test détecterait un débordement d'1h de part et
+    // d'autre.
+    const absence15Aout: StaffAbsenceRow[] = [
+      {
+        staff_id: 'a',
+        start_at: parseParisDatetime('2026-08-15', '00:00').toISOString(),
+        end_at: parseParisDatetime('2026-08-15', '23:59').toISOString(),
+      },
+    ];
+    const staff = [{ id: 'a', name: 'A' }];
+    const paramsFor = (date: string) =>
+      baseParams({ date, staff, absences: absence15Aout, durationMinutes: 30 });
+
+    const veille = computeStaffAvailability(paramsFor('2026-08-14'));
+    const jourJ = computeStaffAvailability(paramsFor('2026-08-15'));
+    const lendemain = computeStaffAvailability(paramsFor('2026-08-16'));
+
+    expect(veille['10:00'].freeStaffIds).toEqual(['a']); // 14 août 10h Paris → disponible
+    expect(jourJ['10:00'].freeStaffIds).toEqual([]); // 15 août 10h Paris → indisponible
+    expect(lendemain['10:00'].freeStaffIds).toEqual(['a']); // 16 août 10h Paris → disponible
   });
 });

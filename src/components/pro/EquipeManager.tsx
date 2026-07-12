@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { parseParisDatetime, getParisDateOffsetStr } from '@/lib/booking-utils';
 
 const JOURS = [
   { label: 'Dim', value: 0 },
@@ -27,7 +28,49 @@ interface Schedule {
   close_time: string;
 }
 
-type Panel = 'none' | 'add' | { type: 'edit'; staff: StaffMember } | { type: 'schedule'; staff: StaffMember };
+interface Absence {
+  id: string;
+  start_at: string;
+  end_at: string;
+  reason: string | null;
+}
+
+type Panel =
+  | 'none'
+  | 'add'
+  | { type: 'edit'; staff: StaffMember }
+  | { type: 'schedule'; staff: StaffMember }
+  | { type: 'absences'; staff: StaffMember };
+
+// "Journée entière" = 00:00 → 23:59 Paris, choisi par convention plutôt que
+// 00:00 → 00:00 (durée nulle, rejetée par le CHECK end_at > start_at côté DB).
+const FULL_DAY_START = '00:00';
+const FULL_DAY_END = '23:59';
+
+// Formate une absence pour l'affichage — masque les heures si elle correspond
+// exactement à une plage "journée entière" (00:00 → 23:59 Paris), les montre
+// sinon (cas plage horaire précise, ex. après-midi).
+function formatAbsenceRange(a: Absence): string {
+  const start = new Date(a.start_at);
+  const end = new Date(a.end_at);
+  const timeFmt = (d: Date) =>
+    d.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false });
+  const dateFmt = (d: Date) =>
+    d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'short' });
+
+  const startTime = timeFmt(start);
+  const endTime = timeFmt(end);
+  const startDateStr = dateFmt(start);
+  const endDateStr = dateFmt(end);
+  const isFullDay = startTime === FULL_DAY_START && endTime === FULL_DAY_END;
+
+  if (isFullDay) {
+    return startDateStr === endDateStr ? startDateStr : `${startDateStr} → ${endDateStr}`;
+  }
+  return startDateStr === endDateStr
+    ? `${startDateStr}, ${startTime}-${endTime}`
+    : `${startDateStr} ${startTime} → ${endDateStr} ${endTime}`;
+}
 
 export default function EquipeManager({
   bizId: _bizId,
@@ -58,6 +101,17 @@ export default function EquipeManager({
   const [schedulesLoading, setSchedulesLoading] = useState(false);
   const [schedulesSaving, setSchedulesSaving] = useState(false);
 
+  // Formulaire absences
+  const [absences, setAbsences] = useState<Absence[]>([]);
+  const [absencesLoading, setAbsencesLoading] = useState(false);
+  const [absencesSaving, setAbsencesSaving] = useState(false);
+  const [absenceFullDay, setAbsenceFullDay] = useState(true);
+  const [absenceDateDebut, setAbsenceDateDebut] = useState('');
+  const [absenceHeureDebut, setAbsenceHeureDebut] = useState('09:00');
+  const [absenceDateFin, setAbsenceDateFin] = useState('');
+  const [absenceHeureFin, setAbsenceHeureFin] = useState('18:00');
+  const [absenceReason, setAbsenceReason] = useState('');
+
   const openAdd = () => {
     setAddName(''); setAddRole(''); setAddEmoji('');
     setError('');
@@ -82,6 +136,71 @@ export default function EquipeManager({
       setSchedules(data.schedules ?? []);
     } catch { setError('Impossible de charger les horaires'); }
     finally { setSchedulesLoading(false); }
+  };
+
+  const openAbsences = async (s: StaffMember) => {
+    setPanel({ type: 'absences', staff: s });
+    setAbsencesLoading(true);
+    setError('');
+    const today = getParisDateOffsetStr(0);
+    setAbsenceDateDebut(today);
+    setAbsenceDateFin(today);
+    setAbsenceFullDay(true);
+    setAbsenceHeureDebut('09:00');
+    setAbsenceHeureFin('18:00');
+    setAbsenceReason('');
+    try {
+      const res = await fetch(`/api/pro/staff/${s.id}/absences`);
+      const data = await res.json();
+      setAbsences(data.absences ?? []);
+    } catch { setError('Impossible de charger les absences'); }
+    finally { setAbsencesLoading(false); }
+  };
+
+  // Repousse la date de fin si elle devient antérieure à la nouvelle date de
+  // début (le pro déplace le début après avoir déjà réfléchi à la fin).
+  const handleAbsenceDateDebutChange = (value: string) => {
+    setAbsenceDateDebut(value);
+    setAbsenceDateFin((prev) => (prev && prev < value ? value : prev));
+  };
+
+  const handleAddAbsence = async (staffId: string) => {
+    setError('');
+    const heureDebut = absenceFullDay ? FULL_DAY_START : absenceHeureDebut;
+    const heureFin = absenceFullDay ? FULL_DAY_END : absenceHeureFin;
+    const startAt = parseParisDatetime(absenceDateDebut, heureDebut);
+    const endAt = parseParisDatetime(absenceDateFin, heureFin);
+    if (endAt.getTime() <= startAt.getTime()) {
+      setError('La date/heure de fin doit être après le début');
+      return;
+    }
+    setAbsencesSaving(true);
+    try {
+      const res = await fetch(`/api/pro/staff/${staffId}/absences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_at: startAt.toISOString(),
+          end_at: endAt.toISOString(),
+          reason: absenceReason.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Erreur serveur'); return; }
+      setAbsences((prev) => [...prev, data.absence].sort((a, b) => a.start_at.localeCompare(b.start_at)));
+      setAbsenceReason('');
+    } catch { setError('Erreur réseau'); }
+    finally { setAbsencesSaving(false); }
+  };
+
+  const handleDeleteAbsence = async (staffId: string, absenceId: string) => {
+    setError('');
+    try {
+      const res = await fetch(`/api/pro/staff/${staffId}/absences/${absenceId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Erreur serveur'); return; }
+      setAbsences((prev) => prev.filter((a) => a.id !== absenceId));
+    } catch { setError('Erreur réseau'); }
   };
 
   const handleAdd = async () => {
@@ -229,6 +348,13 @@ export default function EquipeManager({
                 title="Horaires"
               >
                 🕐
+              </button>
+              <button
+                onClick={() => openAbsences(s)}
+                className="px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+                title="Absences"
+              >
+                🌴
               </button>
               <button
                 onClick={() => openEdit(s)}
@@ -384,6 +510,140 @@ export default function EquipeManager({
             <button onClick={() => { setPanel('none'); setError(''); }} className="flex-1 rounded-xl border border-white/[0.08] py-2 text-sm text-slate-400 hover:text-white transition-colors">Annuler</button>
             <button onClick={() => handleSaveSchedules(panel.staff.id)} disabled={schedulesSaving || schedulesLoading} className="flex-1 rounded-xl bg-mint-500 py-2 text-sm font-semibold text-navy-950 hover:bg-mint-400 disabled:opacity-50 transition-colors">
               {schedulesSaving ? 'Enregistrement...' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Panneau absences */}
+      {panel !== 'none' && panel !== 'add' && panel.type === 'absences' && (
+        <div className="rounded-2xl border border-white/[0.08] bg-navy-900/60 px-5 py-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-white">Absences de {panel.staff.name}</h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Congés, maladie, formation... Ces périodes rendent {panel.staff.name} indisponible à la réservation, par-dessus ses horaires habituels.
+            </p>
+          </div>
+
+          {absencesLoading ? (
+            <p className="text-sm text-slate-500 text-center py-4">Chargement…</p>
+          ) : (
+            <div className="space-y-4">
+              {/* Liste des absences existantes */}
+              {absences.length > 0 ? (
+                <div className="space-y-1.5">
+                  {absences.map((a) => {
+                    const past = new Date(a.end_at).getTime() < Date.now();
+                    return (
+                      <div
+                        key={a.id}
+                        className={`flex items-center justify-between gap-2 rounded-xl bg-white/[0.04] px-3 py-2 ${past ? 'opacity-50' : ''}`}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs text-white truncate">{formatAbsenceRange(a)}</p>
+                          {a.reason && <p className="text-[11px] text-slate-500 truncate">{a.reason}</p>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAbsence(panel.staff.id, a.id)}
+                          className="px-1.5 text-red-400 hover:text-red-300 text-xs transition-colors flex-shrink-0"
+                          title="Supprimer cette absence"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">Aucune absence déclarée.</p>
+              )}
+
+              {/* Formulaire d'ajout */}
+              <div className="space-y-2.5 pt-3 border-t border-white/[0.06]">
+                <label className="flex items-center gap-2 text-xs text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={absenceFullDay}
+                    onChange={(e) => setAbsenceFullDay(e.target.checked)}
+                    className="rounded"
+                  />
+                  Journée(s) entière(s)
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={absenceDateDebut}
+                    min={getParisDateOffsetStr(0)}
+                    onChange={(e) => handleAbsenceDateDebutChange(e.target.value)}
+                    className="flex-1 rounded-xl bg-white/[0.06] border border-white/[0.08] px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-mint-500/40"
+                  />
+                  {!absenceFullDay && (
+                    <input
+                      type="time"
+                      value={absenceHeureDebut}
+                      onChange={(e) => setAbsenceHeureDebut(e.target.value)}
+                      className="w-24 rounded-xl bg-white/[0.06] border border-white/[0.08] px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-mint-500/40"
+                    />
+                  )}
+                </div>
+                <div className="text-center text-slate-600 text-xs">→</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={absenceDateFin}
+                    min={absenceDateDebut || getParisDateOffsetStr(0)}
+                    onChange={(e) => setAbsenceDateFin(e.target.value)}
+                    className="flex-1 rounded-xl bg-white/[0.06] border border-white/[0.08] px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-mint-500/40"
+                  />
+                  {!absenceFullDay && (
+                    <input
+                      type="time"
+                      value={absenceHeureFin}
+                      onChange={(e) => setAbsenceHeureFin(e.target.value)}
+                      className="w-24 rounded-xl bg-white/[0.06] border border-white/[0.08] px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-mint-500/40"
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    value={absenceReason}
+                    onChange={(e) => setAbsenceReason(e.target.value)}
+                    placeholder="Motif (optionnel)"
+                    className="w-full rounded-xl bg-white/[0.06] border border-white/[0.08] px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-mint-500/40"
+                  />
+                  <div className="flex gap-1.5 mt-1.5">
+                    {['Congé', 'Maladie', 'Formation'].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => setAbsenceReason(suggestion)}
+                        className="px-2 py-1 rounded-lg text-[11px] bg-white/[0.04] text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleAddAbsence(panel.staff.id)}
+                  disabled={absencesSaving || !absenceDateDebut || !absenceDateFin}
+                  className="w-full rounded-xl bg-mint-500 py-2 text-sm font-semibold text-navy-950 hover:bg-mint-400 disabled:opacity-50 transition-colors"
+                >
+                  {absencesSaving ? 'Ajout...' : '+ Ajouter cette absence'}
+                </button>
+              </div>
+            </div>
+          )}
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => { setPanel('none'); setError(''); }} className="w-full rounded-xl border border-white/[0.08] py-2 text-sm text-slate-400 hover:text-white transition-colors">
+              Fermer
             </button>
           </div>
         </div>

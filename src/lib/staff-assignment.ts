@@ -11,6 +11,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Booking } from './database.types';
 import { computeStaffAvailability } from './staff-availability';
+import { parseParisDatetime } from './booking-utils';
 
 export interface StaffAvailabilityForDay {
   staffRows: { id: string; name: string }[];
@@ -41,7 +42,14 @@ export async function computeStaffAvailabilityForDay(
   const staffIds = (staffRows || []).map((s) => s.id);
   if (staffIds.length === 0) return null;
 
-  const [{ data: bizHours }, { data: scheduleRows }, { data: staffBookingRows }] = await Promise.all([
+  // Bornes de la journée demandée en instants absolus (heure Paris) — la
+  // requête staff_absences filtre sur ces bornes plutôt que sur `date` seule,
+  // car start_at/end_at sont des TIMESTAMPTZ (une absence peut chevaucher
+  // minuit ou s'étendre sur plusieurs jours).
+  const dayStartAt = parseParisDatetime(date, '00:00');
+  const dayEndAt = new Date(dayStartAt.getTime() + 24 * 60 * 60 * 1000);
+
+  const [{ data: bizHours }, { data: scheduleRows }, { data: staffBookingRows }, { data: absenceRows }] = await Promise.all([
     supabase
       .from('businesses')
       .select('open_time, close_time, open_days')
@@ -58,6 +66,12 @@ export async function computeStaffAvailabilityForDay(
       .eq('date', date)
       .neq('status', 'cancelled')
       .in('staff_id', staffIds),
+    supabase
+      .from('staff_absences')
+      .select('staff_id, start_at, end_at')
+      .in('staff_id', staffIds)
+      .lt('start_at', dayEndAt.toISOString())
+      .gt('end_at', dayStartAt.toISOString()),
   ]);
 
   const existingBookings = (staffBookingRows || []).map((b: any) => ({
@@ -75,6 +89,7 @@ export async function computeStaffAvailabilityForDay(
     staff: staffRows || [],
     schedules: scheduleRows || [],
     existingBookings,
+    absences: absenceRows || [],
   });
 
   return { staffRows: staffRows || [], availability };

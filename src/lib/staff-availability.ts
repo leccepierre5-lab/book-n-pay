@@ -1,15 +1,16 @@
 // src/lib/staff-availability.ts
 // Calcul de disponibilité par praticien pour les services individuels
 // (allow_group === false) — un créneau est libre pour N personnes si au moins
-// N praticiens actifs n'ont ni jour off, ni chevauchement de réservation à ce
-// créneau. Logique pure, sans accès réseau : les données sont déjà chargées
-// par l'appelant (route API, ou routes de création côté serveur).
+// N praticiens actifs n'ont ni jour off, ni absence déclarée (staff_absences,
+// migration 0032), ni chevauchement de réservation à ce créneau. Logique
+// pure, sans accès réseau : les données sont déjà chargées par l'appelant
+// (route API, ou routes de création côté serveur).
 //
 // Ne concerne pas les services collectifs (cours, allow_group === true), qui
 // gardent le calcul d'occupation par tête existant (guestsAtSlot / counts
 // dans availability/route.ts) — un praticien/une salle y sert plusieurs
 // personnes en même temps, ce n'est pas le même mécanisme.
-import { generateSlots, isSlotClosed } from './booking-utils';
+import { generateSlots, isSlotClosed, parseParisDatetime } from './booking-utils';
 
 export interface StaffRow {
   id: string;
@@ -32,6 +33,18 @@ export interface StaffBookingRow {
   duration_minutes: number;
 }
 
+// Congé/absence ponctuelle d'un praticien (staff_absences, migration 0032).
+// start_at/end_at sont des instants absolus (TIMESTAMPTZ, chaînes ISO) — pas
+// des minutes locales comme StaffScheduleRow/StaffBookingRow, car une absence
+// peut chevaucher minuit ou s'étendre sur plusieurs jours. `reason` n'est pas
+// repris ici : sans impact sur le calcul de disponibilité, seulement affiché
+// dans la future vue planning (voir StaffAbsences côté API pour la valeur).
+export interface StaffAbsenceRow {
+  staff_id: string;
+  start_at: string;
+  end_at: string;
+}
+
 export interface StaffAvailabilityParams {
   date: string; // "YYYY-MM-DD"
   durationMinutes: number; // durée du service demandé
@@ -41,6 +54,7 @@ export interface StaffAvailabilityParams {
   staff: StaffRow[]; // déjà filtré is_active = true par l'appelant
   schedules: StaffScheduleRow[]; // toutes les lignes staff_schedules des praticiens ci-dessus
   existingBookings: StaffBookingRow[]; // réservations actives (status != cancelled) du jour, staff_id non nul
+  absences: StaffAbsenceRow[]; // congés/absences des praticiens ci-dessus chevauchant la journée demandée
 }
 
 export interface SlotAvailability {
@@ -69,6 +83,7 @@ export function computeStaffAvailability(
     staff,
     schedules,
     existingBookings,
+    absences,
   } = params;
 
   const result: Record<string, SlotAvailability> = {};
@@ -91,6 +106,13 @@ export function computeStaffAvailability(
     bookingsByStaff.set(b.staff_id, list);
   }
 
+  const absencesByStaff = new Map<string, StaffAbsenceRow[]>();
+  for (const a of absences) {
+    const list = absencesByStaff.get(a.staff_id) ?? [];
+    list.push(a);
+    absencesByStaff.set(a.staff_id, list);
+  }
+
   const bizHoraires = { open_time: businessOpenTime, close_time: businessCloseTime, open_days: businessOpenDays };
 
   for (const slot of slots) {
@@ -99,6 +121,12 @@ export function computeStaffAvailability(
     if (!isSlotClosed(bizHoraires, date, slot)) {
       const slotStart = toMinutes(slot);
       const slotEnd = slotStart + durationMinutes;
+      // Instants absolus du créneau (pas des minutes locales) pour comparer
+      // avec start_at/end_at (TIMESTAMPTZ) — nécessaire pour une absence qui
+      // chevauche minuit ou s'étend sur plusieurs jours, ce que des minutes
+      // "depuis minuit sur `date`" seules ne peuvent pas représenter.
+      const slotStartAt = parseParisDatetime(date, slot).getTime();
+      const slotEndAt = slotStartAt + durationMinutes * 60_000;
 
       for (const st of staff) {
         const staffSchedules = schedulesByStaff.get(st.id) ?? [];
@@ -123,6 +151,14 @@ export function computeStaffAvailability(
         }
 
         if (!covered) continue;
+
+        const staffAbsences = absencesByStaff.get(st.id) ?? [];
+        const isAbsent = staffAbsences.some((a) => {
+          const abStart = new Date(a.start_at).getTime();
+          const abEnd = new Date(a.end_at).getTime();
+          return slotStartAt < abEnd && slotEndAt > abStart;
+        });
+        if (isAbsent) continue;
 
         const staffBookings = bookingsByStaff.get(st.id) ?? [];
         const isBusy = staffBookings.some((b) => {
