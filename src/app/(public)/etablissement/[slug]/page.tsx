@@ -21,6 +21,11 @@ const CATEGORY_ICONS: Record<string, string> = {
 const formatType = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const lowerFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
+// Convention day_of_week (0=Dim, 1=Lun…6=Sam, JS getDay()) — voir database.types.ts.
+// Affiché en ordre de lecture Lun→Dim, cohérent avec StepDateTime.tsx/ProCalendar.tsx.
+const DAY_LABELS: Record<number, string> = { 0: 'Dim', 1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam' };
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
 export async function generateMetadata({
   params,
 }: {
@@ -169,6 +174,22 @@ export default async function EtablissementPage({
               📞 {business.phone}
             </a>
           )}
+        </div>
+      )}
+
+      {/* Horaires — n'affiche que si open_time/close_time renseignés ; open_days
+          peut être vide (time sans days) sans casser le rendu, la liste de
+          jours est alors simplement omise. */}
+      {business.open_time && business.close_time && (
+        <div className="px-4 pt-3 pb-1 flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs text-slate-400 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.08]">
+            🕐 {business.open_time.slice(0, 5)}–{business.close_time.slice(0, 5)}
+            {business.open_days.length > 0 && (
+              <span className="text-slate-500">
+                {' '}· {WEEK_ORDER.filter((d) => business.open_days.includes(d)).map((d) => DAY_LABELS[d]).join(', ')}
+              </span>
+            )}
+          </span>
         </div>
       )}
 
