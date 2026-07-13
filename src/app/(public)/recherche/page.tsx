@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { createServiceRoleClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Recherche' };
-import { searchBusinesses, getAvailableCities, CATEGORIES, type SearchFilters } from '@/lib/queries/catalog';
-import type { FlashSlot } from '@/lib/database.types';
+export const revalidate = 60;
+import {
+  searchBusinesses,
+  getAvailableCities,
+  getActiveFlashSlots,
+  CATEGORIES,
+  type SearchFilters,
+} from '@/lib/queries/catalog';
 import { SearchResults } from './_components/SearchResults';
 import { CityAutocomplete } from './_components/CityAutocomplete';
 import { BusinessNameAutocomplete } from './_components/BusinessNameAutocomplete';
@@ -18,6 +23,16 @@ export default async function SearchPage({
   const { type: _droppedType, ...paramsWithoutTypeRaw } = params;
   const paramsWithoutType = paramsWithoutTypeRaw as Record<string, string>;
 
+  // Changer de catégorie = nouvelle intention de recherche : on garde q (nom
+  // cherché) mais on purge type/maxPrice/minRating pour éviter un 0-résultat
+  // muet dû à des filtres hérités de l'ancienne catégorie.
+  const catBaseParams = (() => {
+    const { type: _t, maxPrice: _mp, minRating: _mr, ...rest } = params as Record<string, string | undefined>;
+    return Object.fromEntries(
+      Object.entries(rest).filter(([, v]) => v != null)
+    ) as Record<string, string>;
+  })();
+
   const filters: SearchFilters = {
     query: params.q,
     category: params.category || 'all',
@@ -27,18 +42,9 @@ export default async function SearchPage({
     minRating: params.minRating ? Number(params.minRating) : undefined,
   };
 
-  const today = new Date().toISOString().split('T')[0];
-  const serviceRole = createServiceRoleClient();
-
-  const [businesses, { data: flashSlots }, cities] = await Promise.all([
+  const [businesses, flashSlots, cities] = await Promise.all([
     searchBusinesses(filters),
-    serviceRole
-      .from('flash_slots')
-      .select('*')
-      .eq('active', true)
-      .gte('date', today)
-      .order('date', { ascending: true })
-      .limit(5),
+    getActiveFlashSlots(),
     getAvailableCities(),
   ]);
 
@@ -83,7 +89,7 @@ export default async function SearchPage({
             {CATEGORIES.map((cat) => (
               <Link
                 key={cat.id}
-                href={`/recherche?${new URLSearchParams({ ...paramsWithoutType, category: cat.id }).toString()}`}
+                href={`/recherche?${new URLSearchParams({ ...catBaseParams, category: cat.id }).toString()}`}
                 className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                   filters.category === cat.id
                     ? 'bg-mint-500 text-navy-950 shadow-[0_0_12px_rgba(52,211,153,0.35)]'
@@ -129,7 +135,7 @@ export default async function SearchPage({
           <div className="mb-6">
             <h2 className="text-xs font-bold tracking-widest text-mint-400/80 uppercase mb-3">⚡ Créneaux flash</h2>
             <div className="flex gap-3 overflow-x-auto pb-1">
-              {(flashSlots as FlashSlot[]).map((slot) => (
+              {flashSlots.map((slot) => (
                 <div
                   key={slot.id}
                   className="shrink-0 rounded-xl bg-navy-900 border border-mint-500/25 p-3.5 min-w-[170px]"

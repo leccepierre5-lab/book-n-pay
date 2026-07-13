@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond } from '@/lib/api-error';
 
@@ -35,6 +36,7 @@ export async function PATCH(
     .single();
 
   if (error) return logAndRespond('[FlashSlots] Erreur update:', error);
+  revalidateTag('flash-slots', { expire: 0 });
   return NextResponse.json(data);
 }
 
@@ -65,5 +67,6 @@ export async function DELETE(
     .eq('biz_id', profile.biz_id!);
 
   if (error) return logAndRespond('[FlashSlots] Erreur suppression:', error);
+  revalidateTag('flash-slots', { expire: 0 });
   return NextResponse.json({ success: true });
 }

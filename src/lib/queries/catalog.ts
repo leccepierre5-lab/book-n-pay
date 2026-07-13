@@ -1,8 +1,9 @@
 // src/lib/queries/catalog.ts
 // Requêtes de lecture publique du catalogue (businesses, services, avis).
 // Utilisables depuis Server Components.
-import { createClient } from '@/lib/supabase/server';
-import type { Business, BusinessPhoto, Service, Staff } from '@/lib/database.types';
+import { unstable_cache } from 'next/cache';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import type { Business, BusinessPhoto, FlashSlot, Service, Staff } from '@/lib/database.types';
 
 export interface BusinessWithDetails extends Business {
   services: Service[];
@@ -101,26 +102,58 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
 // l'autocomplétion du filtre ville (jamais une ville "morte"). Dédupliquée et
 // triée ici (côté serveur) pour renvoyer une liste déjà propre au composant
 // client, plutôt que de lui faire refaire ce travail.
-export async function getAvailableCities(): Promise<string[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('businesses')
-    .select('city')
-    .eq('frozen', false)
-    .eq('is_published', true);
+// Mise en cache 60s : la liste des villes ne dépend pas de la catégorie
+// sélectionnée, inutile de la refetch à chaque changement de filtre sur
+// /recherche. Client service role (pas de cookies()) car unstable_cache
+// interdit les APIs dynamiques dans la fonction cachée.
+export const getAvailableCities = unstable_cache(
+  async (): Promise<string[]> => {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('city')
+      .eq('frozen', false)
+      .eq('is_published', true);
 
-  if (error) {
-    console.error('[getAvailableCities]', error.message);
-    return [];
-  }
+    if (error) {
+      console.error('[getAvailableCities]', error.message);
+      return [];
+    }
 
-  const cities = new Set<string>();
-  for (const row of data as { city: string | null }[]) {
-    const city = row.city?.trim();
-    if (city) cities.add(city);
-  }
-  return Array.from(cities).sort((a, b) => a.localeCompare(b, 'fr'));
-}
+    const cities = new Set<string>();
+    for (const row of data as { city: string | null }[]) {
+      const city = row.city?.trim();
+      if (city) cities.add(city);
+    }
+    return Array.from(cities).sort((a, b) => a.localeCompare(b, 'fr'));
+  },
+  ['available-cities'],
+  { revalidate: 60, tags: ['available-cities'] }
+);
+
+// Créneaux flash actifs à venir — même logique de cache que getAvailableCities,
+// ne dépend pas des filtres de recherche.
+export const getActiveFlashSlots = unstable_cache(
+  async (): Promise<FlashSlot[]> => {
+    const supabase = createServiceRoleClient();
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('flash_slots')
+      .select('*')
+      .eq('active', true)
+      .gte('date', today)
+      .order('date', { ascending: true })
+      .limit(5);
+
+    if (error) {
+      console.error('[getActiveFlashSlots]', error.message);
+      return [];
+    }
+    return (data ?? []) as FlashSlot[];
+  },
+  ['active-flash-slots'],
+  { revalidate: 60, tags: ['flash-slots'] }
+);
 
 export async function getBusinessBySlug(slug: string): Promise<BusinessWithDetails | null> {
   const supabase = await createClient();
