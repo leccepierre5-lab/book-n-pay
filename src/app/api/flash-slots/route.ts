@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond } from '@/lib/api-error';
 
@@ -61,5 +62,6 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return logAndRespond('[FlashSlots] Erreur création:', error);
+  revalidateTag('flash-slots', { expire: 0 });
   return NextResponse.json(data, { status: 201 });
 }
