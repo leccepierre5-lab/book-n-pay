@@ -24,9 +24,15 @@ export interface SearchFilters {
 export async function searchBusinesses(filters: SearchFilters): Promise<BusinessWithDetails[]> {
   const supabase = await createClient();
 
+  // staff(*) volontairement absent : aucun consommateur de /recherche ne lit
+  // biz.staff (vérifié — SearchResults.tsx, BusinessNameAutocomplete.tsx,
+  // CityAutocomplete.tsx, page.tsx), ce join gonflait requête et payload pour
+  // rien. Le filtre défensif `b.staff ?? []` plus bas gère l'absence proprement
+  // (getBusinessBySlug, lui, garde le join — la fiche établissement en a besoin
+  // pour le choix praticien).
   let queryBuilder = supabase
     .from('businesses')
-    .select('*, services(*), staff(*), business_reviews(rating, review_count)');
+    .select('*, services(*), business_reviews(rating, review_count)');
 
   if (filters.category && filters.category !== 'all') {
     if (filters.category === 'autre') {
