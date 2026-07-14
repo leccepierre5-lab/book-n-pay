@@ -36,8 +36,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 // Dérivé de BNP_PLANS (source de vérité unique des prix, src/lib/plans-config.ts)

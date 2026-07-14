@@ -125,9 +125,13 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
   };
 
   const selectedDateStr = selectedDay ? format(selectedDay, 'yyyy-MM-dd') : null;
-  const selectedDayBookings = selectedDay
-    ? bookings.filter((b) => b.date === selectedDateStr).sort((a, b) => a.time.localeCompare(b.time))
-    : [];
+  const selectedDayBookings = useMemo(
+    () =>
+      selectedDay
+        ? bookings.filter((b) => b.date === selectedDateStr).sort((a, b) => a.time.localeCompare(b.time))
+        : [],
+    [selectedDay, selectedDateStr, bookings]
+  );
 
   const dayStats = useMemo(() => {
     if (!selectedDayBookings.length) return null;
