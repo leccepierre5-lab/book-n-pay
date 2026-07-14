@@ -1,8 +1,10 @@
 # TODO — reprise bnp-next
 
-État au 2026-07-14 (fin de session) : working tree clean, `master` local et
-distant synchronisés sur `7debeba`. Décision Sérénité appliquée (commits
-`1f32080`, `9cfb462`). Ménage vestiges terminé (commits `fad4347`, `7debeba`).
+État au 2026-07-14 (fin de session) : working tree clean, `master` local sur
+`1033d32` (2 commits d'avance sur `origin/master` qui reste à `7debeba` —
+push réservé à Pierre). Décision Sérénité appliquée (commits `1f32080`,
+`9cfb462`). Ménage vestiges terminé (commits `fad4347`, `7debeba`). Audit
+sécurité archivé dans `docs/memory/security-audit-2026-07.md` (`1033d32`).
 
 ## Ouvert, par priorité
 
