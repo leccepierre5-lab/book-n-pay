@@ -19,7 +19,6 @@ export default function GroupTimer({ deadline }: { deadline: string }) {
   );
 
   useEffect(() => {
-    if (seconds <= 0) return;
     const id = setInterval(() => {
       setSeconds((s) => {
         if (s <= 1) {
