@@ -22,7 +22,7 @@ export default function CGUPage() {
         </Link>
 
         <h1 className="mb-2 text-2xl font-semibold text-white">CGU/CGV — Book'nPay</h1>
-        <p className="mb-8 text-xs text-white/40">Dernière mise à jour : juin 2026</p>
+        <p className="mb-8 text-xs text-white/40">Dernière mise à jour : juillet 2026</p>
 
         <div className="space-y-7 text-sm leading-relaxed text-white/70">
           <section>
@@ -113,19 +113,19 @@ export default function CGUPage() {
             <div className="mb-3 space-y-2 rounded-xl border border-white/10 bg-white/5 p-4 text-xs">
               <div className="flex items-start gap-2">
                 <span className="shrink-0 font-semibold text-white">Standard</span>
-                <span>(1 à 15 RDV) : 1 Joker annuel (remboursement de 50 % des frais de réservation).</span>
+                <span>(1 à 15 RDV) : 1 Joker annuel (remboursement de 100 % des frais de réservation).</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="shrink-0 font-semibold text-amber-600">Bronze</span>
-                <span>(16 à 30 RDV) : 1 Joker annuel (remboursement de 100 % des frais de réservation).</span>
+                <span>(16 à 30 RDV) : 2 Jokers annuels (remboursement de 100 % des frais de réservation).</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="shrink-0 font-semibold text-gray-300">Argent</span>
-                <span>(31 à 50 RDV) : 2 Jokers annuels (remboursement de 100 % des frais de réservation).</span>
+                <span>(31 à 50 RDV) : 3 Jokers annuels (remboursement de 100 % des frais de réservation).</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="shrink-0 font-semibold text-yellow-300">Gold</span>
-                <span>(+ 50 RDV) : 3 Jokers annuels (remboursement de 100 % des frais de réservation).</span>
+                <span>(+ 50 RDV) : 4 Jokers annuels (remboursement de 100 % des frais de réservation).</span>
               </div>
             </div>
             <p className="mb-2">
