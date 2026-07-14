@@ -59,10 +59,16 @@ alors que la CGU publiée ne lui promet que 50 %.
 
 ## Décision
 
-*(à remplir)*
-
-- Version retenue :
-- Jokers par palier (Standard/Bronze/Argent/Gold) :
-- Taux de remboursement par palier :
-- Date :
-- Notes :
+- Version retenue : Version C — le code en production (`src/lib/booking-utils.ts`).
+- Jokers par palier (Standard/Bronze/Argent/Gold) : 1 / 2 / 3 / 4.
+- Taux de remboursement par palier : 100 % à tous les paliers.
+- Date : 14 juillet 2026.
+- Motif : correction en faveur du client, aucun risque de contestation — la
+  CGU publiée était plus restrictive que ce que le code applique réellement,
+  donc aligner la CGU sur le code ne retire aucun avantage déjà perçu par les
+  utilisateurs.
+- Note : la question de la rétroactivité est explicitement laissée ouverte,
+  à trancher uniquement si un jour la plateforme voulait resserrer la grille
+  (baisser un taux, retirer un Joker). Dans ce cas, deux options à évaluer :
+  alignement immédiat pour tous, ou grandfathering (les clients existants
+  gardent l'ancienne grille, les nouveaux passent à la nouvelle).
