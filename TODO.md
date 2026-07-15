@@ -1,10 +1,12 @@
 # TODO — reprise bnp-next
 
-État au 2026-07-14 (fin de session) : working tree clean, `master` local sur
-`1033d32` (2 commits d'avance sur `origin/master` qui reste à `7debeba` —
-push réservé à Pierre). Décision Sérénité appliquée (commits `1f32080`,
-`9cfb462`). Ménage vestiges terminé (commits `fad4347`, `7debeba`). Audit
-sécurité archivé dans `docs/memory/security-audit-2026-07.md` (`1033d32`).
+État au 2026-07-15 : working tree clean, `master` local et `origin/master`
+synchronisés sur `a849201` (push déjà effectué, plus rien en attente).
+Décision Sérénité appliquée (commits `1f32080`, `9cfb462`). Ménage vestiges
+terminé (commits `fad4347`, `7debeba`). Audit sécurité archivé dans
+`docs/memory/security-audit-2026-07.md` (`1033d32`). Communication CGU
+Sérénité rédigée et archivée dans `docs/comm/serenite-maj-2026-07.md`
+(`a849201`) — statut : à envoyer, pas encore envoyée.
 
 ## Ouvert, par priorité
 
@@ -18,5 +20,3 @@ sécurité archivé dans `docs/memory/security-audit-2026-07.md` (`1033d32`).
    - `checkin-by-qr` — nécessite une session pro authentifiée.
 3. **Suppression de la table `profiles`** — récursion RLS documentée dans
    `SECURITY_TODO.md`, non urgent car fail-fermé.
-4. **Communication utilisateurs de la MAJ CGU** — optionnel, en leur
-   faveur, sans urgence.
