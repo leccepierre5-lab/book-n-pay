@@ -16,11 +16,39 @@ comme ignorée par `rls-check.mjs`). **Retest manuel `forgot-password` et
 (IP et email, données réelles `rate_limits`), mécanisme confirmé actif sur
 `checkin-by-qr` (nuance : blocage effectif à 30/5min non observé, seul le
 comptage par compte pro l'est) — détail dans
-`docs/memory/security-audit-2026-07.md`.
+`docs/memory/security-audit-2026-07.md`. **Volet légal : reconnaissance de
+conformité faite** (mentions légales/RGPD dédié/médiateur/rétractation
+absents, emails sans mentions légales/opt-out — détail dans
+`docs/memory/legal-audit-2026-07-15.md`), **blocage prérequis identifié** :
+RDV CCI Bayonne à prendre par Pierre avant toute rédaction sérieuse.
 
 ## Ouvert, par priorité
 
-1. **Volet légal** (le plus urgent en risque réel) : mentions légales,
-   politique RGPD dédiée, médiateur consommation, relecture avocat. En
-   attente que Pierre rassemble SIREN / adresse / hébergeur / durées de
-   conservation.
+1. **Volet légal** (le plus urgent en risque réel) — reconnaissance de
+   conformité faite le 15/07/2026, détail complet dans
+   `docs/memory/legal-audit-2026-07-15.md`. État factuel :
+   - Mentions légales : **absentes**.
+   - Politique de confidentialité RGPD dédiée : **absente** ; le RGPD dans
+     la CGU (§8) est très incomplet au regard de l'art. 13 (8 lignes, pas
+     de bases légales / durées de conservation / destinataires /
+     transferts hors UE).
+   - Médiateur consommation : **absent**.
+   - Droit de rétractation dans les CGV : **non énoncé** (ni clause ni
+     exclusion motivée).
+   - Emails transactionnels : **pas de mentions légales, pas d'opt-out**.
+   - Case consentement marketing indistincte de l'acceptation CGU (mineur).
+   - CGU/CGV : structurellement solide, Sérénité déjà aligné — pas un
+     point de blocage.
+   - Cookies : aucun tracker détecté dans le code, bandeau probablement
+     non requis (à confirmer côté dashboard Vercel).
+
+   **Blocage prérequis** : Pierre doit prendre RDV avec la CCI de Bayonne
+   (05 59 46 59 46, 50-51 Allées Marines) pour trancher forme juridique,
+   immatriculation, obligations (TVA, comptabilité). Rien de sérieux ne
+   peut se rédiger avant.
+
+   **3 infos clés à récupérer via la CCI** : forme juridique définitive,
+   SIREN, obligations TVA/comptabilité.
+
+   **Médiateur en parallèle** (indépendant du RDV CCI) : choisir entre
+   CM2C / MEDICYS / AME, ~100€/an.
