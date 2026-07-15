@@ -47,6 +47,14 @@ const TABLES = [
   ['staff_absences', 'public'],
 ];
 
+// PostgREST renvoie ce code quand la table n'existe plus dans le schéma —
+// distinct d'un blocage RLS (qui renvoie 0 ligne en 200, ou une autre erreur).
+// Permet de retirer une table de TABLES sans avoir à toucher ce fichier —
+// elle est juste signalée comme absente plutôt que testée pour de faux.
+function isMissingTable(error) {
+  return error && typeof error === 'object' && error.code === 'PGRST205';
+}
+
 function verdict(expected, status, rowCount) {
   if (status >= 400) {
     // PostgREST renvoie une erreur si la table n'existe pas / pas de grant du tout.
@@ -79,13 +87,24 @@ async function checkTable(table) {
 }
 
 const results = [];
+const missing = [];
 for (const [table, expected] of TABLES) {
   const { status, rowCount, error } = await checkTable(table);
+  if (isMissingTable(error)) {
+    missing.push(table);
+    continue;
+  }
   results.push({ table, expected, status, rowCount, verdict: verdict(expected, status, rowCount), error });
 }
 
 console.log('\n=== Bloc 1 — RLS en prod, lu via clé anon publique ===\n');
 console.log(`Supabase project: ${SUPABASE_URL}\n`);
+if (missing.length) {
+  for (const table of missing) {
+    console.log(`ℹ️ table '${table}' absente du schéma, ignorée (listée dans TABLES mais supprimée depuis)`);
+  }
+  console.log('');
+}
 const colWidth = Math.max(...results.map((r) => r.table.length)) + 2;
 for (const r of results) {
   console.log(
@@ -95,7 +114,7 @@ for (const r of results) {
 }
 
 const holes = results.filter((r) => r.verdict.startsWith('🔴'));
-console.log(`\n${holes.length} trou(s) détecté(s) sur ${results.length} tables testées.`);
+console.log(`\n${holes.length} trou(s) détecté(s) sur ${results.length} tables testées${missing.length ? ` (${missing.length} ignorée(s), absente(s) du schéma)` : ''}.`);
 if (holes.length) {
   console.log('Tables en trou :', holes.map((h) => h.table).join(', '));
 }
