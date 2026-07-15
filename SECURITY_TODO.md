@@ -42,8 +42,10 @@ mené le 15/07 (0 ligne, 0 référence code, 0 FK entrante, 0 fonction
 Postgres dépendante — `is_admin`/`owns_biz`/`check_booking_access`
 utilisent `app_users`, pas `profiles`) : suppression versionnée dans
 `supabase/migrations/0023_drop_profiles.sql` (`DROP POLICY` × 2 +
-`DROP TABLE`) — **migration pas encore exécutée en base**, Pierre la
-lance lui-même après relecture. Détail : `docs/memory/security-audit-2026-07.md`.
+`DROP TABLE`), **exécutée en base par Pierre** (SQL Editor Supabase).
+Vérifié post-suppression : `is_admin()`/`auth_biz_id()` fonctionnent,
+audit RLS relancé (`rls-check.mjs`) → 0 trou sur 21 tables, `profiles`
+signalée comme absente/ignorée. Détail : `docs/memory/security-audit-2026-07.md`.
 
 ## 2. IDOR bookings/group — ✅ corrigé le 02/07/2026 (commit `357d678`)
 
