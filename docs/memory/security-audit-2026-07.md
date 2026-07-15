@@ -14,11 +14,6 @@ Les 5 commits de l'audit ont été mergés sur `master` via PR #6 (`c88b43d`).
 - Signature webhook Stripe rejette bien un payload sans signature ou avec
   une fausse signature.
 
-**Non prouvé automatiquement** (à tester manuellement) :
-- `forgot-password` — masque volontairement l'état du rate limit, jamais de
-  429 par design. Vérifier via la table `rate_limits` Supabase.
-- `checkin-by-qr` — nécessite une session pro authentifiée.
-
 ## Décision Sérénité (même journée)
 
 Modèle de fidélité aligné code = référence — voir
@@ -55,3 +50,19 @@ Détail et priorités à jour dans `TODO.md` à la racine du repo. En résumé :
   migration `supabase/migrations/0023_drop_profiles.sql`, exécutée en base
   par Pierre, vérifiée post-suppression (`is_admin()`/`auth_biz_id()` OK,
   `rls-check.mjs` relancé → 0 trou sur 21 tables).
+- **Retest manuel `forgot-password` et `checkin-by-qr`** — clos le
+  15/07/2026, données réelles observées dans `public.rate_limits` :
+  - `forgot-password:ip:83.193.30.142` → `count=5`,
+    `window_start=2026-07-14 13:31:39` — compteur exactement au plafond
+    documenté (5/15 min par IP) : le rate limit mord.
+  - `forgot-password:email:audit-ratelimit-test@book-n-pay.invalid` →
+    `count=3`, `window_start=2026-07-14 13:31:40` — compteur exactement au
+    plafond documenté (3/15 min par email) : le rate limit mord.
+  - `checkin-by-qr:<uuid-compte-pro>` → 6 lignes distinctes du 09/07 avec
+    compteurs entre 1 et 2 — le mécanisme est câblé et compte réellement
+    par compte pro, mais **aucune ligne n'atteint le plafond (30/5 min)** :
+    le blocage effectif à 30 n'est pas prouvé par ces données, seule
+    l'existence et le fonctionnement du compteur le sont.
+  - Bonus (hors mandat, observé au passage, confirmatif) : `join-group:ip`
+    → 10, `stripe-checkout:ip` → 30, cohérents avec les plafonds
+    documentés.

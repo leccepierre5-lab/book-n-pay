@@ -11,7 +11,12 @@ supprimée de bout en bout** : audit d'usage (0 ligne/0 référence code/0 FK/
 0 fonction dépendante), migration `0023_drop_profiles.sql`, **exécutée en
 base par Pierre**, vérifiée post-suppression (`is_admin()`/`auth_biz_id()`
 OK, audit RLS relancé → 0 trou sur 21 tables, `profiles` bien signalée
-comme ignorée par `rls-check.mjs`).
+comme ignorée par `rls-check.mjs`). **Retest manuel `forgot-password` et
+`checkin-by-qr` fait** : rate limit confirmé mordant sur `forgot-password`
+(IP et email, données réelles `rate_limits`), mécanisme confirmé actif sur
+`checkin-by-qr` (nuance : blocage effectif à 30/5min non observé, seul le
+comptage par compte pro l'est) — détail dans
+`docs/memory/security-audit-2026-07.md`.
 
 ## Ouvert, par priorité
 
@@ -19,7 +24,3 @@ comme ignorée par `rls-check.mjs`).
    politique RGPD dédiée, médiateur consommation, relecture avocat. En
    attente que Pierre rassemble SIREN / adresse / hébergeur / durées de
    conservation.
-2. **Retest manuel des rate limits** non prouvés par le protocole
-   automatique :
-   - `forgot-password` — vérifier via la table `rate_limits` Supabase.
-   - `checkin-by-qr` — nécessite une session pro authentifiée.
