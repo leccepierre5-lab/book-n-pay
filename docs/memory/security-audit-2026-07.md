@@ -43,8 +43,10 @@ Détail et priorités à jour dans `TODO.md` à la racine du repo. En résumé :
 - **P1** : lint a 193 warnings `react/no-unescaped-entities` non corrigés
   (volontairement laissés en warning, pas en erreur) — à nettoyer un jour,
   aucune urgence.
-- **P2** : suppression de la table `profiles` (récursion RLS documentée
-  dans `SECURITY_TODO.md`, non urgent car fail-fermé).
+- **P2** : suppression de la table `profiles` — ✅ audit d'usage fait le
+  15/07/2026 (0 ligne, 0 référence code, 0 FK entrante, 0 fonction
+  dépendante), migration versionnée `supabase/migrations/0023_drop_profiles.sql`.
+  Reste seulement l'exécution en base, prévue par Pierre après relecture.
 - **P2** : migrations 0001-0007 (schéma de base) toujours non versionnées,
   dette connue documentée dans `SECURITY_TODO.md`, non bloquant.
 - Optionnel, sans urgence : communication utilisateurs de la MAJ CGU (en

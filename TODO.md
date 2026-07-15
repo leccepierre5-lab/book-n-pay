@@ -6,7 +6,10 @@ Décision Sérénité appliquée (commits `1f32080`, `9cfb462`). Ménage vestige
 terminé (commits `fad4347`, `7debeba`). Audit sécurité archivé dans
 `docs/memory/security-audit-2026-07.md` (`1033d32`). Communication CGU
 Sérénité rédigée et archivée dans `docs/comm/serenite-maj-2026-07.md`
-(`a849201`) — statut : à envoyer, pas encore envoyée.
+(`a849201`) — statut : à envoyer, pas encore envoyée. Table `profiles` :
+audit d'usage fait, suppression versionnée dans
+`supabase/migrations/0023_drop_profiles.sql` — exécution en base restant
+à faire par Pierre.
 
 ## Ouvert, par priorité
 
@@ -18,5 +21,3 @@ Sérénité rédigée et archivée dans `docs/comm/serenite-maj-2026-07.md`
    automatique :
    - `forgot-password` — vérifier via la table `rate_limits` Supabase.
    - `checkin-by-qr` — nécessite une session pro authentifiée.
-3. **Suppression de la table `profiles`** — récursion RLS documentée dans
-   `SECURITY_TODO.md`, non urgent car fail-fermé.

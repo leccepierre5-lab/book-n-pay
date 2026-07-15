@@ -35,10 +35,15 @@ depuis git, et à recréer les mêmes policies sur un environnement vierge.
 réellement vierge devra d'abord les recréer avant de rejouer cette migration.
 Hors périmètre de ce snapshot (documente les policies, pas leurs dépendances).
 
-**Découverte en passant** : la table `profiles` a du RLS + 2 policies mais
-n'apparaît pas dans `src/lib/database.types.ts` — probable reliquat d'une
-itération antérieure à `app_users`. Documentée telle quelle, à vérifier si
-encore utilisée avant suppression éventuelle (pas fait ici, hors scope).
+**Découverte en passant, ✅ résolue le 15/07/2026** : la table `profiles` avait
+du RLS + 2 policies mais n'apparaissait pas dans `src/lib/database.types.ts`
+— reliquat d'une itération antérieure à `app_users`. Audit d'usage complet
+mené le 15/07 (0 ligne, 0 référence code, 0 FK entrante, 0 fonction
+Postgres dépendante — `is_admin`/`owns_biz`/`check_booking_access`
+utilisent `app_users`, pas `profiles`) : suppression versionnée dans
+`supabase/migrations/0023_drop_profiles.sql` (`DROP POLICY` × 2 +
+`DROP TABLE`) — **migration pas encore exécutée en base**, Pierre la
+lance lui-même après relecture. Détail : `docs/memory/security-audit-2026-07.md`.
 
 ## 2. IDOR bookings/group — ✅ corrigé le 02/07/2026 (commit `357d678`)
 
