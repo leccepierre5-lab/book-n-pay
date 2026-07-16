@@ -103,3 +103,21 @@ valeurs utilisateur interpolées dans un template HTML : `member.name` /
 (`crypto.timingSafeEqual`), remplace les 9 comparaisons `!==` classiques :
 les 8 routes `src/app/api/cron/*` (`CRON_SECRET`) + `loyalty/update-status`
 (`INTERNAL_API_SECRET`).
+
+## 2026-07-16 — Rotation clé service_role (PRIORITÉ)
+- `SUPABASE_SERVICE_ROLE_KEY` (JWT legacy, bypasse RLS entièrement) a été
+  utilisée en variable d'environnement (`--env-file`) pendant une session de
+  debug le 16/07, pour des scripts ponctuels dans `scripts/audit/`. La clé
+  brute n'a jamais été affichée en clair (seuls un préfixe tronqué, sa
+  longueur, et le payload JWT décodé — `ref`/`role`/`iat`/`exp`, pas le
+  secret — sont apparus dans la session) et elle reste dans `.env.local`
+  (gitignore) — pas d'exposition publique connue.
+- Par précaution néanmoins (clé à privilèges maximaux manipulée en
+  interactif) : **la faire tourner**.
+- ⚠️ Le projet est en migration vers le nouveau système de clés (ECC P-256
+  + `sb_publishable_`/`sb_secret_`) — voir aussi le bug JWT ouvert dans
+  `docs/reprises/reprise-2026-07-16-soir.md`. La rotation service_role doit
+  se faire via le Dashboard en tenant compte de cet état — voir doc
+  Supabase "New API Keys and Asymmetric Authentication". Idéalement migrer
+  vers une clé `sb_secret_` côté serveur plutôt que régénérer la legacy.
+- À traiter avec la résolution du bug JWT keys (même session, même sujet).

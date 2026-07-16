@@ -52,3 +52,45 @@ RDV CCI Bayonne à prendre par Pierre avant toute rédaction sérieuse.
 
    **Médiateur en parallèle** (indépendant du RDV CCI) : choisir entre
    CM2C / MEDICYS / AME, ~100€/an.
+
+## Blindage technique — audit de l'existant (session dédiée, après audit fonctionnel)
+
+Objectif : passer en revue chaque brique critique d'un SaaS de réservation +
+paiement, en mode AUDIT DE L'EXISTANT (le SaaS tourne déjà en prod) — PAS
+en construction from-scratch. Pour chaque point : présent dans le code ?
+correct ? couvert par la doc ? versionné en migration ? Croiser avec
+SECURITY_TODO.md et docs/memory/security-audit-2026-07.md pour ne pas
+dupliquer.
+
+Stack connue : Next.js / Supabase / Stripe / Resend. Ne PAS reposer les
+questions de stack. À confirmer dans les docs existants : modèle de flux
+financier (Stripe Connect direct vs encaissement puis reversement) et cible
+prestataires.
+
+Briques à auditer :
+1. BDD & gestion du temps
+   - Schéma réel (app_users, businesses, services, bookings, payments) —
+     déjà confirmé contre migrations.
+   - Dates/heures stockées en UTC ? Conversion timezone pro vs client ?
+   - Buffer times entre rendez-vous ?
+2. Anti double-booking & concurrence
+   - Verrouillage (SELECT FOR UPDATE / transaction) contre les race
+     conditions sur un même créneau ?
+   - Réservation temporaire (créneau bloqué pendant le paiement, libéré
+     si échec) ?
+3. Paiement Stripe
+   - Webhooks résilients (checkout.session.completed valide la résa même
+     si le client ferme le navigateur) ?
+   - Idempotence (pas de double débit) ?
+   - Remboursement partiel/total + gestion des frais Stripe non remboursés ?
+   - Factures conformes (numérotation séquentielle, mentions légales, TVA) ?
+4. Notifications & délivrabilité
+   - Emails transactionnels (confirmation, rappels J-1 / H-2 anti no-show) ?
+   - DNS SPF / DKIM / DMARC configurés ? (redirection Ionos déjà OK)
+5. Conformité & monitoring
+   - RGPD : script de suppression totale des données d'un utilisateur
+     (right to be forgotten) ?
+   - Monitoring erreurs (Sentry) + logs d'audit ?
+
+Note : le prompt architecture complet d'origine est archivé (conversation
+2026-07-16). Le convertir en checklist point par point contre l'existant.
