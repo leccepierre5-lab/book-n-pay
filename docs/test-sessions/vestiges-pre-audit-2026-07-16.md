@@ -77,6 +77,10 @@ WHERE id IN (
 
 ## Statut
 
-Recon faite, script rédigé. **Pas encore exécuté** — en attente du feu vert
-de Pierre avant le DELETE `businesses`/`app_users` (SQL Editor) et la
-suppression des 4 comptes `auth.users` (Dashboard ou Admin API).
+**FAIT.** Exécuté le 16/07/2026 via `scripts/audit/vestiges-delete.mjs`
+(feu vert donné par Pierre) : 2 businesses + 4 `app_users` supprimés
+(`DELETE` PostgREST, service_role), 4 comptes `auth.users` supprimés via
+`supabase.auth.admin.deleteUser` (pas de DELETE SQL brut). Re-recon
+(`vestiges-recon.mjs`) après coup : "(aucun)" sur les deux requêtes —
+base propre, plus aucun vestige pré-existant. Prêt à passer à la phase
+suivante de l'audit (création des données de test `@book-n-pay.invalid`).
