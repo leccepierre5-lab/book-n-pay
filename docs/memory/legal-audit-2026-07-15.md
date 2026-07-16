@@ -27,7 +27,7 @@ hébergeur avec coordonnées) n'existe nulle part dans le code.
 §8 "Données personnelles" (lignes 258-268), 8 lignes au total : liste les
 données collectées (nom/téléphone/email), une finalité unique ("gestion
 des réservations"), promesse de non-revente, droits d'accès/rectification/
-suppression via un email Gmail (`Booknpay.64@gmail.com`).
+suppression via un email Gmail (`Booknpay.64@gmail.com`). (résolu le 16/07/2026 : remplacé par contact@book-n-pay.com dans le commit qui suit)
 Manque au regard de l'art. 13 RGPD : finalités réelles incomplètes
 (paiement Stripe, fidélité Sérénité, parrainage, avis/notifications
 §10-§11 non mentionnés comme traitement de données) ; **aucune base

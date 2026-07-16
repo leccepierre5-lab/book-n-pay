@@ -386,7 +386,7 @@ Le montant sera crédité sur votre moyen de paiement d'origine sous 5 à 10 jou
 
 ⚠️ Note : les frais de gestion Book'nPay ne sont pas remboursés conformément aux CGV Art. 3.
 
-Si vous avez des questions, contactez-nous à Booknpay.64@gmail.com
+Si vous avez des questions, contactez-nous à contact@book-n-pay.com
 
 À bientôt,
 L'équipe Book'nPay`,

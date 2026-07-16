@@ -261,8 +261,8 @@ export default function CGUPage() {
               gestion des réservations et ne sont jamais revendues à des tiers. Conformément au
               RGPD, vous disposez d'un droit d'accès, de rectification et de suppression de vos
               données en contactant :{' '}
-              <a href="mailto:Booknpay.64@gmail.com" className="text-emerald-500 underline">
-                Booknpay.64@gmail.com
+              <a href="mailto:contact@book-n-pay.com" className="text-emerald-500 underline">
+                contact@book-n-pay.com
               </a>
             </p>
           </section>

@@ -141,7 +141,7 @@ ${refundLine}
 
 ⚠️ Rappel : les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 3).
 
-Si vous avez des questions : Booknpay.64@gmail.com
+Si vous avez des questions : contact@book-n-pay.com
 
 À bientôt,
 L'équipe Book'nPay`,
