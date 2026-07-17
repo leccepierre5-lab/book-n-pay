@@ -3,11 +3,13 @@
 // Port de src/components/pro/NotificationsConfig.jsx — persisté dans
 // business_settings.notification_prefs (jsonb) plutôt que localStorage,
 // pour que les préférences suivent le pro sur tous ses appareils.
-// ⚠️ Comme dans l'original : la plupart des toggles sont déclaratifs
-// uniquement pour l'instant — les crons (send-rdv-reminders, etc.) ne lisent
-// pas encore cette config pour décider d'envoyer ou non. Documenté en TODO
-// dans le README plutôt que de prétendre que ces toggles changent déjà le
-// comportement réel des crons.
+// ⚠️ État réel par toggle (mis à jour 17/07) :
+// - newBooking : CÂBLÉ (stripe/webhook/route.ts, sur checkout.session.completed
+//   — email au owner à chaque paiement confirmé, gate sur ce flag).
+// - cancelBooking / paymentReceived / groupPending / reminderH24 / reminderH2 :
+//   toujours déclaratifs uniquement, rien ne les lit encore. Documenté en TODO
+//   dans le README plutôt que de prétendre que ces toggles changent déjà le
+//   comportement réel des crons.
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
