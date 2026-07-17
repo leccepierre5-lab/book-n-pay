@@ -3,13 +3,19 @@
 // Port de src/components/pro/NotificationsConfig.jsx — persisté dans
 // business_settings.notification_prefs (jsonb) plutôt que localStorage,
 // pour que les préférences suivent le pro sur tous ses appareils.
-// ⚠️ État réel par toggle (mis à jour 17/07) :
+// ⚠️ État réel par toggle (mis à jour 17/07, voir lib/pro-notifications.ts) :
 // - newBooking : CÂBLÉ (stripe/webhook/route.ts, sur checkout.session.completed
 //   — email au owner à chaque paiement confirmé, gate sur ce flag).
-// - cancelBooking / paymentReceived / groupPending / reminderH24 / reminderH2 :
-//   toujours déclaratifs uniquement, rien ne les lit encore. Documenté en TODO
-//   dans le README plutôt que de prétendre que ces toggles changent déjà le
-//   comportement réel des crons.
+// - cancelBooking : CÂBLÉ (bookings/cancel + loyalty/use-joker — PAS
+//   pro/refund-gesture, geste du pro lui-même, inutile de l'en notifier).
+// - paymentReceived / groupPending / reminderH24 / reminderH2 : toujours
+//   déclaratifs uniquement, rien ne les lit encore. reminderH24/reminderH2
+//   ont en plus leurs propres bugs indépendants du câblage (voir audit
+//   17/07 — comportement contradictoire / libellé horaire faux), à traiter
+//   séparément. Documenté en TODO dans le README plutôt que de prétendre
+//   que ces toggles changent déjà le comportement réel des crons.
+// - rdvImminent / noShowAuto : gérés par AlertsPanel.tsx, mais celui-ci ne
+//   lit PAS ce flag non plus — décoratifs eux aussi.
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 

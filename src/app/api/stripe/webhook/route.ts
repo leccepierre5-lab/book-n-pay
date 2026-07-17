@@ -9,6 +9,7 @@ import Stripe from 'stripe';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { maybeCreateOverageCharge, invoiceUnpaidOverageCharges } from '@/lib/stripe/overageCharge';
+import { notifyProNewBooking } from '@/lib/pro-notifications';
 
 // ⚠️ CORRECTIF (test E2E billing) : sur ce compte Stripe (version d'API
 // 2026-05-27.dahlia), invoice.subscription n'est plus peuplé — confirmé en
@@ -94,67 +95,17 @@ export async function POST(req: NextRequest) {
 
       console.log(`[Webhook] ✅ Paiement validé — booking ${bookingId}, membre ${memberId}, ${dep}€`);
 
-      // ── Notification pro — nouvelle réservation payée ─────────────────────
-      // Placé APRÈS le early-return d'idempotence ci-dessus (webhook rejoué
-      // sur un membre déjà 'paid' → return avant d'arriver ici), donc un
-      // seul email par paiement réel, jamais de doublon sur rejeu.
-      // Déclenché sur le PAIEMENT confirmé, pas la création (bookings/create,
-      // status='invite') — évite de notifier pour des paniers abandonnés.
-      // Seul le owner a un compte/email (la table `staff` n'a aucun champ
-      // email — un praticien assigné n'est jamais notifiable séparément).
-      try {
-        const { data: notifBooking } = await supabase
-          .from('bookings')
-          .select('biz_id, biz_name, service_name, staff_name, date, time')
-          .eq('id', bookingId)
-          .maybeSingle();
-
-        if (notifBooking?.biz_id) {
-          const { data: biz } = await supabase
-            .from('businesses')
-            .select('owner_id')
-            .eq('id', notifBooking.biz_id)
-            .maybeSingle();
-
-          const { data: notifSettings } = await supabase
-            .from('business_settings')
-            .select('notification_prefs')
-            .eq('biz_id', notifBooking.biz_id)
-            .maybeSingle();
-
-          // Même merge que NotificationsConfig.tsx (DEFAULTS newBooking=true) —
-          // un pro qui n'a jamais ouvert ses réglages doit être notifié par
-          // défaut, pas silencieusement exclu faute de préférence enregistrée.
-          const newBookingEnabled = notifSettings?.notification_prefs?.newBooking !== false;
-
-          if (biz?.owner_id && newBookingEnabled) {
-            const { data: ownerAuth } = await supabase.auth.admin.getUserById(biz.owner_id);
-            const ownerEmail = ownerAuth.user?.email;
-
-            if (ownerEmail) {
-              const dateFormatted = new Date(notifBooking.date + 'T12:00:00').toLocaleDateString('fr-FR', {
-                weekday: 'long', day: 'numeric', month: 'long',
-              });
-              const allMemberIdsForNotif = meta.allMemberIds
-                ? meta.allMemberIds.split(',').map((s: string) => s.trim()).filter(Boolean)
-                : [];
-              const groupNote = allMemberIdsForNotif.length > 1
-                ? ` (groupe de ${allMemberIdsForNotif.length} personnes)`
-                : '';
-
-              await sendEmail({
-                to: ownerEmail,
-                subject: `✅ Nouvelle réservation — ${notifBooking.service_name}`,
-                text: `Bonjour,\n\nVous avez une nouvelle réservation confirmée${groupNote} !\n\n💆 Prestation : ${notifBooking.service_name}${notifBooking.staff_name ? `\n👤 Praticien : ${notifBooking.staff_name}` : ''}\n📅 Date : ${dateFormatted}\n🕐 Heure : ${notifBooking.time}\n💶 Frais de réservation reçus : ${dep}€\n\nRetrouvez le détail dans votre espace pro.\nL'équipe Book'nPay`,
-              }).catch(() => {});
-            }
-          }
-        }
-      } catch (notifErr: any) {
-        // Ne jamais faire échouer le traitement du paiement (déjà encaissé,
-        // déjà marqué 'paid' ci-dessus) pour un problème de notification.
-        console.error('[Webhook] Notification pro échouée:', notifErr.message);
-      }
+      // Notification pro — nouvelle réservation payée. Placé APRÈS le
+      // early-return d'idempotence ci-dessus (webhook rejoué sur un membre
+      // déjà 'paid' → return avant d'arriver ici), donc un seul email par
+      // paiement réel, jamais de doublon sur rejeu. Voir lib/pro-notifications.ts.
+      const allMemberIdsForNotif = meta.allMemberIds
+        ? meta.allMemberIds.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : [];
+      await notifyProNewBooking(supabase, bookingId, {
+        depositAmount: dep,
+        groupSize: allMemberIdsForNotif.length,
+      });
 
       // ── Consommation de la réduction de parrainage ────────────────────────
       // Déclenché uniquement si le paiement est confirmé (jamais sur session abandonnée)

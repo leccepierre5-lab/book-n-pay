@@ -21,6 +21,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, phonesMatch } from '@/lib/booking-utils';
 import { depositRefundAmountCents } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
+import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 
@@ -112,6 +113,12 @@ export async function POST(req: NextRequest) {
     // assign_staff_and_create_booking ne regardent booking_members, les
     // deux filtrent uniquement bookings.status). Voir lib/booking-lifecycle.ts.
     await cancelBookingIfNoActiveMembers(serviceSupabase, bookingId);
+
+    await notifyProBookingCancelled(serviceSupabase, bookingId, {
+      memberName: member.name,
+      refunded: refundDone,
+      refundAmount: member.deposit ?? 0,
+    });
 
     await serviceSupabase.from('booking_logs').insert({
       booking_id: bookingId,
