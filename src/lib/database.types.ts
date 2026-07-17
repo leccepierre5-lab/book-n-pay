@@ -4,6 +4,14 @@
 
 export type UserRole = 'admin' | 'pro' | 'client';
 export type LoyaltyStatus = 'Standard' | 'Bronze' | 'Argent' | 'Gold';
+// ⚠️ 'completed' = tous les membres actifs sont passés 'paid' (dépôt réglé),
+// PAS "prestation rendue" — ce champ bascule au moment du paiement, pas du
+// service. Pour savoir si un RDV a réellement eu lieu, lire
+// MemberStatus==='arrived' (posé par check-in QR ou cloturer-prestation),
+// jamais BookingStatus. Vérifié le 17/07 : aucun consommateur du repo ne
+// fait cette confusion (fidélité/avis/no-show/stats lisent tous
+// MemberStatus) — piège documenté ici pour qu'il ne soit pas réintroduit,
+// pas parce qu'un bug existe aujourd'hui.
 export type BookingStatus = 'active' | 'cancelled' | 'completed';
 export type MemberStatus = 'invite' | 'paid' | 'arrived' | 'no_show' | 'cancelled';
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected';
