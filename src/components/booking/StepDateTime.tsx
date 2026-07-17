@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
 import type { Service, Staff } from '@/lib/database.types';
-import { isSlotClosed } from '@/lib/booking-utils';
+import { isSlotClosed, isSlotPast } from '@/lib/booking-utils';
 
 type StaffAvailability = Record<string, { freeCount: number; freeStaffIds: string[] }>;
 
@@ -47,14 +47,6 @@ function isPast(iso: string): boolean {
 
 function isToday(iso: string): boolean {
   return iso === new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
-}
-
-function isSlotPast(date: string, slot: string): boolean {
-  const todayParis = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
-  if (date > todayParis) return false;
-  if (date < todayParis) return true;
-  const nowParis = new Date().toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false });
-  return slot <= nowParis;
 }
 
 function formatDateLabel(iso: string): string {

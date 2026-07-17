@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
 import type { Service, Staff } from '@/lib/database.types';
-import { calcFraisGestion, normalizePhone } from '@/lib/booking-utils';
+import { calcFraisGestion, normalizePhone, isSlotPast } from '@/lib/booking-utils';
 import { createClient } from '@/lib/supabase/client';
 
 // Contact Picker API — Chrome Android 80+, absent sur Safari iOS et desktop.
@@ -195,6 +195,10 @@ function ModeAPayment({
 
   const handlePay = async () => {
     if (!accepted) return;
+    if (slots.some((s) => isSlotPast(date, s))) {
+      setError('Un ou plusieurs créneaux sont déjà passés. Merci de retourner en arrière et de choisir un autre horaire.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -469,6 +473,10 @@ function ModeBPayment({
 
   const handlePay = async () => {
     if (!accepted || !allPhonesSet) return;
+    if (slots.some((s) => isSlotPast(date, s))) {
+      setError('Un ou plusieurs créneaux sont déjà passés. Merci de retourner en arrière et de choisir un autre horaire.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -726,6 +734,10 @@ function SoloPayment({
   const solde = service.price - service.deposit;
 
   const handlePay = async () => {
+    if (isSlotPast(date, time)) {
+      setError('Ce créneau est déjà passé. Merci de retourner en arrière et de choisir un autre horaire.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {

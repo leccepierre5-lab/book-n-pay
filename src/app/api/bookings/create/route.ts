@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { generateQrCode } from '@/lib/booking-utils';
+import { generateQrCode, isSlotPast } from '@/lib/booking-utils';
 import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
@@ -34,6 +34,16 @@ export async function POST(req: NextRequest) {
 
     if (!bizId || !serviceId || !date || !time) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 });
+    }
+
+    // Garde-fou serveur — le front désactive déjà les créneaux passés
+    // (StepDateTime.tsx), mais un state figé (onglet resté ouvert, soumission
+    // tardive) ou un appel direct à l'API le contournerait sans cette
+    // vérification. Seule source de vérité réelle contre la création de RDV
+    // fantômes dans le passé (voir diagnostic 17/07 — faille confirmée par
+    // repro directe avant ce correctif).
+    if (isSlotPast(date, time)) {
+      return NextResponse.json({ error: 'Ce créneau est déjà passé. Merci de choisir un autre créneau.' }, { status: 400 });
     }
 
     const { data: business } = await supabase

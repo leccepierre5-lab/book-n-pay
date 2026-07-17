@@ -223,6 +223,21 @@ export function isSlotClosed(biz: BizHoraires, date: string, slot: string): bool
   return dayClosed || outsideHours;
 }
 
+// Source de vérité unique pour "ce créneau est-il déjà passé", partagée
+// front (StepDateTime, revalidation avant submit) et back (bookings/create,
+// bookings/create-group) — comparaison en Europe/Paris, pas le fuseau du
+// serveur/navigateur. Un créneau à l'heure exacte de "maintenant" compte
+// comme passé (même règle que l'ancien isSlotPast front, volontairement
+// stricte : mieux vaut refuser un edge-case à la seconde près que laisser
+// créer un RDV déjà entamé).
+export function isSlotPast(date: string, time: string): boolean {
+  const todayParis = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+  if (date > todayParis) return false;
+  if (date < todayParis) return true;
+  const nowParis = new Date().toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false });
+  return time.slice(0, 5) <= nowParis;
+}
+
 // ── Frais de gestion progressifs ─────────────────────────────────────────────
 // Barème : ≤ 50€ → 1,99€ | 50,01-80€ → 2,10€ | 80,01-100€ → 2,30€ | > 100€ → 2,50€
 // ⚠️ Garder synchronisé avec app_config (frais_gestion_palier_*) côté serveur —

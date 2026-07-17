@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { generateQrCode, generateGroupRef, normalizePhone } from '@/lib/booking-utils';
+import { generateQrCode, generateGroupRef, normalizePhone, isSlotPast } from '@/lib/booking-utils';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { normalizeStaffChoice, orderExplicitFirst, getCandidateStaffIds } from '@/lib/staff-group-order';
@@ -49,6 +49,12 @@ export async function POST(req: NextRequest) {
     }
     if (mode === 'b' && guests.length !== slots.length - 1) {
       return NextResponse.json({ error: 'Nombre d\'invités incorrect pour le mode B' }, { status: 400 });
+    }
+    // Même garde-fou que bookings/create/route.ts — un groupe peut couvrir
+    // plusieurs créneaux consécutifs (ex. 09h30 → 11h00), il suffit qu'UN
+    // seul soit déjà passé pour rejeter toute la création.
+    if (slots.some((s: string) => isSlotPast(date, s))) {
+      return NextResponse.json({ error: 'Un ou plusieurs créneaux sont déjà passés. Merci de choisir un autre horaire.' }, { status: 400 });
     }
     // staffChoices : un choix par personne pour le cas "service individuel
     // multi-praticiens" (CAS 2 — voir CONCEPTION_CAS2_STAFF_GROUPE.md).
