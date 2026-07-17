@@ -7,6 +7,7 @@ import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/l
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
+import { isNonRealBusiness } from '@/lib/queries/catalog';
 import type { Booking } from '@/lib/database.types';
 
 export async function POST(req: NextRequest) {
@@ -48,12 +49,27 @@ export async function POST(req: NextRequest) {
 
     const { data: business } = await supabase
       .from('businesses')
-      .select('frozen')
+      .select('frozen, owner_id, slug')
       .eq('id', bizId)
       .maybeSingle();
     if (business?.frozen) {
       return NextResponse.json(
         { error: 'Cet établissement est temporairement indisponible.' },
+        { status: 423 }
+      );
+    }
+    // Garde-fou — 1124 fiches "démo" (isNonRealBusiness, voir
+    // lib/queries/catalog.ts) sont publiées et recherchables (catalogue
+    // voulu, voir supabase/seed/demo_businesses.sql) mais n'ont ni compte
+    // pro ni business_settings : sans ce check, un vrai client peut
+    // réserver ET payer dessus (stripe/checkout ne bloque pas l'absence de
+    // compte Connect, l'argent reste sur le compte Book'nPay faute de
+    // transfer_data.destination) pour un RDV qui ne sera jamais honoré.
+    // Même helper que le noindex SEO — source unique de "fiche non réelle",
+    // ne pas réinventer un critère owner_id divergent ici.
+    if (!business || isNonRealBusiness(business)) {
+      return NextResponse.json(
+        { error: "Cet établissement n'est pas disponible à la réservation." },
         { status: 423 }
       );
     }

@@ -5,6 +5,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { calcFraisGestion, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
+import { isNonRealBusiness } from '@/lib/queries/catalog';
 
 function isAllowedOrigin(url: string, reqOrigin: string | null, reqHost: string | null): boolean {
   try {
@@ -101,9 +102,29 @@ export async function POST(req: NextRequest) {
     if (bookingMeta?.bookingId) {
       const { data: booking } = await supabase
         .from('bookings')
-        .select('service_id')
+        .select('service_id, biz_id')
         .eq('id', bookingMeta.bookingId)
         .maybeSingle();
+
+      // Défense en profondeur — bookings/create[-group] bloque déjà la
+      // création sur une fiche démo (isNonRealBusiness), mais ce point-ci
+      // est celui où l'argent change réellement de main (Stripe) : le
+      // revérifier ici coûte une requête et évite qu'un futur chemin de
+      // création oublie le même garde-fou (pattern déjà vu 3x cette
+      // session — cancel/refund-gesture/use-joker, puis connect-onboarding/
+      // connect-status, avaient chacun le même bug dupliqué séparément).
+      // Même helper que le noindex SEO / bookings/create — source unique.
+      if (booking?.biz_id) {
+        const { data: bizOwner } = await supabase
+          .from('businesses')
+          .select('owner_id, slug')
+          .eq('id', booking.biz_id)
+          .maybeSingle();
+        if (!bizOwner || isNonRealBusiness(bizOwner)) {
+          console.error(`[Checkout] Tentative de paiement sur une fiche non réelle — booking=${bookingMeta.bookingId} biz=${booking.biz_id}`);
+          return NextResponse.json({ error: "Cet établissement n'est pas disponible à la réservation." }, { status: 423 });
+        }
+      }
 
       if (booking?.service_id) {
         const { data: service } = await supabase

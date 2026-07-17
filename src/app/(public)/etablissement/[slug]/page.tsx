@@ -253,7 +253,25 @@ export default async function EtablissementPage({
       )}
 
       </div>
-      <BookingFlow business={business} icon={CATEGORY_ICONS[business.category] || '🏢'} />
+      {isNonRealBusiness(business) ? (
+        // Couche 1 (confort) du garde-fou démo — les couches dures sont
+        // bookings/create[-group] et stripe/checkout, qui rejettent déjà la
+        // réservation même via un appel direct. Ici on évite juste de faire
+        // cliquer un vrai visiteur sur un CTA qui échouerait de toute façon,
+        // et on explique pourquoi plutôt que de faire disparaître la fiche
+        // (le catalogue vitrine reste voulu — supabase/seed/demo_businesses.sql).
+        <div className="max-w-4xl mx-auto px-4 pb-8">
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 text-center">
+            <p className="mb-1 text-xl">🏗️</p>
+            <p className="text-sm font-semibold text-white mb-1">Fiche de démonstration</p>
+            <p className="text-xs text-slate-500">
+              Cet établissement illustre notre catalogue mais n&apos;a pas encore de compte actif — la réservation n&apos;est pas disponible ici.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <BookingFlow business={business} icon={CATEGORY_ICONS[business.category] || '🏢'} />
+      )}
     </div>
   );
 }

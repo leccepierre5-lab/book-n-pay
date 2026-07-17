@@ -5,6 +5,7 @@ import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { normalizeStaffChoice, orderExplicitFirst, getCandidateStaffIds } from '@/lib/staff-group-order';
 import { logAndRespond } from '@/lib/api-error';
+import { isNonRealBusiness } from '@/lib/queries/catalog';
 import type { Booking } from '@/lib/database.types';
 
 interface ParticipantMeta {
@@ -74,11 +75,17 @@ export async function POST(req: NextRequest) {
     // Check biz not frozen
     const { data: biz } = await supabaseService
       .from('businesses')
-      .select('frozen')
+      .select('frozen, owner_id, slug')
       .eq('id', bizId)
       .maybeSingle();
     if (biz?.frozen) {
       return NextResponse.json({ error: 'Établissement temporairement indisponible.' }, { status: 423 });
+    }
+    // Même garde-fou que bookings/create/route.ts (isNonRealBusiness, source
+    // unique partagée avec le noindex SEO) — voir ce fichier pour le
+    // raisonnement complet (fiches démo réservables ET payables).
+    if (!biz || isNonRealBusiness(biz)) {
+      return NextResponse.json({ error: "Cet établissement n'est pas disponible à la réservation." }, { status: 423 });
     }
 
     // Upsert organizer profile
