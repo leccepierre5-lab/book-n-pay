@@ -25,9 +25,25 @@ export async function GET(req: NextRequest) {
 
   console.log(`[Rappels] ${bookings?.length || 0} RDV demain (${tomorrowStr})`);
 
+  // Opt-out pro — défaut TRUE (absence de préférence = envoi, comme avant
+  // le câblage de ce flag). Ne pas confondre avec un défaut "false" : ce
+  // cron envoyait déjà à 100% des business, câbler avec un défaut false
+  // aurait coupé les rappels en masse au déploiement (voir
+  // NotificationsConfig.tsx pour le raisonnement complet).
+  const bizIds = [...new Set((bookings || []).map((b) => b.biz_id))];
+  const { data: settingsRows } = bizIds.length > 0
+    ? await supabase.from('business_settings').select('biz_id, notification_prefs').in('biz_id', bizIds)
+    : { data: [] };
+  const optedOutBizIds = new Set(
+    (settingsRows || [])
+      .filter((s) => (s.notification_prefs as Record<string, boolean> | null)?.reminderH24 === false)
+      .map((s) => s.biz_id)
+  );
+
   let sent = 0;
 
   for (const booking of bookings || []) {
+    if (optedOutBizIds.has(booking.biz_id)) continue;
     const recipients = (booking.booking_members || []).filter((m: any) => m.status === 'paid');
 
     for (const member of recipients) {

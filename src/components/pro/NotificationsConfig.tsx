@@ -8,14 +8,23 @@
 //   — email au owner à chaque paiement confirmé, gate sur ce flag).
 // - cancelBooking : CÂBLÉ (bookings/cancel + loyalty/use-joker — PAS
 //   pro/refund-gesture, geste du pro lui-même, inutile de l'en notifier).
-// - paymentReceived / groupPending / reminderH24 / reminderH2 : toujours
-//   déclaratifs uniquement, rien ne les lit encore. reminderH24/reminderH2
-//   ont en plus leurs propres bugs indépendants du câblage (voir audit
-//   17/07 — comportement contradictoire / libellé horaire faux), à traiter
-//   séparément. Documenté en TODO dans le README plutôt que de prétendre
-//   que ces toggles changent déjà le comportement réel des crons.
-// - rdvImminent / noShowAuto : gérés par AlertsPanel.tsx, mais celui-ci ne
-//   lit PAS ce flag non plus — décoratifs eux aussi.
+// - reminderH24 : CÂBLÉ (cron/send-rdv-reminders, rappel client J-1) — défaut
+//   TRUE (opt-out, pas opt-in) : ce cron envoyait déjà à 100% des business
+//   avant d'être câblé (aucune lecture de ce flag), donc le défaut reflète le
+//   comportement réel existant plutôt que la promesse UI jamais honorée
+//   (qui affichait faussement "désactivé" par défaut) — pas de coupure de
+//   masse au déploiement, juste un vrai opt-out enfin fonctionnel pour le
+//   pro qui veut couper ses rappels.
+// - reminderH2 : CÂBLÉ (cron/send-rdv-reminders-j2, défaut TRUE, même
+//   polarité que ci-dessus) — mais **relabellé "J-2"** : le cron tourne une
+//   fois par jour (vercel.json), un vrai "2h avant" est structurellement
+//   impossible sans cron horaire. Le code fait ce qu'il a toujours fait
+//   (rappel à J+2) ; c'était le libellé "2h" qui mentait, pas le timing.
+// - paymentReceived / groupPending : toujours déclaratifs, rien ne les lit
+//   encore. Documenté en TODO dans le README plutôt que de prétendre que ces
+//   toggles changent déjà le comportement réel.
+// - rdvImminent / noShowAuto : gérés par AlertsPanel.tsx, qui ne lit PAS ce
+//   flag non plus — décoratifs eux aussi.
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -26,7 +35,7 @@ const DEFAULTS: Record<string, boolean> = {
   cancelBooking: true,
   paymentReceived: true,
   groupPending: true,
-  reminderH24: false,
+  reminderH24: true,
   reminderH2: true,
 };
 
@@ -51,7 +60,7 @@ const NOTIF_ITEMS = [
     group: 'Rappels automatiques',
     items: [
       { key: 'reminderH24', emoji: '🔔', label: 'Rappel client J-1', desc: 'Envoyer un rappel aux clients 24h avant' },
-      { key: 'reminderH2', emoji: '🕐', label: 'Rappel client H-2', desc: 'Envoyer un rappel aux clients 2h avant' },
+      { key: 'reminderH2', emoji: '🕐', label: 'Rappel client J-2', desc: 'Envoyer un rappel aux clients 2 jours avant' },
     ],
   },
 ];

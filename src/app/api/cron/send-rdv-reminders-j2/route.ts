@@ -25,9 +25,25 @@ export async function GET(req: NextRequest) {
 
   console.log(`[Rappels J-2] ${bookings?.length || 0} RDV dans 2 jours (${targetDateStr})`);
 
+  // Opt-out pro — clé "reminderH2" côté notification_prefs (nom hérité de
+  // l'ancien libellé UI "H-2", jamais renommé en base pour ne pas invalider
+  // une préférence déjà enregistrée — seul le libellé affiché a changé,
+  // voir NotificationsConfig.tsx). Défaut TRUE, même raisonnement que
+  // send-rdv-reminders/route.ts (ce cron envoyait déjà à tout le monde).
+  const bizIds = [...new Set((bookings || []).map((b) => b.biz_id))];
+  const { data: settingsRows } = bizIds.length > 0
+    ? await supabase.from('business_settings').select('biz_id, notification_prefs').in('biz_id', bizIds)
+    : { data: [] };
+  const optedOutBizIds = new Set(
+    (settingsRows || [])
+      .filter((s) => (s.notification_prefs as Record<string, boolean> | null)?.reminderH2 === false)
+      .map((s) => s.biz_id)
+  );
+
   let sent = 0;
 
   for (const booking of bookings || []) {
+    if (optedOutBizIds.has(booking.biz_id)) continue;
     const recipients = (booking.booking_members || []).filter((m: any) => m.status === 'paid');
 
     for (const member of recipients) {
