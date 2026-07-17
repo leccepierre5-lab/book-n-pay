@@ -27,9 +27,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Non autorisé pour ce business' }, { status: 403 });
     }
 
-    const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_SECRET_KEY!;
-    const stripe = new Stripe(stripeKey);
     const serviceSupabase = createServiceRoleClient();
+
+    // ⚠️ CORRECTIF (backlog, priorité haute) : utilisait toujours la clé
+    // live, même en mode_test_paiement — contrairement à stripe/checkout,
+    // bookings/solde-checkout, cron/expire-groups, etc. Résultat : impossible
+    // de tester l'onboarding Stripe Connect d'un pro sans un vrai compte
+    // live, quel que soit le mode test. Même bascule que ces routes.
+    const { data: testModeConfig } = await serviceSupabase
+      .from('app_config')
+      .select('value')
+      .eq('key', 'mode_test_paiement')
+      .maybeSingle();
+    const isTestMode = testModeConfig?.value === 'true';
+    const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
 
     const { data: existing } = await serviceSupabase
       .from('business_settings')

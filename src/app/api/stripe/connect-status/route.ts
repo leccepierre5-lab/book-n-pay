@@ -40,7 +40,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ connected: false, onboardingComplete: false });
     }
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+    // ⚠️ CORRECTIF (backlog, priorité haute, même cause que connect-onboarding) :
+    // utilisait toujours la clé live — interroger avec la clé live un compte
+    // créé en clé test échoue (les comptes Connect test/live sont deux
+    // espaces Stripe totalement séparés, jamais visibles l'un depuis
+    // l'autre). Même bascule que le reste de la stack paiement.
+    const { data: testModeConfig } = await serviceSupabase
+      .from('app_config')
+      .select('value')
+      .eq('key', 'mode_test_paiement')
+      .maybeSingle();
+    const isTestMode = testModeConfig?.value === 'true';
+    const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
     const account = await stripe.accounts.retrieve(settings.stripe_account_id);
     const onboardingComplete = !!(account.details_submitted && account.charges_enabled);
 
