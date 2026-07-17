@@ -223,6 +223,16 @@ export function isSlotClosed(biz: BizHoraires, date: string, slot: string): bool
   return dayClosed || outsideHours;
 }
 
+// Fenêtre de validité d'une invitation 'invite' non payée (booking_members),
+// solo ou groupe — 30 min partout : c'est le plancher dur imposé par Stripe
+// sur Checkout Session.expires_at (impossible de descendre plus bas), donc
+// pas la peine d'avoir une constante différente par flux. Consommée par la
+// création du membre (solo: bookings/create, groupe: bookings/group),
+// alignée sur stripe/checkout/route.ts (expires_at) et lue par le cron
+// cleanup-expired-invites (filet si le webhook checkout.session.expired
+// n'arrive pas).
+export const INVITE_EXPIRY_MS = 30 * 60 * 1000;
+
 // Source de vérité unique pour "ce créneau est-il déjà passé", partagée
 // front (StepDateTime, revalidation avant submit) et back (bookings/create,
 // bookings/create-group) — comparaison en Europe/Paris, pas le fuseau du

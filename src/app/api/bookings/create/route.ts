@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { generateQrCode, isSlotPast } from '@/lib/booking-utils';
+import { generateQrCode, isSlotPast, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
 import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
@@ -216,6 +216,11 @@ export async function POST(req: NextRequest) {
         status: 'invite',
         qr_code: generateQrCode(),
         referrer_name: referrerName,
+        // Sans ça, un abandon du tunnel Stripe (avant checkout.session.completed)
+        // laissait ce membre 'invite' à vie — rien ne le clôturait jamais (voir
+        // diagnostic 17/07). Filet lu par cleanup-expired-invites ; la voie
+        // rapide normale est le webhook checkout.session.expired.
+        invite_expiry: new Date(Date.now() + INVITE_EXPIRY_MS).toISOString(),
       })
       .select()
       .single();

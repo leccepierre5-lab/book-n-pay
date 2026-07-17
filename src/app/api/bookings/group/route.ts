@@ -6,12 +6,11 @@
 // (un invité non connecté doit pouvoir rejoindre un groupe via un lien).
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { calcFraisGestion, generateQrCode, normalizePhone } from '@/lib/booking-utils';
+import { calcFraisGestion, generateQrCode, normalizePhone, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 
 const MAX_GROUP_SIZE = 23;
-const INVITE_DELAY_MS = 30 * 60 * 1000; // 30 minutes
 
 export async function POST(req: NextRequest) {
   const supabase = createServiceRoleClient();
@@ -113,7 +112,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const inviteExpiry = new Date(Date.now() + INVITE_DELAY_MS).toISOString();
+      const inviteExpiry = new Date(Date.now() + INVITE_EXPIRY_MS).toISOString();
 
       const { data: newMember, error: insertError } = await supabase
         .from('booking_members')

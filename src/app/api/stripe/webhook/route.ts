@@ -346,6 +346,47 @@ L'équipe Book'nPay`,
     }
   }
 
+  // ── SESSION EXPIRÉE — client n'a jamais payé (tunnel Stripe abandonné) ───
+  // ⚠️ Nécessite que cet event type soit abonné côté Dashboard Stripe sur cet
+  // endpoint — sans ça ce bloc ne s'exécute jamais (dormant, sans risque).
+  // Ne concerne aujourd'hui que les sessions solo (expires_at posé
+  // uniquement là, voir stripe/checkout/route.ts) ; générique quand même —
+  // même logique idempotente que le cron cleanup-expired-invites (filet si
+  // ce webhook n'arrive pas ou n'est pas encore abonné).
+  if (event.type === 'checkout.session.expired') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const meta = session.metadata || {};
+    const bookingId = meta.bookingId;
+    const memberId = meta.memberId;
+
+    if (bookingId && memberId) {
+      const { data: member } = await supabase
+        .from('booking_members')
+        .select('status')
+        .eq('id', memberId)
+        .eq('booking_id', bookingId)
+        .maybeSingle();
+
+      // Ne jamais écraser un statut réel (paid/arrived/cancelled) — l'ordre
+      // de livraison des webhooks Stripe n'est pas garanti.
+      if (member?.status === 'invite') {
+        await supabase.from('booking_members').update({ status: 'cancelled' }).eq('id', memberId);
+
+        const { data: remaining } = await supabase
+          .from('booking_members')
+          .select('status')
+          .eq('booking_id', bookingId)
+          .in('status', ['paid', 'arrived']);
+
+        if (!remaining || remaining.length === 0) {
+          await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
+        }
+
+        console.log(`[Webhook] Session expirée — membre ${memberId} (booking ${bookingId}) → cancelled`);
+      }
+    }
+  }
+
   // ── REMBOURSEMENT ────────────────────────────────────────────────────────
   if (event.type === 'charge.refunded') {
     const charge = event.data.object as Stripe.Charge;

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { calcFraisGestion } from '@/lib/booking-utils';
+import { calcFraisGestion, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 
@@ -266,6 +266,16 @@ export async function POST(req: NextRequest) {
         application_fee_amount: freeManagementFee ? 0 : Math.round(fraisGestion * 100),
         transfer_data: { destination: professionalStripeId },
       };
+    }
+
+    // Scope volontairement restreint aux réservations SOLO (pas de groupRef
+    // dans bookingMeta) : c'est le flux concerné par le bug "invite bloqué à
+    // vie" (voir diagnostic 17/07). Les groupes ont déjà leur propre filet
+    // (payment_deadline 20min + cron expire-groups), qu'on ne touche pas ici.
+    // 30 min = plancher dur Stripe pour expires_at (rien en dessous n'est
+    // accepté), aligné sur INVITE_EXPIRY_MS posé côté booking_members.
+    if (!bookingMeta?.groupRef) {
+      sessionParams.expires_at = Math.floor(Date.now() / 1000) + Math.floor(INVITE_EXPIRY_MS / 1000);
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
