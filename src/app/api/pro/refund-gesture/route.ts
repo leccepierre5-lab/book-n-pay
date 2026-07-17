@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { depositRefundAmountCents } from '@/lib/refunds';
+import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
@@ -80,6 +81,9 @@ export async function POST(req: NextRequest) {
     });
 
     await serviceSupabase.from('booking_members').update({ status: 'cancelled' }).eq('id', memberId);
+    // Voir lib/booking-lifecycle.ts — sans ça le créneau restait bloqué
+    // pour toujours (agenda pro + anti-collision réelle).
+    await cancelBookingIfNoActiveMembers(serviceSupabase, bookingId);
     await serviceSupabase.from('booking_logs').insert({
       booking_id: bookingId,
       message: `Remboursement geste commercial accordé par le professionnel`,

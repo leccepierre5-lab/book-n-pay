@@ -20,6 +20,7 @@ import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, phonesMatch } from '@/lib/booking-utils';
 import { depositRefundAmountCents } from '@/lib/refunds';
+import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 
@@ -105,6 +106,12 @@ export async function POST(req: NextRequest) {
       .from('booking_members')
       .update({ status: 'cancelled' })
       .eq('id', memberId);
+
+    // Sans ça, le créneau restait occupé pour toujours (agenda pro ET
+    // anti-collision réelle — ni /api/pro/agenda, ni la RPC Postgres
+    // assign_staff_and_create_booking ne regardent booking_members, les
+    // deux filtrent uniquement bookings.status). Voir lib/booking-lifecycle.ts.
+    await cancelBookingIfNoActiveMembers(serviceSupabase, bookingId);
 
     await serviceSupabase.from('booking_logs').insert({
       booking_id: bookingId,

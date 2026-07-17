@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { JOKERS_LIMITES, JOKERS_PCT } from '@/lib/booking-utils';
+import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
@@ -132,6 +133,10 @@ export async function POST(req: NextRequest) {
       .update({ status: 'cancelled', joker_applique: true, montant_rembourse: montantRembourse })
       .eq('id', memberId)
       .eq('booking_id', bookingId);
+
+    // Voir lib/booking-lifecycle.ts — même trou que cancel/refund-gesture,
+    // trouvé au même audit : sans ça le créneau restait bloqué pour toujours.
+    await cancelBookingIfNoActiveMembers(serviceSupabase, bookingId);
 
     return NextResponse.json({
       jokerApplique: true,
