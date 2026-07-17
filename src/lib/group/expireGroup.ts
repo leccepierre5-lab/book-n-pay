@@ -20,11 +20,22 @@ export async function expireGroupByRef(
   const unpaidMembers = activeMembers.filter((m: any) => m.status === 'invite');
 
   if (unpaidMembers.length === 0 && paidMembers.length > 0) {
+    // Filet de course — cette branche protège contre une lecture juste avant
+    // que le webhook checkout.session.completed (temps réel) n'ait fini de
+    // marquer tout le groupe 'completed' (section "Complétion de groupe",
+    // stripe/webhook/route.ts). Rarement atteinte en pratique : le webhook
+    // devance quasi toujours ce code (appelé par le cron quotidien
+    // expire-groups OU par le polling lazy group/pending-status), d'où 0
+    // ligne 'complete' observée en base au 17/07 malgré ce bug de frappe
+    // vieux de plusieurs sessions (commit 2dae9c4) — pas du code mort
+    // (chemin réellement atteignable), juste une fenêtre de course étroite.
+    // 'completed' est la seule valeur valide de l'enum (active/cancelled/
+    // completed) — 'complete' (sans d) échouait silencieusement ici.
     await supabase
       .from('bookings')
-      .update({ status: 'complete' })
+      .update({ status: 'completed' })
       .eq('group_ref', ref)
-      .neq('status', 'complete');
+      .neq('status', 'completed');
     return { expired: false };
   }
 
@@ -61,7 +72,7 @@ export async function expireGroupByRef(
             await sendEmail({
               to: emailTo,
               subject: `💸 Remboursement — Groupe expiré Book'nPay`,
-              text: `Bonjour ${member.name || 'vous'},\n\nMalheureusement, le délai de paiement pour votre réservation de groupe est expiré car tous les participants n'ont pas confirmé à temps.\n\n📍 ${(bk as any).biz_name}\n💆 ${(bk as any).service_name}\n📅 ${dateFormatted}\n\nVotre réservation a été annulée et vos frais de réservation (${member.deposit ?? 0}€) vous seront remboursés sous 5 à 10 jours ouvrés.\n\nNous sommes désolés pour la gêne occasionnée.\nL'équipe Book'nPay`,
+              text: `Bonjour ${member.name || 'vous'},\n\nMalheureusement, le délai de paiement pour votre réservation de groupe est expiré car tous les participants n'ont pas confirmé à temps.\n\n📍 ${(bk as any).biz_name}\n💆 ${(bk as any).service_name}\n📅 ${dateFormatted}\n\nVotre réservation a été annulée et vos frais de réservation (${member.deposit ?? 0}€) vous seront remboursés sous 5 à 10 jours ouvrés (hors frais de gestion, non remboursables).\n\nVous pouvez reprendre votre réservation en solo dès maintenant si vous le souhaitez, sans attendre les autres participants.\n\nNous sommes désolés pour la gêne occasionnée.\nL'équipe Book'nPay`,
             }).catch(() => {});
           }
         } catch (err: any) {
@@ -78,7 +89,7 @@ export async function expireGroupByRef(
           await sendEmail({
             to: emailTo,
             subject: `❌ Réservation de groupe annulée — Book'nPay`,
-            text: `Bonjour ${member.name || 'vous'},\n\nLe délai de paiement pour la réservation de groupe est expiré. Tous les participants n'ont pas confirmé dans les 20 minutes.\n\n📍 ${(bk as any).biz_name}\n💆 ${(bk as any).service_name}\n📅 ${dateFormatted}\n\nVotre place a été libérée. Aucun montant ne vous a été débité.\n\nN'hésitez pas à effectuer une nouvelle réservation sur book-n-pay.com\nL'équipe Book'nPay`,
+            text: `Bonjour ${member.name || 'vous'},\n\nLe délai de paiement pour la réservation de groupe est expiré. Tous les participants n'ont pas confirmé dans les 20 minutes.\n\n📍 ${(bk as any).biz_name}\n💆 ${(bk as any).service_name}\n📅 ${dateFormatted}\n\nVotre place a été libérée. Aucun montant ne vous a été débité.\n\nVous pouvez reprendre votre réservation en solo dès maintenant si vous le souhaitez, sans attendre les autres participants.\n\nL'équipe Book'nPay`,
           }).catch(() => {});
         }
       }

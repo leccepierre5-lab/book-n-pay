@@ -110,6 +110,15 @@ export async function POST(req: NextRequest) {
     }
 
     const groupRef = generateGroupRef();
+    // ⚠️ 20 min ici, PAS INVITE_EXPIRY_MS (30 min, booking-utils.ts) —
+    // divergence VOLONTAIRE, pas un oubli d'harmonisation. payment_deadline
+    // régit un groupe créé d'un coup (organisateur + invités déjà connus,
+    // mode A/B) et est lu par le cron expire-groups + le polling lazy
+    // group/pending-status (voir lib/group/expireGroup.ts) ; INVITE_EXPIRY_MS
+    // régit une invitation individuelle (solo, ou rejoindre-par-lien) et est
+    // lu par cleanup-expired-invites. Deux mécanismes, deux flux distincts,
+    // déjà testés séparément (CAS 2, 14/14 PASS) — ne pas aligner sans
+    // revalider tout le parcours groupe.
     const paymentDeadline = new Date(Date.now() + 20 * 60 * 1000).toISOString();
 
     const participantsMeta: ParticipantMeta[] = slots.map((slot: string, i: number) => {

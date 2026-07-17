@@ -84,7 +84,21 @@ function GroupCard({
   const deadline = first.payment_deadline;
   const now = new Date();
   const deadlineInFuture = deadline && new Date(deadline) > now;
-  const isExpired = !allPaid && deadline && new Date(deadline) <= now;
+  // Statut réel en base — posé par expireGroupByRef (cron expire-groups /
+  // vérif lazy pending-status) quand le groupe n'a pas été complété dans les
+  // 20 min (payment_deadline, propre à create-group — DISTINCT des 30 min
+  // INVITE_EXPIRY_MS qui régissent les invitations solo/lien, et distinct de
+  // la règle "remboursé si annulé <48h avant le RDV" qui ne s'applique qu'à
+  // une annulation volontaire d'un membre déjà payé — trois règles séparées,
+  // ne pas les confondre). `isExpired` ci-dessous reste un état TRANSITOIRE
+  // (deadline dépassée, pas encore traité) — une fois le groupe réellement
+  // annulé+remboursé, `first.status` passe à 'cancelled' et doit primer sur
+  // ce calcul local, sinon la carte reste bloquée sur "Expiré" indéfiniment.
+  const groupCancelled = first.status === 'cancelled';
+  const isExpired = !allPaid && !groupCancelled && deadline && new Date(deadline) <= now;
+  const totalRefunded = groupCancelled
+    ? allMembers.reduce((sum, m) => sum + (m.montant_rembourse || 0), 0)
+    : 0;
 
   const dateLabel = formatBookingDate(first.date);
   const timeRange = groupBookings.length > 1
@@ -113,12 +127,12 @@ function GroupCard({
             <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
               allPaid
                 ? 'bg-emerald-500/12 text-emerald-400 border-emerald-500/25'
-                : isExpired
+                : groupCancelled || isExpired
                 ? 'bg-red-500/12 text-red-400 border-red-500/25'
                 : 'bg-amber-500/12 text-amber-300 border-amber-500/25'
             }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${allPaid ? 'bg-emerald-400' : isExpired ? 'bg-red-400' : 'bg-amber-400'}`} />
-              {allPaid ? 'Complet' : isExpired ? 'Expiré' : 'En cours'}
+              <span className={`w-1.5 h-1.5 rounded-full ${allPaid ? 'bg-emerald-400' : groupCancelled || isExpired ? 'bg-red-400' : 'bg-amber-400'}`} />
+              {allPaid ? 'Complet' : groupCancelled ? 'Annulé' : isExpired ? 'Expiré' : 'En cours'}
             </span>
             <svg
               className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
@@ -155,24 +169,44 @@ function GroupCard({
           </div>
         )}
 
-        {/* Progress bar */}
-        <div className="mb-3">
-          <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: totalCount > 0 ? `${(paidCount / totalCount) * 100}%` : '0%',
-                background: allPaid
-                  ? 'linear-gradient(90deg, #34d399, #6ee7b7)'
-                  : 'linear-gradient(90deg, #f59e0b, #fcd34d)',
-              }}
-            />
+        {/* Groupe annulé faute de confirmation complète dans les temps —
+            remplace la barre de progression (plus significative une fois
+            tout le monde à 'cancelled') par un résumé explicite du
+            remboursement. */}
+        {groupCancelled ? (
+          <div className="mb-3 rounded-xl border border-red-500/20 bg-red-950/20 px-3 py-2.5">
+            <p className="text-xs text-red-300 font-medium">
+              Groupe non confirmé à temps — réservation annulée
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {totalRefunded > 0
+                ? `${totalRefunded.toFixed(2)}€ remboursés (hors frais de gestion, non remboursables). Détail par personne ci-dessous.`
+                : "Aucun montant n'avait été débité."}
+              {' '}Tu peux refaire une réservation en solo si tu veux.
+            </p>
           </div>
-        </div>
+        ) : (
+          <div className="mb-3">
+            <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: totalCount > 0 ? `${(paidCount / totalCount) * 100}%` : '0%',
+                  background: allPaid
+                    ? 'linear-gradient(90deg, #34d399, #6ee7b7)'
+                    : 'linear-gradient(90deg, #f59e0b, #fcd34d)',
+                }}
+              />
+            </div>
+          </div>
+        )}
 
-        {/* Participants list */}
+        {/* Participants list — une fois le groupe annulé, activeMembers est
+            vide (tout le monde est passé à 'cancelled') ; on retombe sur
+            allMembers pour garder l'historique visible (qui, remboursé de
+            combien) plutôt que de faire disparaître la liste. */}
         <div className="space-y-2">
-          {activeMembers.map((m) => {
+          {(groupCancelled ? allMembers : activeMembers).map((m) => {
             const isMe = phonesMatch(m.phone, myPhone);
             const payerMember = m.paid_by_member_id
               ? allMembers.find((am) => am.id === m.paid_by_member_id)
@@ -236,6 +270,14 @@ function GroupCard({
                 {payerMember && paidForAt && (
                   <p className="text-[10px] text-slate-600 ml-5 mt-0.5">
                     Payé par {payerMember.name || 'un membre'} · {paidForAt}
+                  </p>
+                )}
+                {/* Remboursement — uniquement affiché une fois le groupe
+                    réellement annulé (montant_rembourse posé par
+                    expireGroupByRef), pas de calcul spéculatif ici. */}
+                {groupCancelled && (m.montant_rembourse || 0) > 0 && (
+                  <p className="text-[10px] text-emerald-500/80 ml-5 mt-0.5">
+                    Remboursé {m.montant_rembourse!.toFixed(2)}€
                   </p>
                 )}
               </div>
