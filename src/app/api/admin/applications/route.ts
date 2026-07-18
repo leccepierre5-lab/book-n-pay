@@ -130,8 +130,20 @@ export async function POST(req: NextRequest) {
     const { hashed_token } = linkData.properties;
     const inviteUrl = `${siteUrl}/auth/verify?token_hash=${hashed_token}&type=invite`;
 
-    // ── Rollback (supprime l'utilisateur Auth si une étape suivante échoue) ──
-    const rollback = async (msg: string) => {
+    // ── Rollback (supprime l'utilisateur Auth, et le business s'il a déjà été
+    //    créé, si une étape suivante échoue) ──
+    // ⚠️ CORRECTIF (trouvé en audit, 18/07) : avant ce fix, un échec aux étapes
+    // 4-6 (après la création du business à l'étape 3) ne supprimait QUE
+    // auth.users — businesses/business_settings restaient orphelins
+    // (owner_id pointant vers un utilisateur supprimé). bizId n'est passé
+    // qu'à partir de l'étape 4, une fois le business réellement créé.
+    const rollback = async (msg: string, bizId?: string) => {
+      if (bizId) {
+        const { error: settingsDelErr } = await service.from('business_settings').delete().eq('biz_id', bizId);
+        if (settingsDelErr) console.error('[AdminApplications] Rollback business_settings échoué:', settingsDelErr.message);
+        const { error: bizDelErr } = await service.from('businesses').delete().eq('id', bizId);
+        if (bizDelErr) console.error('[AdminApplications] Rollback businesses échoué:', bizDelErr.message);
+      }
       await service.auth.admin.deleteUser(proUserId).catch(() => {});
       console.error('[AdminApplications] Rollback —', msg);
     };
@@ -183,7 +195,7 @@ export async function POST(req: NextRequest) {
       .upsert({ id: proUserId, name: app.gerant, role: 'pro', biz_id: biz.id });
 
     if (userError) {
-      await rollback(userError.message);
+      await rollback(userError.message, biz.id);
       return logAndRespond('[AdminApplications] Erreur app_users:', userError);
     }
 
@@ -210,7 +222,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (settingsError) {
-      await rollback(settingsError.message);
+      await rollback(settingsError.message, biz.id);
       return logAndRespond('[AdminApplications] Erreur business_settings:', settingsError);
     }
 
@@ -221,7 +233,7 @@ export async function POST(req: NextRequest) {
       .eq('id', applicationId);
 
     if (updateError) {
-      await rollback(updateError.message);
+      await rollback(updateError.message, biz.id);
       return logAndRespond('[AdminApplications] Erreur maj candidature:', updateError);
     }
 
