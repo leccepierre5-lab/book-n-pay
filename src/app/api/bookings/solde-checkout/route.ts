@@ -137,8 +137,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Compte Stripe du professionnel non configuré' }, { status: 400 });
     }
 
-    const successUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/solde-regle?booking=${bookingId}`;
-    const cancelUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/solde-regle?booking=${bookingId}&cancelled=1`;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app';
+    const successUrl = `${siteUrl}/solde-regle?booking=${bookingId}`;
+    const cancelUrl = `${siteUrl}/solde-regle?booking=${bookingId}&cancelled=1`;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],

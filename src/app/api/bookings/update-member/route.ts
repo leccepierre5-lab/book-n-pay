@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     if (safeUpdates.status === 'arrived' && previousMember?.status !== 'arrived' && previousMember?.phone) {
-      fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/loyalty/update-status`, {
+      fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app'}/api/loyalty/update-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

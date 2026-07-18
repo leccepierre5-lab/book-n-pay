@@ -536,7 +536,7 @@ L'équipe Book'nPay`,
 Le paiement de votre abonnement Book'nPay (${amount}€) pour ${biz.name} n'a pas abouti.${reason ? `\n\nRaison : ${reason}` : ''}
 
 Merci de mettre à jour votre moyen de paiement dès que possible pour éviter une interruption de service :
-${process.env.NEXT_PUBLIC_SITE_URL}/pro/reglages
+${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app'}/pro/reglages
 
 L'équipe Book'nPay`,
             }).catch(() => {});
