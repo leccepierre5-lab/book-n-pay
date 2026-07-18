@@ -11,7 +11,7 @@ export async function getProBookingsForMonth(bizId: string, year: number, month:
 
   const { data, error } = await supabase
     .from('bookings')
-    .select('*, booking_members(*)')
+    .select('*, booking_members(*), services(price)')
     .eq('biz_id', bizId)
     .gte('date', from)
     .lte('date', to)

@@ -17,6 +17,7 @@ import {
   subMonths,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import CaisseEncaissement from './CaisseEncaissement';
 
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
@@ -33,6 +34,9 @@ interface BookingMemberRow {
   name: string;
   status: string;
   deposit: number | null;
+  payment_mode: string | null;
+  referrer_name?: string | null;
+  referral_discount_pct?: number;
 }
 
 interface BookingRow {
@@ -42,6 +46,7 @@ interface BookingRow {
   service_name: string;
   staff_name: string | null;
   booking_members: BookingMemberRow[];
+  services?: { price: number } | null;
 }
 
 function exportDayToICS(date: string, dayBookings: BookingRow[]) {
@@ -75,6 +80,7 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCaisse, setSelectedCaisse] = useState<{ booking: BookingRow; member: BookingMemberRow } | null>(null);
 
   const loadMonth = useCallback(
     (date: Date) => {
@@ -295,12 +301,22 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
                                   {m.deposit}€
                                 </span>
                               )}
-                              <span
-                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                style={{ background: cfg.color, color: cfg.text }}
-                              >
-                                {cfg.label}
-                              </span>
+                              {m.status === 'paid' ? (
+                                <button
+                                  onClick={() => setSelectedCaisse({ booking: b, member: m })}
+                                  className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-navy-950"
+                                  style={{ background: 'linear-gradient(135deg, #34d399, #6ee7b7)' }}
+                                >
+                                  Clôturer
+                                </button>
+                              ) : (
+                                <span
+                                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                  style={{ background: cfg.color, color: cfg.text }}
+                                >
+                                  {cfg.label}
+                                </span>
+                              )}
                             </div>
                           </div>
                         );
@@ -311,6 +327,29 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {selectedCaisse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm">
+            <CaisseEncaissement
+              member={selectedCaisse.member}
+              booking={selectedCaisse.booking}
+              onValidatePresence={() => {
+                setBookings((prev) =>
+                  prev.map((b) =>
+                    b.id === selectedCaisse.booking.id
+                      ? { ...b, booking_members: b.booking_members.map((m) => m.id === selectedCaisse.member.id ? { ...m, status: 'arrived' } : m) }
+                      : b
+                  )
+                );
+              }}
+            />
+            <button onClick={() => setSelectedCaisse(null)} className="mt-2 w-full rounded-xl bg-navy-900 border border-white/[0.08] py-2.5 text-xs text-slate-400 hover:text-white transition-colors">
+              Fermer
+            </button>
+          </div>
         </div>
       )}
     </div>
