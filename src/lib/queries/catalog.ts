@@ -60,6 +60,12 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
   // en diagnostiquant un vrai 404 en prod sur les 45 établissements vitrine.
   queryBuilder = queryBuilder.eq('frozen', false).eq('is_published', true);
 
+  // Vitrine démo commerciale (voir /tarifs) : publiée et réservable pour rester
+  // accessible en lien direct, mais volontairement absente du catalogue public
+  // — une fiche démo mélangée aux vraies fiches dans une recherche organique
+  // décrédibiliserait le catalogue commercial.
+  queryBuilder = queryBuilder.neq('slug', 'demo-book-n-pay');
+
   const { data, error } = await queryBuilder;
   if (error) {
     console.error('[searchBusinesses]', error.message);

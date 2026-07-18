@@ -274,7 +274,7 @@ export default function TarifsPage() {
               href="/etablissement/demo-book-n-pay"
               className="inline-flex items-center gap-2 rounded-2xl py-3.5 px-6 text-sm font-semibold text-white border border-white/15 bg-white/5 transition-all hover:scale-[1.01] hover:bg-white/10"
             >
-              Essayer une réservation en conditions réelles →
+              Essayer le parcours de réservation →
             </Link>
           </div>
         </section>
