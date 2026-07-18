@@ -221,6 +221,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Garde-fou Connect obligatoire hors mode test ──────────────────────────
+    // ⚠️ CORRECTIF (audit, 18/07) : jusqu'ici, l'absence de compte Connect
+    // finalisé n'empêchait jamais de payer — le paiement partait simplement
+    // sans transfer_data.destination, donc intégralement chez Book'nPay, sans
+    // personne à qui le reverser. mode_test_paiement=true reste volontairement
+    // permissif (fixtures/audit, aucun argent réel en jeu — c'est ce qui a
+    // permis tous les tests de cette session sur fixture-pro-audit, qui n'a
+    // pas de compte Connect). Mais en mode live, un business sans Connect
+    // finalisé (stripe_onboarding_complete garanti aligné sur charges_enabled
+    // réel, voir connect-status/route.ts) ne doit structurellement jamais
+    // pouvoir encaisser — même trou que d39f340, cette fois indépendant de
+    // isNonRealBusiness (viserait aussi un vrai pro dont l'onboarding Stripe
+    // ne serait pas terminé).
+    if (!isTestMode && !professionalStripeId) {
+      console.error(
+        `[Checkout] Paiement live refusé — compte Connect non finalisé — biz=${bookingMeta?.bizId || 'inconnu'}`
+      );
+      return NextResponse.json(
+        { error: "Cet établissement n'est pas encore prêt à recevoir des paiements." },
+        { status: 423 }
+      );
+    }
+
     // ── Construction de la session Stripe ────────────────────────────────────
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
       {
