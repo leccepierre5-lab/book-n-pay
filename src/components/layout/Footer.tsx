@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { openCookieNotice } from './CookieBanner';
 
 export default function Footer() {
   const year = new Date().getFullYear();
@@ -14,8 +15,13 @@ export default function Footer() {
           <Link href="/mentions-legales" className="hover:text-white transition-colors duration-200">
             Mentions légales
           </Link>
-          {/* Emplacement réservé pour le futur lien "Gérer les cookies"
-              (bandeau de consentement pas encore implémenté). */}
+          <button
+            type="button"
+            onClick={openCookieNotice}
+            className="hover:text-white transition-colors duration-200"
+          >
+            Gérer les cookies
+          </button>
           <a
             href="mailto:contact@book-n-pay.com"
             className="hover:text-white transition-colors duration-200"

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import PageTransition from '@/components/PageTransition';
+import CookieBanner from '@/components/layout/CookieBanner';
 import { BNP_PLANS } from '@/lib/plans-config';
 
 const inter = Inter({
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <PageTransition>{children}</PageTransition>
+        <CookieBanner />
       </body>
     </html>
   );
