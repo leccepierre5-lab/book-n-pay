@@ -262,13 +262,19 @@ export default function TarifsPage() {
             </div>
           </div>
 
-          <div className="mt-10 text-center">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/simulator"
               className="inline-flex items-center gap-2 rounded-2xl py-3.5 px-6 text-sm font-semibold text-navy-950 transition-all hover:scale-[1.01]"
               style={{ background: 'linear-gradient(135deg, #34d399, #6ee7b7)', boxShadow: '0 4px 20px rgba(52,211,153,0.35)' }}
             >
               Simuler mon ROI →
+            </Link>
+            <Link
+              href="/etablissement/demo-book-n-pay"
+              className="inline-flex items-center gap-2 rounded-2xl py-3.5 px-6 text-sm font-semibold text-white border border-white/15 bg-white/5 transition-all hover:scale-[1.01] hover:bg-white/10"
+            >
+              Essayer une réservation en conditions réelles →
             </Link>
           </div>
         </section>
