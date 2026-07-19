@@ -146,6 +146,13 @@ export default function MonCompteClient({
                 Modifier le mot de passe
                 <svg className="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
+              <a
+                href="/api/auth/export-data"
+                className="w-full flex items-center justify-between px-4 py-3.5 text-sm text-slate-300 hover:text-white hover:bg-white/[0.03] transition-colors text-left"
+              >
+                Télécharger mes données
+                <svg className="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="7 10 12 15 17 10"/><polyline points="12 15 12 3"/></svg>
+              </a>
               <button
                 onClick={() => { setSection('delete'); setDeleteStep(1); setDeleteError(null); setDeletePw(''); }}
                 className="w-full flex items-center justify-between px-4 py-3.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/[0.04] transition-colors text-left"

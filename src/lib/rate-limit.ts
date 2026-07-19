@@ -12,16 +12,23 @@ export interface RateLimitResult {
 }
 
 /**
- * Fail-open par design : si la table/fonction n'existe pas encore (migration
+ * Fail-open par défaut : si la table/fonction n'existe pas encore (migration
  * pas encore exécutée) ou en cas d'erreur réseau, on laisse passer la requête
  * plutôt que de casser l'inscription/connexion/paiement pour tout le monde.
  * Un rate limiter qui plante ne doit jamais devenir un déni de service.
+ *
+ * `failClosed: true` inverse ce choix pour les endpoints où bloquer par
+ * excès de prudence est préférable à un rate-limit qui disparaît (ex. export
+ * de données personnelles) — l'appelant ne perd qu'un retry différé, pas un
+ * flux business critique.
  */
 export async function checkRateLimit(
   key: string,
   limit: number,
-  windowSeconds: number
+  windowSeconds: number,
+  options: { failClosed?: boolean } = {}
 ): Promise<RateLimitResult> {
+  const fallback = { allowed: !options.failClosed, currentCount: 0 };
   try {
     const supabase = createServiceRoleClient();
     const { data, error } = await supabase
@@ -29,8 +36,8 @@ export async function checkRateLimit(
       .single();
 
     if (error || !data) {
-      console.warn('[rate-limit] check_rate_limit indisponible, fail-open:', error?.message);
-      return { allowed: true, currentCount: 0 };
+      console.warn(`[rate-limit] check_rate_limit indisponible, fail-${options.failClosed ? 'closed' : 'open'}:`, error?.message);
+      return fallback;
     }
 
     // Client Supabase non typé sur le schéma (database.types.ts est maintenu
@@ -38,8 +45,8 @@ export async function checkRateLimit(
     const row = data as { allowed: boolean; current_count: number };
     return { allowed: row.allowed, currentCount: row.current_count };
   } catch (e: any) {
-    console.warn('[rate-limit] erreur inattendue, fail-open:', e.message);
-    return { allowed: true, currentCount: 0 };
+    console.warn(`[rate-limit] erreur inattendue, fail-${options.failClosed ? 'closed' : 'open'}:`, e.message);
+    return fallback;
   }
 }
 
