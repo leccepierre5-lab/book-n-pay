@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode, generateGroupRef, normalizePhone, isSlotPast } from '@/lib/booking-utils';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
+import { createSoloBookingWithOverlapCheck } from '@/lib/booking-solo-overlap';
 import { assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { normalizeStaffChoice, orderExplicitFirst, getCandidateStaffIds } from '@/lib/staff-group-order';
 import { logAndRespond } from '@/lib/api-error';
@@ -286,10 +287,68 @@ export async function POST(req: NextRequest) {
 
         resultsByIndex.set(p.index, { bookingId: assigned.id, memberId: member.id });
       }
+    } else if (service && service.allow_group === false) {
+      // Individuel, business SANS staff actif — anti-chevauchement par
+      // durée (migration 0035), même correctif que create/route.ts. Chaque
+      // participant peut avoir un slot différent (CAS 1, plusieurs amis
+      // réservant chacun leur propre créneau chez le même solo) — le verrou
+      // (biz_id, date) de la RPC sérialise les appels de cette boucle entre
+      // eux aussi bien qu'avec une réservation solo concurrente ailleurs.
+      for (const p of participantsMeta) {
+        let booking: { id: string };
+        try {
+          const rpcBooking = await createSoloBookingWithOverlapCheck(supabaseService, {
+            bizId,
+            bizName,
+            serviceId,
+            serviceName,
+            date,
+            time: p.slot,
+            clientId: p.isOrganizer ? (authData.user?.id || null) : null,
+            clientPhone: p.participantPhone,
+            clientName: p.participantName,
+            clientEmail: p.participantEmail,
+            groupRef,
+            paymentDeadline,
+          });
+
+          if (!rpcBooking) {
+            throw Object.assign(
+              new Error(`Le créneau ${p.slot} chevauche une autre prestation déjà réservée. Merci de réessayer.`),
+              { isSlotConflict: true }
+            );
+          }
+          booking = rpcBooking;
+        } catch (err: any) {
+          if (err?.isSlotConflict) throw err;
+          throw err;
+        }
+
+        createdBookingIds.push(booking.id);
+
+        const { data: member, error: memberError } = await supabaseService
+          .from('booking_members')
+          .insert({
+            booking_id: booking.id,
+            name: p.participantName,
+            phone: p.participantPhone,
+            status: 'invite',
+            qr_code: generateQrCode(),
+            referrer_name: p.isOrganizer ? referrerName : null,
+          })
+          .select('id')
+          .single();
+
+        if (memberError) throw memberError;
+        createdMemberIds.push(member.id);
+
+        resultsByIndex.set(p.index, { bookingId: booking.id, memberId: member.id });
+      }
     } else {
-      // Service collectif, ou business sans staff actif — chemin inchangé :
-      // RPC anti-surbooking (0026), staff partagé pour tout le groupe (ex.
-      // un instructeur de cours).
+      // Service collectif — chemin inchangé : RPC anti-surbooking (0026),
+      // staff partagé pour tout le groupe (ex. un instructeur de cours) —
+      // capacité par tête à l'heure exacte, comportement voulu (pas un
+      // chevauchement à bloquer).
       for (const p of participantsMeta) {
         let booking: { id: string };
         try {

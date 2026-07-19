@@ -95,6 +95,74 @@ export async function computeStaffAvailabilityForDay(
   return { staffRows: staffRows || [], availability };
 }
 
+// Même algorithme que computeStaffAvailabilityForDay, appliqué à un pro SOLO
+// (aucun staff actif) en le traitant comme un praticien virtuel unique —
+// corrige l'affichage pour qu'il tienne enfin compte de la durée des
+// prestations, plutôt que du seul comptage par tête à l'heure exacte
+// (trouvé en audit du 19/07/2026 ; voir create_solo_booking_with_overlap_check,
+// migration 0035, pour le pendant écriture — les deux DOIVENT rester
+// cohérents, sinon l'affichage promettrait un créneau que la création
+// refuserait). Ne retourne un résultat QUE si le business n'a aucun staff
+// actif — sinon computeStaffAvailabilityForDay doit être utilisée à la
+// place ; les deux chemins ne se chevauchent jamais côté appelant
+// (availability/route.ts).
+//
+// Périmètre volontairement identique à celui de la fonction SQL (voir point
+// 3 de la migration 0035) : toutes les réservations individuelles
+// (services.allow_group=false) du même business ce jour-là, staff_id ou
+// non — un business sans staff actif AUJOURD'HUI peut porter d'anciennes
+// réservations avec un staff_id hérité d'avant la désactivation du staff ;
+// les ignorer ici les rendrait invisibles à l'écriture aussi (même filtre),
+// donc pas juste un défaut d'affichage mais une vraie collision possible. Un
+// service collectif du même business n'est pas pris en compte ici (hors
+// périmètre assumé, voir migration 0035).
+export async function computeSoloAvailabilityForDay(
+  supabase: SupabaseClient,
+  bizId: string,
+  date: string,
+  durationMinutes: number
+): Promise<Record<string, { freeCount: number; freeStaffIds: string[] }> | null> {
+  const { data: staffRows, error: staffError } = await supabase
+    .from('staff')
+    .select('id')
+    .eq('biz_id', bizId)
+    .eq('is_active', true);
+  if (staffError) throw staffError;
+  if ((staffRows || []).length > 0) return null; // vrai staff configuré — pas ce chemin
+
+  const { data: bizHours } = await supabase
+    .from('businesses')
+    .select('open_time, close_time, open_days')
+    .eq('id', bizId)
+    .maybeSingle();
+
+  const { data: bookingRows } = await supabase
+    .from('bookings')
+    .select('time, services!inner(duration_minutes, allow_group)')
+    .eq('biz_id', bizId)
+    .eq('date', date)
+    .neq('status', 'cancelled')
+    .eq('services.allow_group', false);
+
+  const existingBookings = (bookingRows || []).map((b: any) => ({
+    staff_id: '__solo__',
+    time: b.time as string,
+    duration_minutes: b.services?.duration_minutes ?? 30,
+  }));
+
+  return computeStaffAvailability({
+    date,
+    durationMinutes,
+    businessOpenTime: bizHours?.open_time ?? null,
+    businessCloseTime: bizHours?.close_time ?? null,
+    businessOpenDays: bizHours?.open_days ?? [],
+    staff: [{ id: '__solo__', name: 'solo' }],
+    schedules: [], // [] → resolveWorkingRanges retombe sur les horaires business
+    existingBookings,
+    absences: [],
+  });
+}
+
 export interface AssignStaffParams {
   bizId: string;
   bizName: string;

@@ -28,7 +28,7 @@
 // 100% identique à avant (counts).
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { computeStaffAvailabilityForDay } from '@/lib/staff-assignment';
+import { computeStaffAvailabilityForDay, computeSoloAvailabilityForDay } from '@/lib/staff-assignment';
 import { logAndRespond } from '@/lib/api-error';
 
 export async function GET(req: NextRequest) {
@@ -112,6 +112,22 @@ export async function GET(req: NextRequest) {
       // nul dans computeStaffAvailability → sinon tous les créneaux retournent freeCount:0)
       if (Object.keys(av).length > 0) {
         responseBody.staffAvailability = av;
+      }
+    } else {
+      // Business sans staff actif (pro solo) — même algorithme par durée
+      // que le staff réel, appliqué au pro comme praticien virtuel unique.
+      // Corrige un affichage qui ne tenait auparavant compte que du
+      // comptage par tête (counts ci-dessus), jamais de la durée (trouvé en
+      // audit 19/07 ; voir create_solo_booking_with_overlap_check,
+      // migration 0035, pour le pendant écriture).
+      const soloAvailability = await computeSoloAvailabilityForDay(
+        supabase,
+        bizId,
+        date,
+        service.duration_minutes
+      );
+      if (soloAvailability && Object.keys(soloAvailability).length > 0) {
+        responseBody.staffAvailability = soloAvailability;
       }
     }
   }

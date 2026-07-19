@@ -5,6 +5,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { generateQrCode, isSlotPast, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
 import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
+import { createSoloBookingWithOverlapCheck } from '@/lib/booking-solo-overlap';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import { isNonRealBusiness } from '@/lib/queries/catalog';
@@ -192,10 +193,36 @@ export async function POST(req: NextRequest) {
     if (rpcBooking) {
       // Déjà inséré par assign_staff_and_create_booking (RETURNING *).
       booking = rpcBooking;
+    } else if (service && service.allow_group === false) {
+      // Individuel, business SANS staff actif — anti-chevauchement par
+      // durée (migration 0035). Remplace l'ancien passage par
+      // create_booking_with_capacity_check ici, qui ne protégeait que le
+      // même service/créneau exact, jamais deux services différents
+      // chevauchant chez le même pro solo (trouvé en audit 19/07).
+      const soloBooking = await createSoloBookingWithOverlapCheck(supabaseService, {
+        bizId,
+        bizName,
+        serviceId,
+        serviceName,
+        date,
+        time,
+        clientId: authData.user?.id || null,
+        clientPhone: clientPhone || null,
+        clientName,
+        clientEmail: clientEmail || null,
+      });
+
+      if (!soloBooking) {
+        return NextResponse.json(
+          { error: 'Ce créneau chevauche une autre prestation déjà réservée. Merci de choisir un autre horaire.' },
+          { status: 409 }
+        );
+      }
+      booking = soloBooking;
     } else {
-      // Service collectif, ou business sans staff actif — passe par la RPC
-      // anti-surbooking (migration 0026) : verrou + re-vérification de
-      // services.max_persons + insertion dans une seule transaction Postgres.
+      // Service collectif — capacité par tête (migration 0026/0027),
+      // inchangé : plusieurs personnes sur un même créneau est le
+      // comportement voulu, pas un chevauchement à bloquer.
       const capacityBooking = await createBookingWithCapacityCheck(supabaseService, {
         bizId,
         bizName,
