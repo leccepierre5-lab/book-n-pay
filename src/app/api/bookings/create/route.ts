@@ -8,6 +8,7 @@ import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import { isNonRealBusiness } from '@/lib/queries/catalog';
+import { isDemoTesterEmail } from '@/lib/demo-mode';
 import type { Booking } from '@/lib/database.types';
 
 export async function POST(req: NextRequest) {
@@ -68,6 +69,21 @@ export async function POST(req: NextRequest) {
     // Même helper que le noindex SEO — source unique de "fiche non réelle",
     // ne pas réinventer un critère owner_id divergent ici.
     if (!business || isNonRealBusiness(business)) {
+      // Mode démo — testeur whitelisté (DEMO_TESTER_EMAILS, email lu depuis
+      // la session serveur, jamais un paramètre) sur une fiche sans
+      // propriétaire réel : on laisse vivre le parcours (paiement Stripe
+      // test réel côté client) mais SANS créer de ligne bookings/
+      // booking_members — cette fiche n'a ni pro ni agenda pour jamais
+      // l'afficher/la gérer, elle resterait orpheline en base pour
+      // toujours. Le récap de confirmation est reconstruit côté front
+      // depuis les données du parcours, pas depuis la base (voir
+      // confirmation/page.tsx).
+      if (business && isNonRealBusiness(business) && isDemoTesterEmail(authData.user?.email)) {
+        return NextResponse.json({
+          demo: true,
+          booking: { biz_name: bizName, service_name: serviceName, staff_name: staffName || null, date, time },
+        });
+      }
       return NextResponse.json(
         { error: "Cet établissement n'est pas disponible à la réservation." },
         { status: 423 }

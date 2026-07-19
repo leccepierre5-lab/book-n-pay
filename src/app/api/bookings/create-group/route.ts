@@ -6,6 +6,7 @@ import { assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { normalizeStaffChoice, orderExplicitFirst, getCandidateStaffIds } from '@/lib/staff-group-order';
 import { logAndRespond } from '@/lib/api-error';
 import { isNonRealBusiness } from '@/lib/queries/catalog';
+import { isDemoTesterEmail } from '@/lib/demo-mode';
 import type { Booking } from '@/lib/database.types';
 
 interface ParticipantMeta {
@@ -85,6 +86,29 @@ export async function POST(req: NextRequest) {
     // unique partagée avec le noindex SEO) — voir ce fichier pour le
     // raisonnement complet (fiches démo réservables ET payables).
     if (!biz || isNonRealBusiness(biz)) {
+      // Mode démo — même mécanisme que bookings/create/route.ts (voir ce
+      // fichier pour le raisonnement complet). Mode A seulement (paiement
+      // groupé en un coup, tout connu à l'avance) : le mode B (invitation
+      // par lien, ouvert plus tard dans une AUTRE session) est
+      // structurellement incompatible avec "rien écrit en base" — il n'y
+      // aurait rien en base à quoi le lien pourrait pointer.
+      if (biz && isNonRealBusiness(biz) && isDemoTesterEmail(authData.user?.email)) {
+        if (mode === 'b') {
+          return NextResponse.json(
+            { error: "Le mode invitation par lien n'est pas disponible en mode démo. Choisis un paiement groupé (mode A) ou une réservation solo." },
+            { status: 400 }
+          );
+        }
+        return NextResponse.json({
+          demo: true,
+          groupRef: 'demo',
+          primaryBookingId: null,
+          primaryMemberId: null,
+          allMemberIds: [],
+          guestMemberIds: [],
+          booking: { biz_name: bizName, service_name: serviceName, date, slots, participants: slots.length },
+        });
+      }
       return NextResponse.json({ error: "Cet établissement n'est pas disponible à la réservation." }, { status: 423 });
     }
 

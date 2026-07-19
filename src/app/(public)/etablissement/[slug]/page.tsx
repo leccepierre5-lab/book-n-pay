@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getBusinessBySlug, isNonRealBusiness, CATEGORIES } from '@/lib/queries/catalog';
+import { isDemoTesterEmail } from '@/lib/demo-mode';
 import BookingFlow from '@/components/booking/BookingFlow';
 import FavoriteButton from '@/components/public/FavoriteButton';
 
@@ -99,6 +100,7 @@ export default async function EtablissementPage({
       .maybeSingle();
     isFavorited = !!fav;
   }
+  const isDemoTester = isDemoTesterEmail(authData.user?.email);
 
   const photos = (business.business_photos ?? []).sort((a, b) => a.sort_order - b.sort_order);
   const hasSocial =
@@ -253,7 +255,7 @@ export default async function EtablissementPage({
       )}
 
       </div>
-      {isNonRealBusiness(business) ? (
+      {isNonRealBusiness(business) && !isDemoTester ? (
         // Couche 1 (confort) du garde-fou démo — les couches dures sont
         // bookings/create[-group] et stripe/checkout, qui rejettent déjà la
         // réservation même via un appel direct. Ici on évite juste de faire
@@ -270,7 +272,20 @@ export default async function EtablissementPage({
           </div>
         </div>
       ) : (
-        <BookingFlow business={business} icon={CATEGORY_ICONS[business.category] || '🏢'} />
+        <>
+          {isNonRealBusiness(business) && isDemoTester && (
+            <div className="max-w-4xl mx-auto px-4 pt-3">
+              <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 text-center">
+                <p className="text-xs font-semibold text-amber-300 mb-0.5">🧪 Mode démo — testeur</p>
+                <p className="text-xs text-amber-200/80">
+                  Fiche sans compte pro actif. Le paiement se fait en carte de test Stripe (4242 4242 4242 4242),
+                  aucun euro réel ne bouge, et rien n&apos;est enregistré côté réservation.
+                </p>
+              </div>
+            </div>
+          )}
+          <BookingFlow business={business} icon={CATEGORY_ICONS[business.category] || '🏢'} />
+        </>
       )}
     </div>
   );

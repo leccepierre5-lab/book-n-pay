@@ -301,6 +301,10 @@ export async function POST(req: NextRequest) {
         clientUserId: clientUserId || '',
         referralDiscountPct: String(referralDiscountPct),
         hasFreeManagementFee: freeManagementFee ? 'true' : 'false',
+        // Traçabilité dashboard Stripe uniquement — bookingId/memberId vides
+        // pour une session démo font déjà que le webhook no-op proprement
+        // (voir stripe/webhook/route.ts), ce flag ne change aucun comportement.
+        isDemo: bookingMeta?.isDemo ? 'true' : 'false',
       },
     };
 

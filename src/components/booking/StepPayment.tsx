@@ -5,6 +5,7 @@ import type { BusinessWithDetails } from '@/lib/queries/catalog';
 import type { Service, Staff } from '@/lib/database.types';
 import { calcFraisGestion, normalizePhone, isSlotPast } from '@/lib/booking-utils';
 import { createClient } from '@/lib/supabase/client';
+import { isNonRealBusiness } from '@/lib/business-helpers';
 
 // Contact Picker API — Chrome Android 80+, absent sur Safari iOS et desktop.
 type ContactRecord = { name?: string[]; tel?: string[] };
@@ -108,9 +109,9 @@ function RecapBox({
 }
 
 function ModeSelection({
-  service, participants, onSelect,
+  service, participants, onSelect, hideModeB,
 }: {
-  service: Service; participants: number; onSelect: (m: PayMode) => void;
+  service: Service; participants: number; onSelect: (m: PayMode) => void; hideModeB?: boolean;
 }) {
   const total = service.deposit * participants;
   return (
@@ -141,31 +142,35 @@ function ModeSelection({
         </div>
       </button>
 
-      {/* Mode B */}
-      <button
-        onClick={() => onSelect('b')}
-        className="w-full text-left rounded-2xl bg-navy-900 border border-white/[0.08] p-4 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all duration-200"
-      >
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-            </svg>
+      {/* Mode B — masqué en mode démo (fiche sans propriétaire réel) :
+          un lien d'invitation n'a rien de persistant à quoi pointer sans
+          écriture en base, voir bookings/create-group/route.ts. */}
+      {!hideModeB && (
+        <button
+          onClick={() => onSelect('b')}
+          className="w-full text-left rounded-2xl bg-navy-900 border border-white/[0.08] p-4 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all duration-200"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">Partager un lien à chaque personne</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Vous payez <strong className="text-white">{service.deposit}€</strong> maintenant,
+                les autres reçoivent un lien pour payer le leur.
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Fonctionne via WhatsApp, SMS ou n'importe quelle messagerie.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-bold text-white">Partager un lien à chaque personne</p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Vous payez <strong className="text-white">{service.deposit}€</strong> maintenant,
-              les autres reçoivent un lien pour payer le leur.
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Fonctionne via WhatsApp, SMS ou n'importe quelle messagerie.
-            </p>
-          </div>
-        </div>
-      </button>
+        </button>
+      )}
     </div>
   );
 }
@@ -235,6 +240,7 @@ function ModeAPayment({
       if (!createRes.ok || createData.error) throw new Error(createData.error || 'Erreur création réservation');
 
       const { groupRef, primaryBookingId, primaryMemberId, allMemberIds } = createData;
+      const isDemo = !!createData.demo;
 
       // Single Stripe checkout for N × deposit + fraisGestion
       const discountPct: number = (profile?.referral_discounts_available || 0) > 0
@@ -242,6 +248,12 @@ function ModeAPayment({
         : (profile?.pending_referral_discount_pct || 0);
       const ratio = discountPct > 0 ? (1 - discountPct / 100) : 1;
       const effectiveDepositPerPerson = Math.round(depositPerPerson * ratio * 100) / 100;
+
+      // Mode démo — même raisonnement que SoloPayment : rien écrit en base,
+      // confirmation reconstruite depuis les query params.
+      const successUrl = isDemo
+        ? `${window.location.origin}/confirmation?demo=1&biz=${encodeURIComponent(business.name)}&service=${encodeURIComponent(service.name)}&date=${date}&slots=${encodeURIComponent(slots.join(','))}&participants=${participants}${staff?.name ? `&staff=${encodeURIComponent(staff.name)}` : ''}`
+        : `${window.location.origin}/confirmation?booking=${primaryBookingId}`;
 
       const checkoutRes = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -251,10 +263,10 @@ function ModeAPayment({
           quantity: participants,
           clientUserId: authData.user?.id || '',
           bookingMeta: {
-            bookingId: primaryBookingId,
-            memberId: primaryMemberId,
-            groupRef,
-            allMemberIds: allMemberIds.join(','),
+            bookingId: isDemo ? '' : primaryBookingId,
+            memberId: isDemo ? '' : primaryMemberId,
+            groupRef: isDemo ? '' : groupRef,
+            allMemberIds: (allMemberIds || []).join(','),
             bizId: business.id,
             bizName: business.name,
             serviceName: service.name,
@@ -263,8 +275,9 @@ function ModeAPayment({
             clientName: profile?.name || '',
             clientPhone: profile?.phone || '',
             clientEmail: authData.user?.email || '',
+            isDemo,
           },
-          successUrl: `${window.location.origin}/confirmation?booking=${primaryBookingId}`,
+          successUrl,
           cancelUrl: window.location.href,
         }),
       });
@@ -772,8 +785,18 @@ function SoloPayment({
           clientEmail: authData.user?.email || '',
         }),
       });
-      const { booking, member, error: createError } = await createRes.json();
+      const createData = await createRes.json();
+      const { booking, member, error: createError } = createData;
       if (createError) throw new Error(createError);
+      const isDemo = !!createData.demo;
+
+      // Mode démo (fiche sans propriétaire réel, testeur whitelisté côté
+      // serveur) : bookings/create n'a rien écrit en base — pas de booking.id
+      // ni member.id réels. La confirmation est reconstruite depuis les
+      // query params, pas depuis la base (voir confirmation/page.tsx).
+      const successUrl = isDemo
+        ? `${window.location.origin}/confirmation?demo=1&biz=${encodeURIComponent(business.name)}&service=${encodeURIComponent(service.name)}&date=${date}&time=${time}${staff?.name ? `&staff=${encodeURIComponent(staff.name)}` : ''}`
+        : `${window.location.origin}/confirmation?booking=${booking.id}`;
 
       const checkoutRes = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -783,8 +806,8 @@ function SoloPayment({
           quantity: 1,
           clientUserId: authData.user?.id || '',
           bookingMeta: {
-            bookingId: booking.id,
-            memberId: member.id,
+            bookingId: isDemo ? '' : booking.id,
+            memberId: isDemo ? '' : member.id,
             bizId: business.id,
             bizName: business.name,
             serviceName: service.name,
@@ -793,8 +816,9 @@ function SoloPayment({
             clientName: profile?.name || '',
             clientPhone: profile?.phone || '',
             clientEmail: authData.user?.email || '',
+            isDemo,
           },
-          successUrl: `${window.location.origin}/confirmation?booking=${booking.id}`,
+          successUrl,
           cancelUrl: window.location.href,
         }),
       });
@@ -937,7 +961,7 @@ export default function StepPayment({
     return (
       <div>
         <RecapBox business={business} service={service} staff={staff} date={date} slots={slots} participants={participants} staffChoices={staffChoices} />
-        <ModeSelection service={service} participants={participants} onSelect={setMode} />
+        <ModeSelection service={service} participants={participants} onSelect={setMode} hideModeB={isNonRealBusiness(business)} />
       </div>
     );
   }
