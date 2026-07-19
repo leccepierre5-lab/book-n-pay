@@ -9,6 +9,7 @@ import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { depositRefundAmountCents } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
+import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 
 export async function POST(req: NextRequest) {
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     const serviceSupabase = createServiceRoleClient();
     const { data: booking } = await serviceSupabase
       .from('bookings')
-      .select('biz_id')
+      .select('biz_id, biz_name, service_name, date, time, client_email')
       .eq('id', bookingId)
       .maybeSingle();
 
@@ -88,6 +89,38 @@ export async function POST(req: NextRequest) {
       booking_id: bookingId,
       message: `Remboursement geste commercial accordé par le professionnel`,
     });
+
+    // Email au client — le remboursement lui-même est déjà acquis à ce stade
+    // (au-dessus), un échec d'envoi ne doit jamais faire échouer la réponse.
+    const clientEmail = member.email || booking.client_email;
+    if (clientEmail) {
+      const dateFormatted = new Date(booking.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      });
+      const amountFormatted = (member.deposit ?? 0).toFixed(2);
+
+      await sendEmail({
+        to: clientEmail,
+        subject: `✅ Remboursement — ${booking.biz_name}`,
+        text: `Bonjour ${member.name},
+
+Le professionnel vous a remboursé vos frais de réservation, à titre de geste commercial.
+
+📍 Établissement : ${booking.biz_name}
+💆 Prestation : ${booking.service_name}
+📅 Date du rendez-vous concerné : ${dateFormatted}
+🕐 Heure : ${booking.time}
+💶 Montant remboursé : ${amountFormatted}€
+✅ Crédit sous 5 à 10 jours ouvrés selon votre banque.
+
+⚠️ Rappel : les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 3).
+
+Si vous avez des questions : contact@book-n-pay.com
+
+À bientôt,
+L'équipe Book'nPay`,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
