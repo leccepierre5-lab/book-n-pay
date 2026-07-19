@@ -2,8 +2,9 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { getProBookings, getProStats, getBusinessSettings } from '@/lib/queries/pro';
+import { getProBookings, getProStats } from '@/lib/queries/pro';
 import ProDashboard from '@/components/pro/ProDashboard';
+import type { Business } from '@/lib/database.types';
 
 export default async function ProPage() {
   const supabase = await createClient();
@@ -28,27 +29,32 @@ export default async function ProPage() {
   // laisse passer pour éviter un aller-retour vers setup-billing (et un
   // risque de double Subscription Stripe créée) pendant la brève fenêtre
   // où le webhook n'est pas encore arrivé.
+  // Requête unique — réutilisée plus bas pour stripeConnected (avant : 2
+  // requêtes séparées sur la même table pour le même biz_id).
   const admin = createServiceRoleClient();
-  const { data: billingCheck } = await admin
+  const { data: settings } = await admin
     .from('business_settings')
-    .select('subscription_status, stripe_subscription_id')
+    .select('*')
     .eq('biz_id', profile.biz_id!)
     .maybeSingle();
-  if (billingCheck?.subscription_status === 'pending' && !billingCheck.stripe_subscription_id) {
+  if (settings?.subscription_status === 'pending' && !settings.stripe_subscription_id) {
     redirect('/pro/setup-billing');
   }
 
   // Redirige vers l'onboarding si l'établissement n'est pas encore publié
-  const biz = profile.businesses as { is_published?: boolean } | null;
+  const biz = profile.businesses as Business | null;
   if (biz && biz.is_published === false) {
     redirect('/pro/onboarding');
   }
 
   const today = new Date().toISOString().split('T')[0];
-  const [todayBookings, stats, settings] = await Promise.all([
+  const [todayBookings, stats] = await Promise.all([
     getProBookings(profile.biz_id, { from: today, to: today }),
-    getProStats(profile.biz_id),
-    getBusinessSettings(profile.biz_id),
+    getProStats(profile.biz_id, {
+      open_time: biz?.open_time ?? null,
+      close_time: biz?.close_time ?? null,
+      open_days: biz?.open_days ?? [],
+    }),
   ]);
 
   return (

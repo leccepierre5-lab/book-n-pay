@@ -223,6 +223,24 @@ export function isSlotClosed(biz: BizHoraires, date: string, slot: string): bool
   return dayClosed || outsideHours;
 }
 
+// Le RDV a-t-il été RÉSERVÉ (created_at, pas la date du RDV lui-même) alors
+// que le pro n'aurait pas pu décrocher le téléphone — hors jour ouvré ou hors
+// plage horaire ? Conversion explicite en heure de Paris (jamais le fuseau
+// du runtime, cf. commentaire de parseParisDatetime ci-dessus) via les mêmes
+// primitives Intl que isSlotPast/getParisDateOffsetStr.
+export function isCreatedOffHours(createdAtIso: string, biz: BizHoraires): boolean {
+  if (!biz.open_time || !biz.close_time) return false;
+  const d = new Date(createdAtIso);
+  const parisDateStr = d.toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+  const dayOfWeek = new Date(parisDateStr + 'T12:00:00').getDay();
+  const parisTimeStr = d.toLocaleTimeString('fr-FR', {
+    timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const dayClosed = !biz.open_days.includes(dayOfWeek);
+  const outsideHours = parisTimeStr < biz.open_time.slice(0, 5) || parisTimeStr >= biz.close_time.slice(0, 5);
+  return dayClosed || outsideHours;
+}
+
 // Fenêtre de validité d'une invitation 'invite' non payée (booking_members),
 // solo ou groupe — 30 min partout : c'est le plancher dur imposé par Stripe
 // sur Checkout Session.expires_at (impossible de descendre plus bas), donc

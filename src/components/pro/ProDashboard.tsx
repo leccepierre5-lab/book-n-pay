@@ -238,22 +238,59 @@ export default function ProDashboard({
           </div>
         )}
 
-        {/* Stats grid */}
-        <div className="mb-6 grid grid-cols-2 gap-3">
-          {[
-            { label: 'CA ce mois', value: `${stats.totalRevenue}€`, color: 'text-mint-400', icon: '💰' },
-            { label: 'Taux no-show', value: `${stats.noShowRate}%`, color: stats.noShowRate > 15 ? 'text-red-400' : 'text-white', icon: '📊' },
-            { label: 'Réservations', value: stats.totalBookings, color: 'text-white', icon: '📅' },
-            { label: 'À venir', value: stats.upcomingCount, color: 'text-blue-400', icon: '🗓️' },
-          ].map((s) => (
-            <div key={s.label} className="rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
-              <p className="text-xs text-slate-500 mb-2 flex items-center gap-1.5">
-                <span>{s.icon}</span>{s.label}
+        {/* Stats grid — état dédié si le pro démarre (0 réservation ce mois),
+            évite le mur de zéros identifié en audit (19/07) sur le premier
+            écran vu par un pro fraîchement inscrit. */}
+        {stats.totalBookings === 0 && stats.upcomingCount === 0 ? (
+          <div className="mb-6 rounded-2xl bg-navy-900 border border-white/[0.08] p-5 text-center">
+            <p className="text-2xl mb-2">🚀</p>
+            <p className="text-sm font-semibold text-white mb-1">Aucune réservation pour l'instant</p>
+            <p className="text-xs text-slate-500">Tes statistiques (CA, no-show, réservations) apparaîtront ici dès ta première réservation.</p>
+          </div>
+        ) : (
+          <div className="mb-6 grid grid-cols-2 gap-3">
+            {[
+              { label: 'CA ce mois', value: `${stats.totalRevenue}€`, color: 'text-mint-400', icon: '💰' },
+              { label: 'Taux no-show', value: `${stats.noShowRate}%`, color: stats.noShowRate > 15 ? 'text-red-400' : 'text-white', icon: '📊' },
+              { label: 'Réservations', value: stats.totalBookings, color: 'text-white', icon: '📅' },
+              { label: 'À venir', value: stats.upcomingCount, color: 'text-blue-400', icon: '🗓️' },
+            ].map((s) => (
+              <div key={s.label} className="rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
+                <p className="text-xs text-slate-500 mb-2 flex items-center gap-1.5">
+                  <span>{s.icon}</span>{s.label}
+                </p>
+                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Ce que Book'nPay vous apporte — 2 métriques factuelles retenues
+            après relecture (19/07) : "temps gagné" écarté (hypothèse non
+            mesurée, pas montré à un pro qui paie un abonnement tant qu'il
+            n'y a pas de vraie mesure). Le 1er chiffre est un CUMUL depuis
+            l'inscription (voir getProStats) — délibérément indépendant du
+            gate "je démarre" ci-dessus (basé sur le mois courant) : un pro
+            avec un mois calme mais un historique réel ne doit pas revoir
+            un message "vous démarrez" qui masquerait sa vraie valeur cumulée. */}
+        {stats.depositSecuredCount > 0 && (
+          <div className="mb-6 space-y-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ce que Book'nPay vous apporte depuis votre inscription</p>
+            <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
+              <p className="text-sm text-white">
+                <span className="font-bold text-mint-400">{stats.depositSecuredCount}</span> RDV sécurisé{stats.depositSecuredCount > 1 ? 's' : ''} par acompte
+                <span className="text-slate-500"> · </span>
+                <span className="font-bold text-mint-400">{stats.depositSecuredAmount}€</span> couverts depuis votre inscription
               </p>
-              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
             </div>
-          ))}
-        </div>
+            <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
+              <p className="text-sm text-white">
+                <span className="font-bold text-blue-400">{stats.offHoursBookingsCount}</span> réservation{stats.offHoursBookingsCount > 1 ? 's' : ''} prise{stats.offHoursBookingsCount > 1 ? 's' : ''} ce mois-ci hors de vos horaires d'ouverture
+              </p>
+              <p className="text-xs text-slate-500 mt-1">Des clients que vous n'auriez pas pu décrocher au téléphone.</p>
+            </div>
+          </div>
+        )}
 
         {/* QR Scanner button */}
         <button
