@@ -3,10 +3,10 @@
 // Traite les groupes expirés que personne n'a consultés pendant la journée.
 // La logique réelle est dans src/lib/group/expireGroup.ts.
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { expireGroupByRef } from '@/lib/group/expireGroup';
 import { isValidBearerSecret } from '@/lib/constant-time';
+import { getStripeClient } from '@/lib/stripe/client';
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -15,16 +15,7 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServiceRoleClient();
-
-  // ⚠️ CORRECTIF SÉCURITÉ (audit) : utilisait toujours la clé live, même
-  // en mode_test_paiement. Même bascule que stripe/checkout/route.ts.
-  const { data: testModeConfig } = await supabase
-    .from('app_config')
-    .select('value')
-    .eq('key', 'mode_test_paiement')
-    .maybeSingle();
-  const isTestMode = testModeConfig?.value === 'true';
-  const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+  const stripe = await getStripeClient(supabase);
 
   const now = new Date().toISOString();
 

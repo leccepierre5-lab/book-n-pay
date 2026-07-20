@@ -12,12 +12,12 @@
 // une session authentifiée et en vérifiant que le `phone` fourni correspond
 // au profil connecté (ou que l'appelant est admin).
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { JOKERS_LIMITES, JOKERS_PCT } from '@/lib/booking-utils';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { logAndRespond } from '@/lib/api-error';
+import { getStripeClient } from '@/lib/stripe/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -110,8 +110,7 @@ export async function POST(req: NextRequest) {
 
     let refundId: string | null = null;
     if (targetMember.stripe_payment_intent_id) {
-      const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_SECRET_KEY!;
-      const stripe = new Stripe(stripeKey);
+      const stripe = await getStripeClient(serviceSupabase);
       const refund = await stripe.refunds.create({
         payment_intent: targetMember.stripe_payment_intent_id,
         amount: Math.round(montantRembourse * 100),

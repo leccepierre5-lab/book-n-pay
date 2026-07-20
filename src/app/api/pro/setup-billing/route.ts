@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getPlanConfig, getEngagementEndDate } from '@/lib/plans-config';
 import { logAndRespondStripeError } from '@/lib/api-error';
+import { getStripeClient } from '@/lib/stripe/client';
 
 function getFirstOfNextMonth(): number {
   const now = new Date();
@@ -61,17 +61,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ⚠️ CORRECTIF : cette route utilisait toujours STRIPE_SECRET_KEY (live),
-  // sans jamais respecter mode_test_paiement comme stripe/checkout/route.ts.
   // Indispensable tant que STRIPE_PRICE_STARTER/BUSINESS/SCALE ne pointent
   // que vers des Price objects en mode test (aucun equivalent live cree).
-  const { data: testModeConfig } = await admin
-    .from('app_config')
-    .select('value')
-    .eq('key', 'mode_test_paiement')
-    .maybeSingle();
-  const isTestMode = testModeConfig?.value === 'true';
-  const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+  const stripe = await getStripeClient(admin);
 
   try {
     // Attacher le PM au Customer et le définir par défaut

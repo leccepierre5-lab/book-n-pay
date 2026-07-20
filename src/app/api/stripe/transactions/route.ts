@@ -1,9 +1,9 @@
 // src/app/api/stripe/transactions/route.ts
 // Port de base44/functions/stripeTransactions/entry.ts
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond } from '@/lib/api-error';
+import { getStripeClient } from '@/lib/stripe/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Non autorisé pour ce business' }, { status: 403 });
     }
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
     const serviceSupabase = createServiceRoleClient();
+    const stripe = await getStripeClient(serviceSupabase);
     const { data: settings } = await serviceSupabase
       .from('business_settings')
       .select('stripe_account_id, stripe_onboarding_complete')

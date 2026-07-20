@@ -2,10 +2,11 @@
 // Logique de facturation hors-forfait (voir supabase/migrations/0020_overage_charges.sql).
 // Utilisée depuis le webhook (tentative immédiate) et le cron
 // retry-overage-charges (tentative à +24h).
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildCapTiers } from '@/lib/booking-utils';
 import { OVERAGE_FEE_HT, OVERAGE_CAP_MARGIN, STRIPE_MIN_CHARGE_HT, getPlanConfig } from '@/lib/plans-config';
+import { getStripeClient } from '@/lib/stripe/client';
 
 export interface OverageChargeRow {
   id: string;
@@ -30,21 +31,6 @@ export function buildOverageChargeIdempotencyKey(
 
 export function buildOverageInvoiceIdempotencyKey(bizId: string, chargeIds: string[]): string {
   return `overage-invoice-${bizId}-${[...chargeIds].sort().join('-')}`;
-}
-
-// ⚠️ Le customer/payment method d'un pro sont créés via /api/pro/setup-billing,
-// qui respecte déjà app_config.mode_test_paiement — on doit construire le
-// client Stripe de la même façon ici, sinon "No such customer" en prod dès
-// que le mode test est actif (le webhook, lui, vérifie les signatures avec
-// la clé live et ne peut pas servir pour émettre ces PaymentIntents).
-async function getStripeClient(supabase: SupabaseClient): Promise<Stripe> {
-  const { data: testModeConfig } = await supabase
-    .from('app_config')
-    .select('value')
-    .eq('key', 'mode_test_paiement')
-    .maybeSingle();
-  const isTestMode = testModeConfig?.value === 'true';
-  return new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
 }
 
 // Incrémente le compteur mensuel du pro et crée une charge hors-forfait si la

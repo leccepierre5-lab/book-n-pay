@@ -5,12 +5,12 @@
 // indépendamment de la règle des 48h (qui ne s'applique qu'aux annulations
 // initiées par le client avant le RDV).
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { depositRefundAmountCents } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
+import { getStripeClient } from '@/lib/stripe/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -60,19 +60,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, alreadyRefunded: true });
     }
 
-    // ⚠️ CORRECTIF SÉCURITÉ (audit) : utilisait toujours la clé live, même
-    // en mode_test_paiement — un remboursement pendant un test aurait pu
-    // toucher un vrai compte Stripe. Même bascule que stripe/checkout/route.ts.
-    const { data: testModeConfig } = await serviceSupabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'mode_test_paiement')
-      .maybeSingle();
-    const isTestMode = testModeConfig?.value === 'true';
-    const stripeKey = isTestMode
-      ? process.env.STRIPE_TEST_SECRET_KEY!
-      : process.env.STRIPE_SECRET_KEY!;
-    const stripe = new Stripe(stripeKey);
+    const stripe = await getStripeClient(serviceSupabase);
     await stripe.refunds.create({
       payment_intent: member.stripe_payment_intent_id,
       // Ne rembourse que les frais de réservation — les frais de gestion

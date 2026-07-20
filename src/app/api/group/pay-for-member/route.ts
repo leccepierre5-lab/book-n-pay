@@ -2,8 +2,8 @@
 // Permet à un membre déjà payé de créer une session Stripe pour payer
 // la part d'un autre membre du MÊME groupe encore en attente.
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { getStripeClientWithMode } from '@/lib/stripe/client';
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -73,17 +73,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Mode test/live (même pattern que stripe/checkout et solde-checkout) ──
-  const { data: testModeConfig } = await supabaseAdmin
-    .from('app_config')
-    .select('value')
-    .eq('key', 'mode_test_paiement')
-    .maybeSingle();
-  const isTestMode = testModeConfig?.value === 'true';
-
-  const stripeKey = isTestMode
-    ? process.env.STRIPE_TEST_SECRET_KEY!
-    : process.env.STRIPE_SECRET_KEY!;
-  const stripe = new Stripe(stripeKey);
+  const { stripe, isTestMode } = await getStripeClientWithMode(supabaseAdmin);
 
   // ── Compte Stripe Connect du pro — sans ça l'argent restait intégralement
   // chez Book'nPay, jamais reversé (même trou que d39f340/checkout, trouvé

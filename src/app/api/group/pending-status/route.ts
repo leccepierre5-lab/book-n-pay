@@ -2,9 +2,9 @@
 // Retourne le groupe en attente le plus urgent pour l'utilisateur connecté.
 // Déclenche aussi l'expiration lazy si le deadline est dépassé.
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { expireGroupByRef } from '@/lib/group/expireGroup';
+import { getStripeClient } from '@/lib/stripe/client';
 
 export async function GET() {
   const supabase = await createClient();
@@ -42,15 +42,7 @@ export async function GET() {
     return bk?.payment_deadline && bk.payment_deadline <= now;
   });
   if (expiredRows.length > 0) {
-    // ⚠️ CORRECTIF SÉCURITÉ (audit) : utilisait toujours la clé live, même
-    // en mode_test_paiement. Même bascule que stripe/checkout/route.ts.
-    const { data: testModeConfig } = await supabaseAdmin
-      .from('app_config')
-      .select('value')
-      .eq('key', 'mode_test_paiement')
-      .maybeSingle();
-    const isTestMode = testModeConfig?.value === 'true';
-    const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+    const stripe = await getStripeClient(supabaseAdmin);
     const expiredRefs = [...new Set(expiredRows.map((r) => (r as any).bookings?.group_ref as string).filter(Boolean))];
     for (const ref of expiredRefs) {
       await expireGroupByRef(ref, supabaseAdmin, stripe).catch((e) =>

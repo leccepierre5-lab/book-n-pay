@@ -6,6 +6,7 @@ import { calcFraisGestion, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import { isNonRealBusiness } from '@/lib/queries/catalog';
+import { getStripeClientWithMode } from '@/lib/stripe/client';
 
 function isAllowedOrigin(url: string, reqOrigin: string | null, reqHost: string | null): boolean {
   try {
@@ -172,17 +173,7 @@ export async function POST(req: NextRequest) {
     const effectiveDeposit = Math.round(amount * ratio * 100) / 100;
 
     // ── Mode test/live ────────────────────────────────────────────────────────
-    const { data: testModeConfig } = await supabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'mode_test_paiement')
-      .maybeSingle();
-    const isTestMode = testModeConfig?.value === 'true';
-
-    const stripeKey = isTestMode
-      ? process.env.STRIPE_TEST_SECRET_KEY!
-      : process.env.STRIPE_SECRET_KEY!;
-    const stripe = new Stripe(stripeKey);
+    const { stripe, isTestMode } = await getStripeClientWithMode(supabase);
 
     // ── Barème frais de gestion — TOUJOURS recalculé côté serveur ─────────────
     // ⚠️ CORRECTIF SÉCURITÉ (audit architecture, 20/07) : `fraisGestionInput`

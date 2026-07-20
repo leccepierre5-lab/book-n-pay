@@ -3,9 +3,9 @@
 // Crée (ou réutilise) un compte Stripe Express pour un pro, puis génère le
 // lien d'onboarding KYC. Réservé aux pros authentifiés.
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond } from '@/lib/api-error';
+import { getStripeClient } from '@/lib/stripe/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,18 +29,7 @@ export async function POST(req: NextRequest) {
 
     const serviceSupabase = createServiceRoleClient();
 
-    // ⚠️ CORRECTIF (backlog, priorité haute) : utilisait toujours la clé
-    // live, même en mode_test_paiement — contrairement à stripe/checkout,
-    // bookings/solde-checkout, cron/expire-groups, etc. Résultat : impossible
-    // de tester l'onboarding Stripe Connect d'un pro sans un vrai compte
-    // live, quel que soit le mode test. Même bascule que ces routes.
-    const { data: testModeConfig } = await serviceSupabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'mode_test_paiement')
-      .maybeSingle();
-    const isTestMode = testModeConfig?.value === 'true';
-    const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+    const stripe = await getStripeClient(serviceSupabase);
 
     const { data: existing } = await serviceSupabase
       .from('business_settings')

@@ -7,9 +7,9 @@
 // pro (stripeAccountId, état KYC). Corrigé en exigeant une session
 // authentifiée appartenant au pro propriétaire (ou admin).
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond } from '@/lib/api-error';
+import { getStripeClient } from '@/lib/stripe/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,18 +40,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ connected: false, onboardingComplete: false });
     }
 
-    // ⚠️ CORRECTIF (backlog, priorité haute, même cause que connect-onboarding) :
-    // utilisait toujours la clé live — interroger avec la clé live un compte
-    // créé en clé test échoue (les comptes Connect test/live sont deux
-    // espaces Stripe totalement séparés, jamais visibles l'un depuis
-    // l'autre). Même bascule que le reste de la stack paiement.
-    const { data: testModeConfig } = await serviceSupabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'mode_test_paiement')
-      .maybeSingle();
-    const isTestMode = testModeConfig?.value === 'true';
-    const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+    const stripe = await getStripeClient(serviceSupabase);
     const account = await stripe.accounts.retrieve(settings.stripe_account_id);
     const onboardingComplete = !!(account.details_submitted && account.charges_enabled);
 

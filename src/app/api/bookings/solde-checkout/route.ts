@@ -5,10 +5,10 @@
 // body n'accepte que bookingId/memberId, voir src/lib/solde-checkout.ts pour
 // la logique de calcul/garde-fous/idempotence, testée unitairement).
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond, logAndRespondStripeError } from '@/lib/api-error';
+import { getStripeClient } from '@/lib/stripe/client';
 import {
   computeSolde,
   isProAuthorizedForBiz,
@@ -76,13 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Mode test/live — même bascule que les frais de réservation ─────────
-    const { data: testModeConfig } = await serviceSupabase
-      .from('app_config')
-      .select('value')
-      .eq('key', 'mode_test_paiement')
-      .maybeSingle();
-    const isTestMode = testModeConfig?.value === 'true';
-    const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+    const stripe = await getStripeClient(serviceSupabase);
 
     // ── Idempotence : double-clic ou re-render ne doivent jamais créer une
     // deuxième session pour le même solde ────────────────────────────────

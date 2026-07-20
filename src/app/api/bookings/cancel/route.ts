@@ -16,7 +16,6 @@
 // d'autre en devinant un bookingId/memberId. Corrigé en vérifiant
 // l'appartenance avant toute action.
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, phonesMatch } from '@/lib/booking-utils';
 import { depositRefundAmountCents } from '@/lib/refunds';
@@ -24,6 +23,7 @@ import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
+import { getStripeClient } from '@/lib/stripe/client';
 
 const CANCEL_DEADLINE_HOURS = 48;
 
@@ -85,8 +85,7 @@ export async function POST(req: NextRequest) {
     let refundDone = false;
     if (eligibleForRefund && member.stripe_payment_intent_id) {
       try {
-        const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_SECRET_KEY!;
-        const stripe = new Stripe(stripeKey);
+        const stripe = await getStripeClient(serviceSupabase);
         await stripe.refunds.create({
           payment_intent: member.stripe_payment_intent_id,
           // Ne rembourse que les frais de réservation — les frais de gestion

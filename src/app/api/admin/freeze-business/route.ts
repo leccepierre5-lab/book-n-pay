@@ -6,11 +6,11 @@
 // notifie les clients concernés ; dégeler notifie les clients annulés que
 // l'établissement a repris (port de notifyUnfreeze).
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { depositRefundAmountCents } from '@/lib/refunds';
 import { logAndRespond } from '@/lib/api-error';
+import { getStripeClient } from '@/lib/stripe/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,15 +45,8 @@ export async function POST(req: NextRequest) {
       // crash au chargement du module si STRIPE_SECRET_KEY est absente d'un
       // environnement (ex: Preview Vercel, où seule la clé Production est
       // configurée) — l'ancien `new Stripe(...)` au niveau module plantait le
-      // build même sur des routes jamais appelées. Respecte aussi
-      // mode_test_paiement, comme les autres routes de remboursement.
-      const { data: testModeConfig } = await serviceSupabase
-        .from('app_config')
-        .select('value')
-        .eq('key', 'mode_test_paiement')
-        .maybeSingle();
-      const isTestMode = testModeConfig?.value === 'true';
-      const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+      // build même sur des routes jamais appelées.
+      const stripe = await getStripeClient(serviceSupabase);
 
       await serviceSupabase
         .from('businesses')
