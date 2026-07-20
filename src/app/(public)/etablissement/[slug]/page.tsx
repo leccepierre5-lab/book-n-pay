@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getBusinessBySlug, isNonRealBusiness, CATEGORIES } from '@/lib/queries/catalog';
-import { isDemoTesterEmail } from '@/lib/demo-mode';
+import { isDemoTesterEmail, isProAccount, PRO_CANNOT_BOOK_MESSAGE } from '@/lib/demo-mode';
 import BookingFlow from '@/components/booking/BookingFlow';
 import FavoriteButton from '@/components/public/FavoriteButton';
 
@@ -101,6 +101,14 @@ export default async function EtablissementPage({
     isFavorited = !!fav;
   }
   const isDemoTester = isDemoTesterEmail(authData.user?.email);
+  // Masquage confort seulement — le rejet dur vit dans bookings/create[-group]
+  // (voir lib/demo-mode.ts). Requêté uniquement pour une fiche réelle : sur
+  // une fiche démo, seul isDemoTester compte, pas la peine d'interroger le
+  // rôle pour rien.
+  const isProBlocked =
+    !isNonRealBusiness(business) && authData.user
+      ? await isProAccount(supabase, authData.user.id)
+      : false;
 
   const photos = (business.business_photos ?? []).sort((a, b) => a.sort_order - b.sort_order);
   const hasSocial =
@@ -269,6 +277,20 @@ export default async function EtablissementPage({
             <p className="text-xs text-slate-500">
               Cet établissement illustre notre catalogue mais n&apos;a pas encore de compte actif — la réservation n&apos;est pas disponible ici.
             </p>
+          </div>
+        </div>
+      ) : isProBlocked ? (
+        <div className="max-w-4xl mx-auto px-4 pb-8">
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 text-center">
+            <p className="mb-1 text-xl">🔒</p>
+            <p className="text-sm font-semibold text-white mb-1">Compte professionnel</p>
+            <p className="text-xs text-slate-500 mb-3">{PRO_CANNOT_BOOK_MESSAGE}</p>
+            <Link
+              href="/inscription"
+              className="inline-block text-xs font-medium text-mint-400 hover:text-mint-300 transition-colors"
+            >
+              Créer un compte client →
+            </Link>
           </div>
         </div>
       ) : (

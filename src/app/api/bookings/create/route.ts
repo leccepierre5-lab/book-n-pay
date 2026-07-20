@@ -9,7 +9,7 @@ import { createSoloBookingWithOverlapCheck } from '@/lib/booking-solo-overlap';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import { isNonRealBusiness } from '@/lib/queries/catalog';
-import { isDemoTesterEmail } from '@/lib/demo-mode';
+import { isDemoTesterEmail, isProAccount, PRO_CANNOT_BOOK_MESSAGE } from '@/lib/demo-mode';
 import type { Booking } from '@/lib/database.types';
 
 export async function POST(req: NextRequest) {
@@ -89,6 +89,18 @@ export async function POST(req: NextRequest) {
         { error: "Cet établissement n'est pas disponible à la réservation." },
         { status: 423 }
       );
+    }
+
+    // Séparation stricte rôles pro/client (voir lib/demo-mode.ts pour le
+    // raisonnement complet) — un compte pro ne réserve jamais avec ce
+    // compte. Volontairement placé APRÈS le bloc démo ci-dessus : le
+    // chemin démo est déjà retourné à ce stade, donc ce check ne peut
+    // s'appliquer qu'à une réservation réelle.
+    if (authData.user?.id) {
+      const isPro = await isProAccount(supabase, authData.user.id);
+      if (isPro) {
+        return NextResponse.json({ error: PRO_CANNOT_BOOK_MESSAGE, code: 'PRO_ACCOUNT_CANNOT_BOOK' }, { status: 403 });
+      }
     }
 
     const supabaseService = createServiceRoleClient();
