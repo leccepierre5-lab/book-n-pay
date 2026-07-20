@@ -139,7 +139,10 @@ export default function CGUPage() {
               <li>
                 <strong className="text-white/80">Statut acquis :</strong> Le statut atteint est
                 conservé par l'Utilisateur, sous réserve d'effectuer un minimum de 5 rendez-vous par
-                année civile.
+                année civile. À défaut, l'Utilisateur est déclassé d'un seul palier au 1er janvier
+                suivant (par exemple Gold vers Argent), sans perte des Jokers déjà attribués pour
+                l'année en cours ni du compteur de rendez-vous cumulés. Ce déclassement graduel est
+                distinct du déclassement total prévu à l'article 4.4 en cas d'inactivité prolongée.
               </li>
               <li>
                 <strong className="text-white/80">Frais exclus :</strong> Le "Joker" permet
@@ -306,9 +309,11 @@ export default function CGUPage() {
           <section>
             <h2 className="mb-2 text-base font-semibold text-white">10. Avis et évaluations</h2>
             <p className="mb-3">
-              Book'nPay peut envoyer automatiquement un email de satisfaction 2 heures après la
-              réalisation d'un rendez-vous honoré. L'Utilisateur est libre de répondre ou non. Les
-              avis collectés peuvent être affichés sur la fiche de l'établissement concerné.
+              Après un rendez-vous honoré, Book'nPay peut inviter l'Utilisateur, via une
+              notification affichée sur la plateforme, à laisser un avis sur l'établissement
+              concerné via Google. Book'nPay ne collecte, n'héberge ni ne modère le contenu de cet
+              avis, qui reste géré par Google. Une note et un nombre d'avis peuvent être affichés à
+              titre indicatif sur la fiche de l'établissement.
             </p>
           </section>
 

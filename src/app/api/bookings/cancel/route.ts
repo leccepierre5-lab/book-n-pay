@@ -95,6 +95,12 @@ export async function POST(req: NextRequest) {
           // PaymentIntent par défaut, gestion incluse).
           amount: depositRefundAmountCents(member.deposit),
           reason: 'requested_by_customer',
+          // Cette route envoie déjà son propre email d'annulation
+          // (ci-dessous) : ce flag dit au webhook charge.refunded de ne
+          // pas en renvoyer un second pour le même remboursement. Un
+          // remboursement déclenché ailleurs (dashboard Stripe, admin
+          // freeze) n'a pas ce flag et le webhook reste le filet normal.
+          metadata: { email_sent: 'true' },
         });
         refundDone = true;
         console.log(`[CancelClient] ✅ Remboursement OK — booking=${bookingId} membre=${memberId}`);

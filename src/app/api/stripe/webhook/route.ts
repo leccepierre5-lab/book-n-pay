@@ -405,6 +405,41 @@ L'équipe Book'nPay`,
     const charge = event.data.object as Stripe.Charge;
     let meta = charge.metadata || {};
 
+    // `metadata` posée par stripe.refunds.create() vit sur le Refund, pas
+    // sur la Charge (ni le PaymentIntent) : c'est pour ça qu'on la lit sur
+    // charge.refunds.data et pas sur `meta`. Dette n°6 (double email) :
+    // bookings/cancel et pro/refund-gesture envoient déjà leur propre
+    // email contextualisé et posent ce flag — le webhook reste le filet
+    // silencieux uniquement pour ces deux chemins. Un remboursement
+    // déclenché ailleurs (dashboard Stripe, admin freeze) n'a pas ce flag
+    // et déclenche l'email générique ci-dessous comme avant : mieux vaut
+    // un email en trop qu'un client remboursé sans le savoir.
+    //
+    // Tri par `created` plutôt qu'un ID exact — LIMITE CONNUE, PAS UN OUBLI :
+    // sur `charge.refunded`, `event.data.object` est la Charge, pas le
+    // Refund ; aucun champ de l'événement ne pointe directement le refund
+    // qui vient de le déclencher (vérifié, pas supposé). En théorie, deux
+    // refunds rapprochés sur la même charge + webhooks retardés/rejoués
+    // pourraient faire lire le mauvais refund. En pratique ce chemin est
+    // FERMÉ aujourd'hui : `member.status === 'cancelled'` (cancel/route.ts
+    // et pro/refund-gesture/route.ts) empêche l'app d'émettre un second
+    // `stripe.refunds.create` sur le même paiement — la seule façon
+    // d'atteindre deux refunds sur une charge est une action manuelle dans
+    // le Dashboard Stripe en parallèle d'un refund applicatif, pas un
+    // chemin produit.
+    // Si un jour l'app peut légitimement émettre plusieurs refunds sur la
+    // même charge (ex. remboursements partiels successifs sur un booking
+    // de groupe), ce tri cesse d'être fiable — la sortie connue est de
+    // s'abonner à `refund.updated` côté Dashboard Stripe : l'objet de cet
+    // événement EST le Refund concerné, plus besoin de le déduire d'une
+    // liste.
+    const refunds = charge.refunds?.data ?? [];
+    const latestRefund = refunds.reduce<Stripe.Refund | undefined>(
+      (latest, r) => (!latest || r.created > latest.created ? r : latest),
+      undefined
+    );
+    const emailAlreadySent = latestRefund?.metadata?.email_sent === 'true';
+
     if ((!meta.bookingId || !meta.memberId) && charge.payment_intent) {
       try {
         const pi = await stripe.paymentIntents.retrieve(charge.payment_intent as string);
@@ -428,7 +463,7 @@ L'équipe Book'nPay`,
         .eq('booking_id', bookingId);
     }
 
-    if (customerEmail) {
+    if (customerEmail && !emailAlreadySent) {
       await sendEmail({
         to: customerEmail,
         subject: `💸 Remboursement effectué — Book'nPay`,

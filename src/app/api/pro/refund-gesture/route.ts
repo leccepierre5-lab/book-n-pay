@@ -79,6 +79,12 @@ export async function POST(req: NextRequest) {
       // Book'nPay restent acquis, même sur un geste commercial du pro.
       amount: depositRefundAmountCents(member.deposit),
       reason: 'requested_by_customer',
+      // Cette route envoie déjà son propre email (ci-dessous) : ce flag
+      // dit au webhook charge.refunded de ne pas en renvoyer un second
+      // pour le même remboursement. Un remboursement déclenché ailleurs
+      // (dashboard Stripe, admin freeze) n'a pas ce flag et le webhook
+      // reste le filet normal.
+      metadata: { email_sent: 'true' },
     });
 
     await serviceSupabase.from('booking_members').update({ status: 'cancelled' }).eq('id', memberId);
