@@ -184,24 +184,38 @@ export async function POST(req: NextRequest) {
       : process.env.STRIPE_SECRET_KEY!;
     const stripe = new Stripe(stripeKey);
 
-    // ── Barème frais de gestion ───────────────────────────────────────────────
-    let fraisGestion = fraisGestionInput;
-    if (!fraisGestion || fraisGestion < 1.99 || fraisGestion > 9.99) {
-      const { data: configs } = await supabase
-        .from('app_config')
-        .select('key, value')
-        .like('key', 'frais_gestion_palier_%');
+    // ── Barème frais de gestion — TOUJOURS recalculé côté serveur ─────────────
+    // ⚠️ CORRECTIF SÉCURITÉ (audit architecture, 20/07) : `fraisGestionInput`
+    // n'était revalidé que s'il sortait d'une fourchette large [1.99, 9.99] —
+    // un appelant pouvait donc envoyer n'importe quelle valeur À L'INTÉRIEUR
+    // de cette fourchette et manipuler directement la commission Book'nPay
+    // (le montant sert à la fois au prix facturé et à `application_fee_amount`
+    // plus bas). Même invariant que le reste de cette route (montant/dépôt
+    // déjà relu en base) : ne jamais faire confiance à un paramètre client.
+    // `fraisGestionInput` n'est plus utilisé pour le calcul, uniquement pour
+    // détecter une tentative de falsification (log, pas de blocage — la
+    // valeur envoyée est simplement ignorée).
+    const { data: configs } = await supabase
+      .from('app_config')
+      .select('key, value')
+      .like('key', 'frais_gestion_palier_%');
 
-      const cfg: Record<string, number> = {};
-      (configs || []).forEach((row) => {
-        const n = parseFloat(row.value);
-        if (!isNaN(n)) cfg[row.key] = n;
-      });
+    const cfg: Record<string, number> = {};
+    (configs || []).forEach((row) => {
+      const n = parseFloat(row.value);
+      if (!isNaN(n)) cfg[row.key] = n;
+    });
 
-      if (amount > 100) fraisGestion = cfg.frais_gestion_palier_4 ?? 2.5;
-      else if (amount > 80) fraisGestion = cfg.frais_gestion_palier_3 ?? 2.3;
-      else if (amount > 50) fraisGestion = cfg.frais_gestion_palier_2 ?? 2.1;
-      else fraisGestion = cfg.frais_gestion_palier_1 ?? calcFraisGestion(amount);
+    let fraisGestion: number;
+    if (amount > 100) fraisGestion = cfg.frais_gestion_palier_4 ?? 2.5;
+    else if (amount > 80) fraisGestion = cfg.frais_gestion_palier_3 ?? 2.3;
+    else if (amount > 50) fraisGestion = cfg.frais_gestion_palier_2 ?? 2.1;
+    else fraisGestion = cfg.frais_gestion_palier_1 ?? calcFraisGestion(amount);
+
+    if (fraisGestionInput !== undefined && Math.abs(Number(fraisGestionInput) - fraisGestion) > 0.02) {
+      console.warn(
+        `[Checkout] fraisGestion falsifié ignoré — reçu ${fraisGestionInput}€, palier réel appliqué ${fraisGestion}€ (amount=${amount})`
+      );
     }
 
     // Frais de gestion offerts (bonus palier parrainage) — s'applique indépendamment du %
