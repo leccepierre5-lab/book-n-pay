@@ -72,7 +72,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Montant des frais de réservation invalide' }, { status: 400 });
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  // ── Mode test/live (même pattern que stripe/checkout et solde-checkout) ──
+  const { data: testModeConfig } = await supabaseAdmin
+    .from('app_config')
+    .select('value')
+    .eq('key', 'mode_test_paiement')
+    .maybeSingle();
+  const isTestMode = testModeConfig?.value === 'true';
+
+  const stripeKey = isTestMode
+    ? process.env.STRIPE_TEST_SECRET_KEY!
+    : process.env.STRIPE_SECRET_KEY!;
+  const stripe = new Stripe(stripeKey);
+
+  // ── Compte Stripe Connect du pro — sans ça l'argent restait intégralement
+  // chez Book'nPay, jamais reversé (même trou que d39f340/checkout, trouvé
+  // en audit sécu du 20/07 sur cette route précisément).
+  const bizId = targetBooking?.biz_id;
+  let professionalStripeId: string | null = null;
+  if (bizId) {
+    const { data: settings } = await supabaseAdmin
+      .from('business_settings')
+      .select('stripe_account_id, stripe_onboarding_complete')
+      .eq('biz_id', bizId)
+      .maybeSingle();
+    if (settings?.stripe_account_id && settings.stripe_onboarding_complete) {
+      professionalStripeId = settings.stripe_account_id;
+    }
+  }
+
+  if (!isTestMode && !professionalStripeId) {
+    console.error(`[PayForMember] Paiement live refusé — compte Connect non finalisé — biz=${bizId || 'inconnu'}`);
+    return NextResponse.json(
+      { error: "Cet établissement n'est pas encore prêt à recevoir des paiements." },
+      { status: 423 }
+    );
+  }
+
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.book-n-pay.com';
 
   const session = await stripe.checkout.sessions.create({
@@ -99,6 +135,12 @@ export async function POST(req: NextRequest) {
       groupRef,
       depositAmount: String(deposit),
     },
+    // Pas d'application_fee_amount : même logique que solde-checkout, 100%
+    // du montant va au pro via Connect (le paiement initial du créateur du
+    // groupe a déjà couvert les frais de gestion Book'nPay).
+    ...(professionalStripeId && {
+      payment_intent_data: { transfer_data: { destination: professionalStripeId } },
+    }),
     success_url: `${baseUrl}/mes-reservations?pay_for_success=1`,
     cancel_url: `${baseUrl}/mes-reservations`,
   });
