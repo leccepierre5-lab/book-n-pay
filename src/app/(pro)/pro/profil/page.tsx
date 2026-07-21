@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import ProProfileForm from '@/components/pro/ProProfileForm';
+import ProAddressForm from '@/components/pro/ProAddressForm';
 
 export default async function ProProfilPage() {
   const supabase = await createClient();
@@ -20,7 +21,7 @@ export default async function ProProfilPage() {
 
   const { data: business } = await supabaseAdmin
     .from('businesses')
-    .select('id, name, instagram, facebook_url, website, google_place_url')
+    .select('id, name, type, instagram, facebook_url, website, google_place_url, service_area_radius_km')
     .eq('id', profile.biz_id)
     .maybeSingle();
 
@@ -29,6 +30,12 @@ export default async function ProProfilPage() {
     .select('id, url, sort_order')
     .eq('biz_id', profile.biz_id)
     .order('sort_order', { ascending: true });
+
+  const { data: location } = await supabaseAdmin
+    .from('business_locations')
+    .select('address, postal_code, address_public')
+    .eq('biz_id', profile.biz_id)
+    .maybeSingle();
 
   if (!business) redirect('/pro');
 
@@ -46,6 +53,16 @@ export default async function ProProfilPage() {
           initialWebsite={business.website ?? ''}
           initialPhotos={(photos ?? []) as { id: string; url: string; sort_order: number }[]}
         />
+        <div className="mt-6">
+          <ProAddressForm
+            bizType={business.type}
+            initialAddress={location?.address ?? ''}
+            initialPostalCode={location?.postal_code ?? ''}
+            initialAddressPublic={location?.address_public ?? null}
+            initialRadiusKm={business.service_area_radius_km}
+            hasSavedAddress={!!location}
+          />
+        </div>
       </div>
     </div>
   );

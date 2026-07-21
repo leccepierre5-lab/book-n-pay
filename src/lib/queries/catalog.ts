@@ -3,13 +3,18 @@
 // Utilisables depuis Server Components.
 import { unstable_cache } from 'next/cache';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import type { Business, BusinessPhoto, FlashSlot, Service, Staff } from '@/lib/database.types';
+import type { Business, BusinessLocation, BusinessPhoto, FlashSlot, Service, Staff } from '@/lib/database.types';
 
 export interface BusinessWithDetails extends Business {
   services: Service[];
   staff: Staff[];
   business_reviews: { rating: number | null; review_count: number } | null;
   business_photos: BusinessPhoto[];
+  // null si le pro n'a jamais saisi d'adresse, OU si address_public=false et
+  // que l'appelant n'est ni le propriétaire ni admin — RLS sur
+  // business_locations (migration 0037) filtre déjà côté requête, jamais de
+  // filtrage à refaire ici.
+  business_locations: Pick<BusinessLocation, 'address' | 'postal_code' | 'lat' | 'lng' | 'address_public'> | null;
 }
 
 export interface SearchFilters {
@@ -195,7 +200,7 @@ export async function getBusinessBySlug(slug: string): Promise<BusinessWithDetai
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('businesses')
-    .select('*, services(*), staff(*), business_reviews(rating, review_count), business_photos(id, url, sort_order, created_at, biz_id)')
+    .select('*, services(*), staff(*), business_reviews(rating, review_count), business_photos(id, url, sort_order, created_at, biz_id), business_locations(address, postal_code, lat, lng, address_public)')
     .eq('slug', slug)
     .eq('is_published', true)
     .maybeSingle();

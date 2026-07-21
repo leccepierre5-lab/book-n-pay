@@ -59,8 +59,23 @@ export interface Business {
   frozen: boolean;
   frozen_reason: string | null;
   is_published: boolean;
+  service_area_radius_km: number | null;
   created_at: string;
   updated_at: string;
+}
+
+// Adresse géocodée (API adresse.data.gouv.fr) — table séparée business_locations
+// (migration 0037), jamais fusionnée dans Business : address_public=false doit
+// pouvoir masquer address/lat/lng au public via RLS, ce qu'une colonne sur
+// businesses ne permet pas (RLS filtre des lignes, pas des colonnes).
+export interface BusinessLocation {
+  biz_id: string;
+  address: string;
+  postal_code: string;
+  lat: number;
+  lng: number;
+  address_public: boolean;
+  created_at: string;
 }
 
 export interface BusinessPhoto {

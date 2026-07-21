@@ -3,8 +3,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getBusinessBySlug, isNonRealBusiness, CATEGORIES } from '@/lib/queries/catalog';
+import { getBusinessBySlug, isNonRealBusiness, CATEGORIES, type BusinessWithDetails } from '@/lib/queries/catalog';
 import { isDemoTesterEmail, isProAccount, PRO_CANNOT_BOOK_MESSAGE } from '@/lib/demo-mode';
+import { SITE_URL } from '@/lib/site-config';
 import BookingFlow from '@/components/booking/BookingFlow';
 import FavoriteButton from '@/components/public/FavoriteButton';
 
@@ -26,6 +27,72 @@ const lowerFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 // Affiché en ordre de lecture Lun→Dim, cohérent avec StepDateTime.tsx/ProCalendar.tsx.
 const DAY_LABELS: Record<number, string> = { 0: 'Dim', 1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam' };
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const SCHEMA_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// JSON-LD LocalBusiness — chantier SEO c. Deux branches adresse/geo, jamais
+// mélangées : address_public=true expose address+geo précis (business_locations,
+// déjà filtré par RLS en amont — voir migration 0037) ; sinon areaServed sur la
+// ville publique (businesses.city) + rayon (businesses.service_area_radius_km),
+// aucune coordonnée personnelle du pro dans ce second cas.
+function buildBusinessJsonLd(business: BusinessWithDetails, coverPhotoUrl: string | undefined) {
+  const location = business.business_locations;
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    name: business.name,
+    url: `${SITE_URL}/etablissement/${business.slug}`,
+  };
+
+  if (business.phone) jsonLd.telephone = business.phone;
+  if (coverPhotoUrl) jsonLd.image = coverPhotoUrl;
+
+  // Pas d'aggregateRating : business_reviews est saisi manuellement (aucune
+  // route de l'app n'écrit dessus) et probablement recopié du profil Google
+  // du pro, et business_review_items (les avis individuels qui devraient
+  // fonder la note) n'est jamais affiché sur la fiche — les deux motifs de
+  // pénalité manuelle Google (avis non authentiques côté site, note sans
+  // avis visibles derrière) sont réunis. À rouvrir seulement si de vrais
+  // avis deviennent visibles sur la page.
+
+  if (location?.address_public) {
+    jsonLd.address = {
+      '@type': 'PostalAddress',
+      streetAddress: location.address,
+      postalCode: location.postal_code,
+      addressLocality: business.city,
+      addressCountry: 'FR',
+    };
+    jsonLd.geo = { '@type': 'GeoCoordinates', latitude: location.lat, longitude: location.lng };
+  } else if (business.city) {
+    jsonLd.areaServed = {
+      '@type': 'City',
+      name: business.service_area_radius_km
+        ? `${business.city} (rayon ${business.service_area_radius_km} km)`
+        : business.city,
+    };
+  }
+
+  if (business.open_time && business.close_time && business.open_days.length > 0) {
+    jsonLd.openingHoursSpecification = business.open_days.map((d) => ({
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: `https://schema.org/${SCHEMA_DAYS[d]}`,
+      opens: business.open_time!.slice(0, 5),
+      closes: business.close_time!.slice(0, 5),
+    }));
+  }
+
+  const offerServices = (business.services ?? []).filter((s) => s.price > 0);
+  if (offerServices.length > 0) {
+    jsonLd.makesOffer = offerServices.map((s) => ({
+      '@type': 'Offer',
+      itemOffered: { '@type': 'Service', name: s.name },
+      price: s.price,
+      priceCurrency: 'EUR',
+    }));
+  }
+
+  return jsonLd;
+}
 
 export async function generateMetadata({
   params,
@@ -137,6 +204,12 @@ export default async function EtablissementPage({
 
   return (
     <div className="relative">
+      {!isNonRealBusiness(business) && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(buildBusinessJsonLd(business, photos[0]?.url)) }}
+        />
+      )}
       <div className="px-4 pt-4">
         <Link href="/recherche" className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
