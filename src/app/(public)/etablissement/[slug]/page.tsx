@@ -61,7 +61,28 @@ export async function generateMetadata({
     ? `Réservez en ligne chez ${business.name}, ${descSuffix}. Paiement sécurisé, confirmation instantanée sur Book'nPay.`
     : `Réservez en ligne chez ${business.name} sur Book'nPay. Paiement sécurisé, confirmation instantanée.`;
 
-  return { title, description, robots };
+  // Fiches fictives (isNonRealBusiness) exclues de l'index et jamais censées
+  // être partagées : og:image générique, pas la peine de soigner le partage
+  // de contenu de démo. Sur une vraie fiche, la 1ère photo par sort_order
+  // (même convention que la galerie ci-dessous) sert de couverture ; à
+  // défaut, repli sur la bannière statique du site.
+  const coverPhoto = !isNonRealBusiness(business)
+    ? [...(business.business_photos ?? [])].sort((a, b) => a.sort_order - b.sort_order)[0]
+    : undefined;
+  const ogImage = coverPhoto?.url || '/og-default.png';
+
+  return {
+    title,
+    description,
+    robots,
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      locale: 'fr_FR',
+      images: [{ url: ogImage, alt: business.name }],
+    },
+  };
 }
 
 export default async function EtablissementPage({
