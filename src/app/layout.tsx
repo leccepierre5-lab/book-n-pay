@@ -4,6 +4,7 @@ import './globals.css';
 import PageTransition from '@/components/PageTransition';
 import CookieBanner from '@/components/layout/CookieBanner';
 import { BNP_PLANS } from '@/lib/plans-config';
+import { SITE_URL, SITE_NAME } from '@/lib/site-config';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -11,8 +12,6 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
-const SITE_URL = 'https://www.book-n-pay.com';
-const SITE_NAME = "Book'nPay";
 const SITE_TITLE = "Book'nPay — Réservation en ligne beauté & bien-être";
 const SITE_DESCRIPTION =
   "Réservez en ligne auprès d'indépendants beauté & bien-être du Pays Basque, Béarn et Landes. Paiement sécurisé, 0% de commission pour les pros.";

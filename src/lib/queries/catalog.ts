@@ -167,6 +167,30 @@ export const getActiveFlashSlots = unstable_cache(
   { revalidate: 60, tags: ['flash-slots'] }
 );
 
+// Fiches réelles à référencer dans le sitemap : mêmes critères que la
+// robots meta de la fiche (isNonRealBusiness / frozen → noindex, donc hors
+// sitemap aussi), plus l'exclusion explicite de la vitrine démo commerciale
+// (déjà exclue de /recherche pour la même raison, voir searchBusinesses).
+export async function getSitemapBusinesses(): Promise<{ slug: string; updated_at: string }[]> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('slug, owner_id, updated_at')
+    .eq('frozen', false)
+    .eq('is_published', true)
+    .not('owner_id', 'is', null)
+    .neq('slug', 'demo-book-n-pay');
+
+  if (error) {
+    console.error('[getSitemapBusinesses]', error.message);
+    return [];
+  }
+
+  return (data as { slug: string; owner_id: string | null; updated_at: string }[])
+    .filter((b) => !b.slug.startsWith('test-'))
+    .map((b) => ({ slug: b.slug, updated_at: b.updated_at }));
+}
+
 export async function getBusinessBySlug(slug: string): Promise<BusinessWithDetails | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
