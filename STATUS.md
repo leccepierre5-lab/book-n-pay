@@ -36,7 +36,7 @@ Dashboard (réservations du jour, stats, check-in QR, caisse, calendrier), `équ
 Candidatures (approuver/rejeter), config `app_config`, gel/dégel d'établissements.
 
 ### API (57 routes sous `src/app/api/`)
-`admin/*`, `auth/*` (register, change-password, delete-account, forgot-password), `booking/post-visit-status*`, `bookings/*` (create, create-group, group, availability, cancel, checkin-by-qr, cloturer-prestation, logs, save-member-email, update-member), `chat/send`, `cron/*` (10 tâches dont `check-engagement-notice`), `favorites`, `flash-slots*`, `group/*`, `loyalty/*`, `pro/*` (12 routes dont `export-clients`, `setup-billing`, `staff`), `stripe/*` (checkout, webhook, connect-onboarding, connect-status, transactions).
+`admin/*`, `auth/*` (register, change-password, delete-account, forgot-password), `booking/post-visit-status*`, `bookings/*` (create, create-group, group, availability, cancel, checkin-by-qr, cloturer-prestation, logs, save-member-email, update-member), `chat/send`, `cron/*` (10 routes, dont 9 actives dans `vercel.json` + `check-engagement-notice` en dry-run, jamais invoquée automatiquement — voir section dédiée), `favorites`, `flash-slots*`, `group/*`, `loyalty/*`, `pro/*` (12 routes dont `export-clients`, `setup-billing`, `staff`), `stripe/*` (checkout, webhook, connect-onboarding, connect-status, transactions).
 
 ### Sécurité — correctifs livrés
 - Toutes les routes API renvoient des erreurs génériques au client (plus de fuite `error.message` brut), sauf messages métier légitimes préservés volontairement (auth, Stripe card errors) et l'erreur de signature webhook Stripe (utile au debug dashboard).
