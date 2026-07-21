@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getBusinessBySlug, isNonRealBusiness, CATEGORIES, type BusinessWithDetails } from '@/lib/queries/catalog';
+import { getBusinessBySlug, isNonRealBusiness, isExcludedFromPublicIndex, CATEGORIES, type BusinessWithDetails } from '@/lib/queries/catalog';
 import { isDemoTesterEmail, isProAccount, PRO_CANNOT_BOOK_MESSAGE } from '@/lib/demo-mode';
 import { SITE_URL } from '@/lib/site-config';
 import BookingFlow from '@/components/booking/BookingFlow';
@@ -104,13 +104,16 @@ export async function generateMetadata({
   if (!business) return {};
 
   // Pas un vrai business (owner_id NULL : jamais passé par le vrai flux
-  // d'approbation partenaire — seed de démo ou anciennes fiches vitrine, voir
-  // isNonRealBusiness) ou fiche gelée par l'admin (répond en 200 mais n'affiche
-  // plus le contenu réel, cf. plus bas) : jamais indexable. Un vrai business
-  // (owner_id non-null, publié, non gelé) reste indexable par défaut, sans
+  // d'approbation partenaire — seed de démo ou anciennes fiches vitrine),
+  // vitrine commerciale (demo-book-n-pay : réelle et réservable, mais jamais
+  // à laisser remonter dans l'index à côté de vrais établissements — voir
+  // SHOWCASE_SLUGS/isExcludedFromPublicIndex, business-helpers.ts), ou fiche
+  // gelée par l'admin (répond en 200 mais n'affiche plus le contenu réel, cf.
+  // plus bas) : jamais indexable. Un vrai business (owner_id non-null,
+  // publié, non gelé, pas une vitrine) reste indexable par défaut, sans
   // condition à ajouter le jour où un vrai pro s'inscrit.
   const robots =
-    isNonRealBusiness(business) || business.frozen ? { index: false, follow: false } : undefined;
+    isExcludedFromPublicIndex(business) || business.frozen ? { index: false, follow: false } : undefined;
 
   const categoryLabel = CATEGORIES.find((c) => c.id === business.category)?.label;
   const activity = business.type?.trim() ? formatType(business.type) : categoryLabel;

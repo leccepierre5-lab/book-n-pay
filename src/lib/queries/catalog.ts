@@ -4,6 +4,7 @@
 import { unstable_cache } from 'next/cache';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import type { Business, BusinessLocation, BusinessPhoto, FlashSlot, Service, Staff } from '@/lib/database.types';
+import { SHOWCASE_SLUGS } from '@/lib/business-helpers';
 
 export interface BusinessWithDetails extends Business {
   services: Service[];
@@ -65,11 +66,15 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
   // en diagnostiquant un vrai 404 en prod sur les 45 établissements vitrine.
   queryBuilder = queryBuilder.eq('frozen', false).eq('is_published', true);
 
-  // Vitrine démo commerciale (voir /tarifs) : publiée et réservable pour rester
-  // accessible en lien direct, mais volontairement absente du catalogue public
-  // — une fiche démo mélangée aux vraies fiches dans une recherche organique
-  // décrédibiliserait le catalogue commercial.
-  queryBuilder = queryBuilder.neq('slug', 'demo-book-n-pay');
+  // Vitrines commerciales (voir /tarifs) : publiées et réservables pour rester
+  // accessibles en lien direct, mais volontairement absentes du catalogue
+  // public — mélangées aux vraies fiches dans une recherche organique, elles
+  // décrédibiliseraient le catalogue commercial. SHOWCASE_SLUGS = source
+  // unique, réutilisée par getSitemapBusinesses et le robots meta de la
+  // fiche (business-helpers.ts) — ne pas dupliquer le slug ici.
+  for (const slug of SHOWCASE_SLUGS) {
+    queryBuilder = queryBuilder.neq('slug', slug);
+  }
 
   const { data, error } = await queryBuilder;
   if (error) {
@@ -173,18 +178,20 @@ export const getActiveFlashSlots = unstable_cache(
 );
 
 // Fiches réelles à référencer dans le sitemap : mêmes critères que la
-// robots meta de la fiche (isNonRealBusiness / frozen → noindex, donc hors
-// sitemap aussi), plus l'exclusion explicite de la vitrine démo commerciale
-// (déjà exclue de /recherche pour la même raison, voir searchBusinesses).
+// robots meta de la fiche (isExcludedFromPublicIndex / frozen → noindex,
+// donc hors sitemap aussi, voir business-helpers.ts pour la source unique).
 export async function getSitemapBusinesses(): Promise<{ slug: string; updated_at: string }[]> {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('businesses')
     .select('slug, owner_id, updated_at')
     .eq('frozen', false)
     .eq('is_published', true)
-    .not('owner_id', 'is', null)
-    .neq('slug', 'demo-book-n-pay');
+    .not('owner_id', 'is', null);
+  for (const slug of SHOWCASE_SLUGS) {
+    query = query.neq('slug', slug);
+  }
+  const { data, error } = await query;
 
   if (error) {
     console.error('[getSitemapBusinesses]', error.message);
@@ -240,7 +247,7 @@ export const CATEGORIES = [
 // lib/business-helpers.ts pour le détail. Ré-exporté ici pour ne pas casser
 // les imports existants ; déplacé dans son propre fichier (sans dépendance
 // server-only) le jour où un composant client en a eu besoin.
-export { isNonRealBusiness } from '@/lib/business-helpers';
+export { isNonRealBusiness, isExcludedFromPublicIndex } from '@/lib/business-helpers';
 
 export const BAB_CITIES = [
   'Biarritz', 'Anglet', 'Bayonne', 'Saint-Jean-de-Luz', 'Hendaye',

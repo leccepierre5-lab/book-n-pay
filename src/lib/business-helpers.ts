@@ -12,3 +12,17 @@
 export function isNonRealBusiness(business: { slug: string; owner_id: string | null }): boolean {
   return business.owner_id === null || business.slug.startsWith('test-');
 }
+
+// Vitrines commerciales : publiées et réellement réservables (voir
+// demo-mode.ts), donc volontairement PAS dans isNonRealBusiness — qui bloque
+// aussi la réservation ailleurs (bookings/create[-group], stripe/checkout).
+// demo-book-n-pay DOIT rester réservable, seule sa découvrabilité organique
+// doit être coupée (recherche, sitemap, indexation) — liste séparée exprès.
+export const SHOWCASE_SLUGS = ['demo-book-n-pay'];
+
+// Source de vérité unique pour "cette fiche ne doit jamais remonter dans le
+// catalogue organique" (recherche, sitemap, robots meta) — à réutiliser
+// partout où cette règle s'applique plutôt que de dupliquer la condition.
+export function isExcludedFromPublicIndex(business: { slug: string; owner_id: string | null }): boolean {
+  return isNonRealBusiness(business) || SHOWCASE_SLUGS.includes(business.slug);
+}
