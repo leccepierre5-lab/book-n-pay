@@ -142,6 +142,7 @@ export async function generateMetadata({
     title,
     description,
     robots,
+    alternates: { canonical: `/etablissement/${slug}` },
     openGraph: {
       title,
       description,

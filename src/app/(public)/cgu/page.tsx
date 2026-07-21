@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   title: "Conditions Générales d'Utilisation et de Vente",
   description:
     "Conditions générales d'utilisation et de vente de Book'nPay : frais de réservation, annulation, réservations de groupe et données personnelles.",
+  alternates: { canonical: '/cgu' },
 };
 
 export default function CGUPage() {

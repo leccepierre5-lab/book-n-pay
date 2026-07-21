@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: 'Devenir partenaire — 0% de commission',
   description:
     "Rejoignez Book'nPay : abonnement fixe, zéro commission sur vos ventes, réservation en ligne et paiement sécurisé pour indépendants beauté & bien-être.",
+  alternates: { canonical: '/devenir-partenaire' },
 };
 
 export default function DevenirPartenairePage() {

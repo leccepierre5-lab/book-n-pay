@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-export const metadata: Metadata = { title: 'Recherche' };
+// Canonical fixe vers /recherche sans query params : les combinaisons de
+// filtres (?category=&city=&sort=...) sont la même page de contenu aux yeux
+// de Google, canonicaliser évite de diluer le classement entre variantes.
+export const metadata: Metadata = { title: 'Recherche', alternates: { canonical: '/recherche' } };
 export const revalidate = 60;
 import {
   searchBusinesses,
