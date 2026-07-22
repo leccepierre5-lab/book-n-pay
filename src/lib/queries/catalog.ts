@@ -77,6 +77,14 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
     queryBuilder = queryBuilder.neq('slug', slug);
   }
 
+  // Garde-fou anti-explosion, pas une pagination. ⚠️ plafonne AVANT le tri
+  // mémoire (l.97-119) : au-delà de 250 fiches, le tri par prix/note devient
+  // partiel (les "250 premières" au sens SQL, pas les 250 meilleures pour le
+  // tri demandé). C'est le seuil qui doit déclencher la vraie pagination SQL
+  // (tri déplacé en base). À faire quand le catalogue dépasse ~150 fiches
+  // réelles.
+  queryBuilder = queryBuilder.limit(250);
+
   const { data, error } = await queryBuilder;
   if (error) {
     console.error('[searchBusinesses]', error.message);
