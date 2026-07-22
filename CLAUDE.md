@@ -63,8 +63,8 @@ des 8 décisions actées en revue, mais l'exécution réelle est ce qui suit.
   migration 0035) — verrou `pg_advisory_xact_lock` par (biz_id, date),
   bornes strictes, valable pour toute réservation individuelle du business
   ce jour-là (staff_id ou non — un business a pu avoir du staff avant de le
-  désactiver). Vérifié par test de concurrence réel en prod le 19/07/2026
-  (`2c3e7e3`, déployé, wiring actif dans les 3 routes bookings) :
+  désactiver). Test de concurrence réel en prod le 19/07/2026 (`2c3e7e3`,
+  déployé, wiring actif dans les 3 routes bookings) :
   - 2 requêtes parallèles sur 2 services individuels qui se chevauchent
     (90 min à 10:00 + 30 min à 10:30) → 1×200 + 1×409 `slot_overlap`,
     1 seule ligne en base.
@@ -74,6 +74,20 @@ des 8 décisions actées en revue, mais l'exécution réelle est ce qui suit.
     2×200, aucun `invalid_service` : le routing n'a pas cassé le chemin
     collectif (`create_booking_with_capacity_check`, 0026/0027, non
     modifiée).
+  - **Nuance apportée le 21/07/2026** : ce test du 19/07 tournait sur une
+    fixture qui a du staff actif (probablement `fixture-pro-audit`, seule
+    à avoir un service individuel à l'époque) — il validait donc le
+    routing anti-chevauchement en général, mais pas spécifiquement le
+    chemin 100% sans staff de la migration 0035 (celui-ci passe par 0024,
+    pas par le verrou solo). Aucune des 4 fixtures réellement sans staff
+    (tatouage, photographie, beaute-domicile, animaux) n'avait de service
+    individuel avant le 21/07, donc le chemin 0035 était en réalité
+    inatteignable sur ces fixtures jusque-là. Corrigé en ajoutant un
+    service individuel sur `fixture-pro-animaux`, puis rejoué en
+    conditions réelles contre la prod (2 requêtes parallèles chevauchantes
+    sur ce service) : 1×200 + 1×409 `slot_overlap`, `staff_id:null`
+    confirmé — c'est ce test-là, pas celui du 19/07, qui vérifie
+    effectivement le chemin solo pur.
 - **Zone aveugle connue, pas encore couverte par un test réel** (niveau 1
   restant avant de considérer le moteur réservations comme audité) :
   annulation/modification de réservation, no-show et remboursement,
