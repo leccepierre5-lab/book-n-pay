@@ -1,6 +1,7 @@
 // src/lib/queries/catalog.ts
 // Requêtes de lecture publique du catalogue (businesses, services, avis).
 // Utilisables depuis Server Components.
+import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import type { Business, BusinessLocation, BusinessPhoto, FlashSlot, Service, Staff } from '@/lib/database.types';
@@ -203,7 +204,9 @@ export async function getSitemapBusinesses(): Promise<{ slug: string; updated_at
     .map((b) => ({ slug: b.slug, updated_at: b.updated_at }));
 }
 
-export async function getBusinessBySlug(slug: string): Promise<BusinessWithDetails | null> {
+// cache() dédup les 2 appels par requête sur la fiche établissement
+// (generateMetadata + page component) — même rendu, un seul hit DB.
+export const getBusinessBySlug = cache(async (slug: string): Promise<BusinessWithDetails | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('businesses')
@@ -222,7 +225,7 @@ export async function getBusinessBySlug(slug: string): Promise<BusinessWithDetai
     ...biz,
     staff: (biz.staff ?? []).filter((s) => s.is_active !== false),
   };
-}
+});
 
 export const CATEGORIES = [
   { id: 'all', label: 'Tout' },
