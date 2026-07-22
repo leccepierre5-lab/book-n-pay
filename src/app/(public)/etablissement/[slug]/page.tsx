@@ -182,25 +182,28 @@ export default async function EtablissementPage({
 
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
-  let isFavorited = false;
-  if (authData.user) {
-    const { data: fav } = await supabase
-      .from('favorites')
-      .select('id')
-      .eq('user_id', authData.user.id)
-      .eq('biz_id', business.id)
-      .maybeSingle();
-    isFavorited = !!fav;
-  }
+
+  // favorites et isProAccount ne dépendent que de authData.user, pas l'un de
+  // l'autre — Promise.all pour éviter 2 aller-retours DB séquentiels.
+  // Masquage confort seulement pour isProBlocked — le rejet dur vit dans
+  // bookings/create[-group] (voir lib/demo-mode.ts). Requêté uniquement pour
+  // une fiche réelle : sur une fiche démo, seul isDemoTester compte, pas la
+  // peine d'interroger le rôle pour rien.
+  const [isFavorited, isProBlocked] = authData.user
+    ? await Promise.all([
+        supabase
+          .from('favorites')
+          .select('id')
+          .eq('user_id', authData.user.id)
+          .eq('biz_id', business.id)
+          .maybeSingle()
+          .then(({ data }) => !!data),
+        !isNonRealBusiness(business)
+          ? isProAccount(supabase, authData.user.id)
+          : Promise.resolve(false),
+      ])
+    : [false, false];
   const isDemoTester = isDemoTesterEmail(authData.user?.email);
-  // Masquage confort seulement — le rejet dur vit dans bookings/create[-group]
-  // (voir lib/demo-mode.ts). Requêté uniquement pour une fiche réelle : sur
-  // une fiche démo, seul isDemoTester compte, pas la peine d'interroger le
-  // rôle pour rien.
-  const isProBlocked =
-    !isNonRealBusiness(business) && authData.user
-      ? await isProAccount(supabase, authData.user.id)
-      : false;
 
   const photos = (business.business_photos ?? []).sort((a, b) => a.sort_order - b.sort_order);
   const hasSocial =
