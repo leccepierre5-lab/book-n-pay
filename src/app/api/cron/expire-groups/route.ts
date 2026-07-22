@@ -34,10 +34,23 @@ export async function GET(req: NextRequest) {
   }
 
   let processed = 0;
+  const failed: string[] = [];
   for (const ref of groupRefs) {
-    await expireGroupByRef(ref, supabase, stripe);
-    processed++;
+    try {
+      await expireGroupByRef(ref, supabase, stripe);
+      processed++;
+    } catch (err: any) {
+      // Un groupe en erreur ne doit pas bloquer les remboursements des
+      // autres groupes de la nuit — voir audit du 22/07 (échec silencieux
+      // constaté : la boucle s'arrêtait net sur la première exception).
+      console.error(`[expire-groups] Échec sur le groupe ${ref}:`, err?.message ?? err);
+      failed.push(ref);
+    }
   }
 
-  return NextResponse.json({ processed });
+  if (failed.length > 0) {
+    console.error(`[expire-groups] ${failed.length} groupe(s) en échec sur ${groupRefs.length} :`, failed);
+  }
+
+  return NextResponse.json({ processed, failed: failed.length, failedRefs: failed });
 }
