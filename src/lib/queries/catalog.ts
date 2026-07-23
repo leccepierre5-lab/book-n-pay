@@ -70,17 +70,15 @@ export async function searchBusinesses(
   // en diagnostiquant un vrai 404 en prod sur les 45 établissements vitrine.
   queryBuilder = queryBuilder.eq('frozen', false).eq('is_published', true);
 
-  // Fiches génériques (owner_id NULL — jamais passées par le flux
-  // d'approbation partenaire réel, 1124 en base au 23/07) : invisibles pour
-  // le catalogue public, réservées à la démonstration testeur (whitelist
-  // DEMO_TESTER_EMAILS, lue côté serveur par l'appelant — jamais un paramètre
-  // venant du client). Filtre volontairement sur owner_id seul, pas
-  // isNonRealBusiness() : le seul résidu QA "test-*" existant a en réalité
-  // owner_id NULL (vérifié en base 23/07, voir business-helpers.ts) — il
-  // tombe donc dans ce filtre au même titre que les autres fiches
-  // génériques, décision assumée (ce n'est pas un vrai partenaire).
+  // Fiches génériques (owner_id NULL, 1124 en base au 23/07) + fixtures pro
+  // (12 comptes réels de test, slugs "fixture-pro-*") : invisibles pour le
+  // catalogue public, réservées à la démonstration testeur (whitelist
+  // DEMO_TESTER_EMAILS, lue côté serveur par l'appelant — jamais un
+  // paramètre venant du client). isTesterOnlyBusiness = source unique
+  // (business-helpers.ts), réutilisée par la fiche individuelle et
+  // getSitemapBusinesses plus bas dans ce fichier.
   if (!opts?.isTester) {
-    queryBuilder = queryBuilder.not('owner_id', 'is', null);
+    queryBuilder = queryBuilder.not('owner_id', 'is', null).not('slug', 'ilike', 'fixture-pro-%');
   }
 
   // Vitrines commerciales (voir /tarifs) : publiées et réservables pour rester
@@ -212,7 +210,8 @@ export async function getSitemapBusinesses(): Promise<{ slug: string; updated_at
     .select('slug, owner_id, updated_at')
     .eq('frozen', false)
     .eq('is_published', true)
-    .not('owner_id', 'is', null);
+    .not('owner_id', 'is', null)
+    .not('slug', 'ilike', 'fixture-pro-%');
   for (const slug of SHOWCASE_SLUGS) {
     query = query.neq('slug', slug);
   }
@@ -274,7 +273,7 @@ export const CATEGORIES = [
 // lib/business-helpers.ts pour le détail. Ré-exporté ici pour ne pas casser
 // les imports existants ; déplacé dans son propre fichier (sans dépendance
 // server-only) le jour où un composant client en a eu besoin.
-export { isNonRealBusiness, isExcludedFromPublicIndex } from '@/lib/business-helpers';
+export { isNonRealBusiness, isExcludedFromPublicIndex, isTesterOnlyBusiness } from '@/lib/business-helpers';
 
 export const BAB_CITIES = [
   'Biarritz', 'Anglet', 'Bayonne', 'Saint-Jean-de-Luz', 'Hendaye',

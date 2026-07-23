@@ -31,3 +31,25 @@ export const SHOWCASE_SLUGS = ['demo-book-n-pay'];
 export function isExcludedFromPublicIndex(business: { slug: string; owner_id: string | null }): boolean {
   return isNonRealBusiness(business) || SHOWCASE_SLUGS.includes(business.slug);
 }
+
+// Fixtures pro (project_bnp_fixtures_metiers) : 12 comptes RÉELS et
+// bookables (owner_id non-null, utilisés pour tester le moteur de
+// réservation) — volontairement PAS dans isNonRealBusiness, qui bloquerait
+// aussi la réservation réelle utilisée par ces tests (bookings/create[-group],
+// stripe/checkout). Mais publiquement ce ne sont pas de vrais partenaires
+// pour autant : même statut "réservé aux testeurs" que les fiches
+// génériques pour la DÉCOUVRABILITÉ (recherche/fiche/sitemap), sans toucher
+// à leur capacité de réservation.
+export function isFixtureBusiness(business: { slug: string }): boolean {
+  return business.slug.startsWith('fixture-pro-');
+}
+
+// Visible uniquement par un testeur whitelist (DEMO_TESTER_EMAILS) dans le
+// catalogue public : généralise owner_id NULL (fiches génériques) + les
+// fixtures pro identifiées par slug — source unique réutilisée par
+// searchBusinesses, la fiche individuelle et getSitemapBusinesses (23/07,
+// masquage fixtures) plutôt que de dupliquer/étendre la condition à 3
+// endroits séparés (même leçon que getStripeClient : une seule règle).
+export function isTesterOnlyBusiness(business: { slug: string; owner_id: string | null }): boolean {
+  return business.owner_id === null || isFixtureBusiness(business);
+}

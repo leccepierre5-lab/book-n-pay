@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getBusinessBySlug, isNonRealBusiness, isExcludedFromPublicIndex, CATEGORIES, type BusinessWithDetails } from '@/lib/queries/catalog';
+import { getBusinessBySlug, isNonRealBusiness, isExcludedFromPublicIndex, isTesterOnlyBusiness, CATEGORIES, type BusinessWithDetails } from '@/lib/queries/catalog';
 import { isDemoTesterEmail, isProAccount, PRO_CANNOT_BOOK_MESSAGE } from '@/lib/demo-mode';
 import { SITE_URL } from '@/lib/site-config';
 import BookingFlow from '@/components/booking/BookingFlow';
@@ -167,16 +167,14 @@ export default async function EtablissementPage({
   if (!business) notFound();
 
   // Session lue AVANT tout rendu — jamais un paramètre client. Fiche
-  // générique (owner_id NULL, jamais passée par l'approbation partenaire
-  // réelle) : 404 pour le public, comme si elle n'existait pas. Réservé aux
-  // testeurs whitelist (DEMO_TESTER_EMAILS) pour continuer à démontrer le
-  // catalogue complet. Filtre sur owner_id seul (pas isNonRealBusiness),
-  // même choix que searchBusinesses (catalog.ts) — voir ce fichier pour le
-  // cas du résidu QA "test-*", qui tombe aussi dans ce filtre.
+  // générique OU fixture pro (isTesterOnlyBusiness, business-helpers.ts) :
+  // 404 pour le public, comme si elle n'existait pas. Réservé aux testeurs
+  // whitelist (DEMO_TESTER_EMAILS) pour continuer à démontrer le catalogue
+  // complet — même règle que searchBusinesses (catalog.ts).
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   const isDemoTester = isDemoTesterEmail(authData.user?.email);
-  if (business.owner_id === null && !isDemoTester) notFound();
+  if (isTesterOnlyBusiness(business) && !isDemoTester) notFound();
 
   if (business.frozen) {
     return (
