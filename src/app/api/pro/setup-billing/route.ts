@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type Stripe from 'stripe';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getPlanConfig, getEngagementEndDate } from '@/lib/plans-config';
 import { logAndRespondStripeError } from '@/lib/api-error';
@@ -8,6 +9,22 @@ function getFirstOfNextMonth(): number {
   const now = new Date();
   const anchor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0));
   return Math.floor(anchor.getTime() / 1000);
+}
+
+// current_period_end quitte le niveau racine de Subscription au profit du
+// niveau item avec le "flexible billing mode" (défaut Stripe dès l'API
+// basil/clover — voir lib/stripe/client.ts pour l'épinglage apiVersion et
+// le contexte complet). Même situation que invoice.subscription dans
+// stripe/webhook/route.ts (getInvoiceSubscriptionId) : le SDK installé
+// (types épinglés sur acacia) ne déclare ce champ qu'à la racine, d'où le
+// cast local plutôt qu'un accès typé. Lit l'item en priorité (forme
+// post-basil) et retombe sur la racine (forme acacia actuelle) — survit
+// aux deux sans changement de code au moment de monter l'apiVersion.
+function getSubscriptionCurrentPeriodEnd(subscription: Stripe.Subscription): number {
+  const itemPeriodEnd = (
+    subscription.items?.data?.[0] as unknown as { current_period_end?: number } | undefined
+  )?.current_period_end;
+  return itemPeriodEnd ?? subscription.current_period_end;
 }
 
 export async function POST(req: NextRequest) {
@@ -85,7 +102,7 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     const startDate = now.toISOString().split('T')[0];
     const engagementEnd = getEngagementEndDate(now, planKey).toISOString().split('T')[0];
-    const nextBilling = new Date(subscription.current_period_end * 1000).toISOString().split('T')[0];
+    const nextBilling = new Date(getSubscriptionCurrentPeriodEnd(subscription) * 1000).toISOString().split('T')[0];
 
     // ⚠️ CORRECTIF (audit — Élevé #5) : subscription_status restait auparavant
     // 'active' dès la création de la Subscription Stripe, sans attendre la
