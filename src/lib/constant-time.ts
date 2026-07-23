@@ -4,7 +4,7 @@
 // une timing attack. crypto.timingSafeEqual() existe précisément pour ça.
 import { timingSafeEqual } from 'crypto';
 
-function constantTimeEqual(a: string, b: string): boolean {
+export function constantTimeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
   // Longueurs différentes = pas égal, mais on ne peut pas juste `return false`

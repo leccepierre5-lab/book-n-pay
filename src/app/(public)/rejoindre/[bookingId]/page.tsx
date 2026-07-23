@@ -4,7 +4,14 @@
 // payer sa place sans compte préalable (cohérent avec le flow Base44).
 import JoinGroupClient from '@/components/group/JoinGroupClient';
 
-export default async function RejoindrePage({ params }: { params: Promise<{ bookingId: string }> }) {
+export default async function RejoindrePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ bookingId: string }>;
+  searchParams: Promise<{ t?: string }>;
+}) {
   const { bookingId } = await params;
-  return <JoinGroupClient bookingId={bookingId} />;
+  const { t } = await searchParams;
+  return <JoinGroupClient bookingId={bookingId} organizerToken={t ?? null} />;
 }

@@ -133,6 +133,7 @@ export interface Booking {
   status: BookingStatus;
   group_ref: string | null;
   payment_deadline: string | null;
+  organizer_token: string;
   client_id: string | null;
   client_phone: string | null;
   client_name: string | null;

@@ -173,6 +173,23 @@ export default async function ConfirmationPage({
           </div>
         )}
 
+        {/* Lien de gestion (retirer un invité) — organizer_token (migration 0039),
+            JAMAIS diffusé dans ShareGroupLink ci-dessous. Gate volontairement
+            plus strict que isGroupBooking : chaque invité atterrit sur cette
+            MÊME URL après son propre paiement (successUrl identique dans
+            JoinGroupClient.tsx) — seul isProvenOrganizer (session = créateur
+            réel) garantit que ce lien n'est rendu que pour l'organisateur. Un
+            organisateur non connecté ne verra pas ce lien (limite déjà
+            partagée avec ShareGroupLink, pas une régression introduite ici). */}
+        {isProvenOrganizer && isGroupBooking && bookingId && (booking as any)?.organizer_token && (
+          <Link
+            href={`/rejoindre/${bookingId}?t=${(booking as any).organizer_token}`}
+            className="mb-5 block text-center text-xs text-slate-400 hover:text-slate-300 underline underline-offset-2"
+          >
+            Gérer mon groupe (retirer un invité)
+          </Link>
+        )}
+
         {/* Email reminder — absent en mode démo, aucun email n'est réellement envoyé */}
         {!isDemo && (
           <div className="mb-5 rounded-2xl bg-navy-900 border border-white/[0.08] p-4 flex items-start gap-3">

@@ -9,13 +9,14 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { calcFraisGestion, generateQrCode, normalizePhone, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
+import { constantTimeEqual } from '@/lib/constant-time';
 
 const MAX_GROUP_SIZE = 23;
 
 export async function POST(req: NextRequest) {
   const supabase = createServiceRoleClient();
   const body = await req.json();
-  const { action, bookingId, memberId, memberData } = body;
+  const { action, bookingId, memberId, memberData, token } = body;
 
   // Normalise le téléphone dès la réception — voir normalizePhone() pour
   // le détail du problème que ça résout (comparaisons phone === phone
@@ -149,8 +150,23 @@ export async function POST(req: NextRequest) {
     }
 
     // ── removeInvite ─────────────────────────────────────────────────────────
+    // Action réservée à l'organisateur — celui-ci n'a pas forcément de compte
+    // (voir en-tête de fichier), donc pas de check client_id === auth.uid()
+    // possible ici : c'est organizer_token (migration 0039) qui fait foi,
+    // jamais diffusé dans le lien invité (ShareGroupLink.tsx), seulement dans
+    // le lien organisateur affiché sur confirmation/page.tsx.
     if (action === 'removeInvite') {
       if (!memberId) return NextResponse.json({ error: 'memberId requis' }, { status: 400 });
+
+      const { data: bookingRow } = await supabase
+        .from('bookings')
+        .select('organizer_token')
+        .eq('id', bookingId)
+        .maybeSingle();
+
+      if (!bookingRow || !token || !constantTimeEqual(token, bookingRow.organizer_token)) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
+      }
 
       const { data: member } = await supabase
         .from('booking_members')

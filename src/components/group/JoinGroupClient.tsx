@@ -27,7 +27,13 @@ interface BookingData {
   services?: { max_persons: number | null; deposit: number; price: number } | null;
 }
 
-export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
+export default function JoinGroupClient({
+  bookingId,
+  organizerToken,
+}: {
+  bookingId: string;
+  organizerToken: string | null;
+}) {
   const [booking, setBooking] = useState<BookingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -134,7 +140,11 @@ export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
   };
 
   const handleRemove = async (memberId: string) => {
-    await callGroupApi({ action: 'removeInvite', memberId });
+    const data = await callGroupApi({ action: 'removeInvite', memberId, token: organizerToken });
+    if (data.error) {
+      setError(data.error);
+      return;
+    }
     loadBooking();
   };
 
@@ -193,7 +203,7 @@ export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
                   <span className="text-xs text-white/40">
                     {m.status === 'paid' || m.status === 'arrived' ? '✓ Payé' : 'En attente'}
                   </span>
-                  {m.status === 'invite' && (
+                  {m.status === 'invite' && organizerToken && (
                     <button onClick={() => handleRemove(m.id)} className="text-xs text-red-400 hover:text-red-300">
                       Retirer
                     </button>
@@ -203,6 +213,8 @@ export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
             ))}
           </div>
         </div>
+
+        {error && <p className="mb-5 text-xs text-red-400">{error}</p>}
 
         {activeMembers.length < hardLimit && booking.status !== 'cancelled' && (
           <form onSubmit={handleJoin} className="space-y-3 rounded-xl bg-navy-900 p-4">
@@ -222,7 +234,6 @@ export default function JoinGroupClient({ bookingId }: { bookingId: string }) {
               required
               className="w-full rounded-lg bg-navy-800 px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
             />
-            {error && <p className="text-xs text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={joining}
