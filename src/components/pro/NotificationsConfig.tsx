@@ -3,7 +3,8 @@
 // Port de src/components/pro/NotificationsConfig.jsx — persisté dans
 // business_settings.notification_prefs (jsonb) plutôt que localStorage,
 // pour que les préférences suivent le pro sur tous ses appareils.
-// ⚠️ État réel par toggle (mis à jour 17/07, voir lib/pro-notifications.ts) :
+// ⚠️ État réel par toggle (mis à jour 23/07, voir lib/pro-notifications.ts
+// et AlertsPanel.tsx) :
 // - newBooking : CÂBLÉ (stripe/webhook/route.ts, sur checkout.session.completed
 //   — email au owner à chaque paiement confirmé, gate sur ce flag).
 // - cancelBooking : CÂBLÉ (bookings/cancel + loyalty/use-joker — PAS
@@ -14,17 +15,25 @@
 //   comportement réel existant plutôt que la promesse UI jamais honorée
 //   (qui affichait faussement "désactivé" par défaut) — pas de coupure de
 //   masse au déploiement, juste un vrai opt-out enfin fonctionnel pour le
-//   pro qui veut couper ses rappels.
+//   pro qui veut couper ses rappels. Libellé précisé "(envoyé à vos
+//   clients)" — "Rappel client" pouvait être lu comme "rappel AU pro
+//   concernant un client", pas comme le vrai destinataire (le client).
 // - reminderH2 : CÂBLÉ (cron/send-rdv-reminders-j2, défaut TRUE, même
 //   polarité que ci-dessus) — mais **relabellé "J-2"** : le cron tourne une
 //   fois par jour (vercel.json), un vrai "2h avant" est structurellement
 //   impossible sans cron horaire. Le code fait ce qu'il a toujours fait
 //   (rappel à J+2) ; c'était le libellé "2h" qui mentait, pas le timing.
-// - paymentReceived / groupPending : toujours déclaratifs, rien ne les lit
-//   encore. Documenté en TODO dans le README plutôt que de prétendre que ces
-//   toggles changent déjà le comportement réel.
-// - rdvImminent / noShowAuto : gérés par AlertsPanel.tsx, qui ne lit PAS ce
-//   flag non plus — décoratifs eux aussi.
+//   Même précision de destinataire que reminderH24 ci-dessus.
+// - rdvImminent / noShowAuto : CÂBLÉ depuis le 23/07 (AlertsPanel.tsx lit
+//   désormais notification_prefs, défaut TRUE, même convention opt-out).
+// - paymentReceived / groupPending : rien ne les a jamais lus côté serveur
+//   (aucune notification n'existe pour ces deux événements — pas un flag
+//   ignoré, une fonctionnalité jamais construite). Masqués de l'UI le
+//   23/07 plutôt que de continuer à promettre un comportement inexistant.
+//   Les clés restent en base (business_settings.notification_prefs) pour
+//   les pros qui les avaient déjà réglées — rien n'a été migré/supprimé,
+//   seul l'affichage a changé. À ressortir du backlog si la fonctionnalité
+//   est construite un jour.
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -52,15 +61,23 @@ const NOTIF_ITEMS = [
     items: [
       { key: 'newBooking', emoji: '✅', label: 'Nouvelle réservation', desc: 'Quand un client confirme un RDV' },
       { key: 'cancelBooking', emoji: '❌', label: 'Annulation', desc: 'Quand un client annule' },
-      { key: 'paymentReceived', emoji: '💳', label: 'Frais de réservation reçus', desc: 'Quand un paiement est validé' },
-      { key: 'groupPending', emoji: '👥', label: 'Groupe incomplet', desc: "Quand un membre du groupe n'a pas encore payé" },
     ],
   },
   {
     group: 'Rappels automatiques',
     items: [
-      { key: 'reminderH24', emoji: '🔔', label: 'Rappel client J-1', desc: 'Envoyer un rappel aux clients 24h avant' },
-      { key: 'reminderH2', emoji: '🕐', label: 'Rappel client J-2', desc: 'Envoyer un rappel aux clients 2 jours avant' },
+      {
+        key: 'reminderH24',
+        emoji: '🔔',
+        label: 'Rappel client J-1 (envoyé à vos clients)',
+        desc: 'Un email est envoyé à vos clients 24h avant leur RDV',
+      },
+      {
+        key: 'reminderH2',
+        emoji: '🕐',
+        label: 'Rappel client J-2 (envoyé à vos clients)',
+        desc: 'Un email est envoyé à vos clients 2 jours avant leur RDV',
+      },
     ],
   },
 ];
@@ -89,7 +106,11 @@ export default function NotificationsConfig({
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const activeCount = Object.values(config).filter(Boolean).length;
+  // Ne compte que les clés réellement affichées — paymentReceived/groupPending
+  // restent dans `config` (et en base) mais ne doivent pas gonfler ce chiffre
+  // puisque le pro n'a plus aucun moyen de les voir ni de les changer.
+  const visibleKeys = NOTIF_ITEMS.flatMap((group) => group.items.map((item) => item.key));
+  const activeCount = visibleKeys.filter((key) => config[key]).length;
 
   return (
     <div className="space-y-5">

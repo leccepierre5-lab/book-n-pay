@@ -30,7 +30,12 @@ interface Alert {
   msg: string;
 }
 
-function computeAlerts(bookings: BookingRow[], today: string): Alert[] {
+function computeAlerts(bookings: BookingRow[], today: string, prefs: Record<string, boolean> | null): Alert[] {
+  // Défaut TRUE (opt-out) — même convention que resolveNotifiableOwnerEmail
+  // (lib/pro-notifications.ts) et NotificationsConfig.tsx : un pro qui n'a
+  // jamais ouvert ses réglages doit continuer à voir ces alertes.
+  const rdvImminentEnabled = prefs?.rdvImminent !== false;
+  const noShowAutoEnabled = prefs?.noShowAuto !== false;
   const now = new Date();
   const alerts: Alert[] = [];
 
@@ -42,7 +47,7 @@ function computeAlerts(bookings: BookingRow[], today: string): Alert[] {
     const minsUntil = (slotTime.getTime() - now.getTime()) / 60000;
 
     for (const member of b.booking_members || []) {
-      if (member.status === 'paid' && minsUntil > 0 && minsUntil <= 15) {
+      if (rdvImminentEnabled && member.status === 'paid' && minsUntil > 0 && minsUntil <= 15) {
         alerts.push({
           id: `soon-${b.id}-${member.id}`,
           type: 'warning',
@@ -50,7 +55,7 @@ function computeAlerts(bookings: BookingRow[], today: string): Alert[] {
           msg: `${member.name} — ${b.service_name} à ${b.time} (dans ${Math.ceil(minsUntil)} min)`,
         });
       }
-      if (member.status === 'paid' && minsUntil < -5 && minsUntil > -120) {
+      if (noShowAutoEnabled && member.status === 'paid' && minsUntil < -5 && minsUntil > -120) {
         alerts.push({
           id: `noshow-${b.id}-${member.id}`,
           type: 'danger',
@@ -64,17 +69,23 @@ function computeAlerts(bookings: BookingRow[], today: string): Alert[] {
   return alerts;
 }
 
-export default function AlertsPanel({ bookings }: { bookings: BookingRow[] }) {
+export default function AlertsPanel({
+  bookings,
+  notificationPrefs,
+}: {
+  bookings: BookingRow[];
+  notificationPrefs?: Record<string, boolean> | null;
+}) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    const update = () => setAlerts(computeAlerts(bookings, today));
+    const update = () => setAlerts(computeAlerts(bookings, today, notificationPrefs ?? null));
     update();
     const interval = setInterval(update, 60_000);
     return () => clearInterval(interval);
-  }, [bookings]);
+  }, [bookings, notificationPrefs]);
 
   const visible = alerts.filter((a) => !dismissed.has(a.id));
   if (visible.length === 0) return null;

@@ -64,6 +64,7 @@ export default async function ProPage() {
         todayBookings={todayBookings}
         stats={stats}
         stripeConnected={!!settings?.stripe_onboarding_complete}
+        notificationPrefs={settings?.notification_prefs ?? null}
       />
     </Suspense>
   );

@@ -43,11 +43,13 @@ export default function ProDashboard({
   todayBookings,
   stats,
   stripeConnected,
+  notificationPrefs,
 }: {
   business: Business;
   todayBookings: BookingRow[];
   stats: ProStats;
   stripeConnected: boolean;
+  notificationPrefs?: Record<string, boolean> | null;
 }) {
   const [bookings, setBookings] = useState(todayBookings);
   const [connectLoading, setConnectLoading] = useState(false);
@@ -211,7 +213,7 @@ export default function ProDashboard({
           </div>
         </header>
 
-        <AlertsPanel bookings={bookings} />
+        <AlertsPanel bookings={bookings} notificationPrefs={notificationPrefs} />
 
         {/* Stripe warning */}
         {!stripeConnectedLocal && (
