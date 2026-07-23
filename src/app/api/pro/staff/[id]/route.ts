@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 
 async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: authData } = await supabase.auth.getUser();
@@ -15,10 +15,10 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
 }
 
 // PATCH /api/pro/staff/[id] — renommer ou désactiver un praticien
-export async function PATCH(
+export const PATCH = withErrorHandling('[Staff]', async (
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -56,13 +56,13 @@ export async function PATCH(
 
   if (error) return logAndRespond('[Staff] Erreur update:', error);
   return NextResponse.json({ staff: data });
-}
+});
 
 // DELETE /api/pro/staff/[id] — suppression définitive (rare, pour les erreurs de création)
-export async function DELETE(
+export const DELETE = withErrorHandling('[Staff]', async (
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -91,4 +91,4 @@ export async function DELETE(
 
   if (error) return logAndRespond('[Staff] Erreur suppression:', error);
   return NextResponse.json({ ok: true });
-}
+});

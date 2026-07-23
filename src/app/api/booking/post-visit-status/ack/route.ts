@@ -8,8 +8,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { phonesMatch } from '@/lib/booking-utils';
+import { withErrorHandling } from '@/lib/api-error';
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling('[PostVisitStatusAck]', async (req: NextRequest) => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) {
@@ -49,4 +50,4 @@ export async function POST(req: NextRequest) {
     .eq('id', memberId);
 
   return NextResponse.json({ ok: true });
-}
+});

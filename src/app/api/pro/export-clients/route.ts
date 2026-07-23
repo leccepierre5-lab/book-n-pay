@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { normalizePhone } from '@/lib/booking-utils';
+import { withErrorHandling } from '@/lib/api-error';
 
 interface ClientAgg {
   name: string;
@@ -26,7 +27,7 @@ function csvEscape(value: string): string {
   return safe;
 }
 
-export async function GET() {
+export const GET = withErrorHandling('[ExportClients]', async () => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -93,4 +94,4 @@ export async function GET() {
       'Content-Disposition': `attachment; filename="clients-book-n-pay-${new Date().toISOString().split('T')[0]}.csv"`,
     },
   });
-}
+});

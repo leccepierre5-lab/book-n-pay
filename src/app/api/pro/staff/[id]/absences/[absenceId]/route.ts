@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 
 async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: authData } = await supabase.auth.getUser();
@@ -15,10 +15,10 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
 }
 
 // DELETE /api/pro/staff/[id]/absences/[absenceId] — supprime une absence
-export async function DELETE(
+export const DELETE = withErrorHandling('[StaffAbsences]', async (
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; absenceId: string }> }
-) {
+) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -35,4 +35,4 @@ export async function DELETE(
 
   if (error) return logAndRespond('[StaffAbsences] Erreur suppression:', error);
   return NextResponse.json({ ok: true });
-}
+});

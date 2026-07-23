@@ -11,8 +11,9 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { phonesMatch } from '@/lib/booking-utils';
+import { withErrorHandling } from '@/lib/api-error';
 
-export async function GET() {
+export const GET = withErrorHandling('[PostVisitStatus]', async () => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) {
@@ -70,4 +71,4 @@ export async function GET() {
     googlePlaceUrl: business?.google_place_url || null,
     referralCode: profile.referral_code || null,
   });
-}
+});

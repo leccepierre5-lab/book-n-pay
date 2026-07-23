@@ -6,8 +6,9 @@ import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getOverageStatus } from '@/lib/booking-utils';
 import { getPlanConfig, getNextPlanConfig } from '@/lib/plans-config';
+import { withErrorHandling } from '@/lib/api-error';
 
-export async function GET() {
+export const GET = withErrorHandling('[OverageStatus]', async () => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -88,4 +89,4 @@ export async function GET() {
     nextPlanPriceHT: nextPlan?.priceHT ?? null,
     nextPlanQuota: nextPlan?.quota ?? null,
   });
-}
+});

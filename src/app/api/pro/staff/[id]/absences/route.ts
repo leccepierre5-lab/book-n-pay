@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 import { getParisDateOffsetStr } from '@/lib/booking-utils';
 
 async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -16,10 +16,10 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
 }
 
 // GET /api/pro/staff/[id]/absences — congés/absences ponctuelles d'un praticien
-export async function GET(
+export const GET = withErrorHandling('[StaffAbsences]', async (
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -36,14 +36,14 @@ export async function GET(
 
   if (error) return logAndRespond('[StaffAbsences] Erreur liste:', error);
   return NextResponse.json({ absences: data ?? [] });
-}
+});
 
 // POST /api/pro/staff/[id]/absences — déclare une nouvelle absence
 // Body : { start_at: ISO string, end_at: ISO string, reason?: string }
-export async function POST(
+export const POST = withErrorHandling('[StaffAbsences]', async (
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -105,4 +105,4 @@ export async function POST(
 
   if (error) return logAndRespond('[StaffAbsences] Erreur création:', error);
   return NextResponse.json({ absence: data });
-}
+});

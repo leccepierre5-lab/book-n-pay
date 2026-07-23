@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 
-export async function PATCH(
+export const PATCH = withErrorHandling('[FlashSlots]', async (
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params;
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
@@ -38,12 +38,12 @@ export async function PATCH(
   if (error) return logAndRespond('[FlashSlots] Erreur update:', error);
   revalidateTag('flash-slots', { expire: 0 });
   return NextResponse.json(data);
-}
+});
 
-export async function DELETE(
+export const DELETE = withErrorHandling('[FlashSlots]', async (
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params;
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
@@ -69,4 +69,4 @@ export async function DELETE(
   if (error) return logAndRespond('[FlashSlots] Erreur suppression:', error);
   revalidateTag('flash-slots', { expire: 0 });
   return NextResponse.json({ success: true });
-}
+});

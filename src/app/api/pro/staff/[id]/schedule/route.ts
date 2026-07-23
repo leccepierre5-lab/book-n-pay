@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 
 async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: authData } = await supabase.auth.getUser();
@@ -15,10 +15,10 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
 }
 
 // GET /api/pro/staff/[id]/schedule — horaires individuels d'un praticien
-export async function GET(
+export const GET = withErrorHandling('[StaffSchedule]', async (
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -35,7 +35,7 @@ export async function GET(
 
   if (error) return logAndRespond('[StaffSchedule] Erreur liste:', error);
   return NextResponse.json({ schedules: data ?? [] });
-}
+});
 
 const DAY_LABELS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 
@@ -44,10 +44,10 @@ const DAY_LABELS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi
 // Plusieurs plages par jour sont autorisées (horaires coupés, ex. pause
 // déjeuner) depuis la migration 0031 — d'où la validation anti-chevauchement
 // ci-dessous, absente avant qu'un même jour ne puisse porter qu'une plage.
-export async function PUT(
+export const PUT = withErrorHandling('[StaffSchedule]', async (
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -126,4 +126,4 @@ export async function PUT(
   }
 
   return NextResponse.json({ ok: true });
-}
+});

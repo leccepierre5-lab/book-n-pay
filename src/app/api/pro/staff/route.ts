@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 
 async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: authData } = await supabase.auth.getUser();
@@ -15,7 +15,7 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
 }
 
 // GET /api/pro/staff — liste les praticiens actifs (et inactifs) de l'établissement
-export async function GET() {
+export const GET = withErrorHandling('[Staff]', async () => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -29,10 +29,10 @@ export async function GET() {
 
   if (error) return logAndRespond('[Staff] Erreur liste:', error);
   return NextResponse.json({ staff: data ?? [] });
-}
+});
 
 // POST /api/pro/staff — créer un nouveau praticien
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling('[Staff]', async (req: NextRequest) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -56,4 +56,4 @@ export async function POST(req: NextRequest) {
 
   if (error) return logAndRespond('[Staff] Erreur création:', error);
   return NextResponse.json({ staff: data }, { status: 201 });
-}
+});

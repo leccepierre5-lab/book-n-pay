@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 
 async function getBizId(): Promise<string | null> {
   const supabase = await createClient();
@@ -15,7 +15,7 @@ async function getBizId(): Promise<string | null> {
   return data.biz_id;
 }
 
-export async function GET() {
+export const GET = withErrorHandling('[Services]', async () => {
   const bizId = await getBizId();
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
 
@@ -28,9 +28,9 @@ export async function GET() {
 
   if (error) return logAndRespond('[Services] Erreur liste:', error);
   return NextResponse.json(data);
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling('[Services]', async (req: NextRequest) => {
   const bizId = await getBizId();
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
 
@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
 
   if (error) return logAndRespond('[Services] Erreur création:', error);
   return NextResponse.json(data, { status: 201 });
-}
+});
 
-export async function PATCH(req: NextRequest) {
+export const PATCH = withErrorHandling('[Services]', async (req: NextRequest) => {
   const bizId = await getBizId();
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
 
@@ -98,9 +98,9 @@ export async function PATCH(req: NextRequest) {
 
   if (error) return logAndRespond('[Services] Erreur update:', error);
   return NextResponse.json(data);
-}
+});
 
-export async function DELETE(req: NextRequest) {
+export const DELETE = withErrorHandling('[Services]', async (req: NextRequest) => {
   const bizId = await getBizId();
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
 
@@ -120,4 +120,4 @@ export async function DELETE(req: NextRequest) {
   const { error } = await supabase.from('services').delete().eq('id', id);
   if (error) return logAndRespond('[Services] Erreur suppression:', error);
   return NextResponse.json({ ok: true });
-}
+});

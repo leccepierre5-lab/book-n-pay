@@ -3,8 +3,9 @@
 // garantit qu'un pro ne voit que les bookings de son propre business.
 import { NextRequest, NextResponse } from 'next/server';
 import { getProBookingsForMonth } from '@/lib/queries/pro';
+import { withErrorHandling } from '@/lib/api-error';
 
-export async function GET(req: NextRequest) {
+export const GET = withErrorHandling('[BookingsMonth]', async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const bizId = searchParams.get('bizId');
   const year = searchParams.get('year');
@@ -16,4 +17,4 @@ export async function GET(req: NextRequest) {
 
   const bookings = await getProBookingsForMonth(bizId, Number(year), Number(month));
   return NextResponse.json({ bookings });
-}
+});

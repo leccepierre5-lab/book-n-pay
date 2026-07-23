@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 import { parseParisDatetime } from '@/lib/booking-utils';
 import { buildAgendaColumns } from '@/lib/agenda';
 
@@ -19,7 +19,7 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
 // GET /api/pro/agenda?date=YYYY-MM-DD — planning par praticien pour une journée
 // (RDV + horaires de travail + absences), agrégé colonne par colonne.
 // bizId résolu depuis la session pro, jamais depuis un paramètre client.
-export async function GET(req: NextRequest) {
+export const GET = withErrorHandling('[Agenda]', async (req: NextRequest) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
   if (!bizId) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -102,4 +102,4 @@ export async function GET(req: NextRequest) {
     businessHours: bizRow ? { open_time: bizRow.open_time, close_time: bizRow.close_time } : null,
     columns,
   });
-}
+});

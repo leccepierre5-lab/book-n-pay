@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 
-export async function POST() {
+export const POST = withErrorHandling('[Publish]', async () => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -41,4 +41,4 @@ export async function POST() {
 
   if (error) return logAndRespond('[Publish] Erreur:', error);
   return NextResponse.json({ ok: true });
-}
+});

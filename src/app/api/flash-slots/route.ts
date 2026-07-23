@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 
-export async function GET(req: NextRequest) {
+export const GET = withErrorHandling('[FlashSlots]', async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const bizId = searchParams.get('biz_id');
 
@@ -21,9 +21,9 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q;
   if (error) return logAndRespond('[FlashSlots] Erreur liste:', error);
   return NextResponse.json(data);
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling('[FlashSlots]', async (req: NextRequest) => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -64,4 +64,4 @@ export async function POST(req: NextRequest) {
   if (error) return logAndRespond('[FlashSlots] Erreur création:', error);
   revalidateTag('flash-slots', { expire: 0 });
   return NextResponse.json(data, { status: 201 });
-}
+});

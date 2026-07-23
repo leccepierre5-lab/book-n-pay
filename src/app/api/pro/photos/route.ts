@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { randomUUID } from 'crypto';
-import { logAndRespond } from '@/lib/api-error';
+import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 
 const MAX_PHOTOS = 5;
 
 // POST: upload nouvelle photo
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling('[Photos]', async (req: NextRequest) => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -77,10 +77,10 @@ export async function POST(req: NextRequest) {
 
   if (insertError) return logAndRespond('[Photos] Erreur insertion:', insertError);
   return NextResponse.json({ photo });
-}
+});
 
 // DELETE: supprimer une photo
-export async function DELETE(req: NextRequest) {
+export const DELETE = withErrorHandling('[Photos]', async (req: NextRequest) => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -118,4 +118,4 @@ export async function DELETE(req: NextRequest) {
 
   await supabaseAdmin.from('business_photos').delete().eq('id', photoId);
   return NextResponse.json({ ok: true });
-}
+});

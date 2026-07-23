@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { withErrorHandling } from '@/lib/api-error';
 
-export async function GET() {
+export const GET = withErrorHandling('[OnboardingStatus]', async () => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -34,4 +35,4 @@ export async function GET() {
     step3Done,
     isPublished: biz?.is_published ?? false,
   });
-}
+});
