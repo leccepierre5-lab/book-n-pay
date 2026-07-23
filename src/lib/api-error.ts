@@ -74,3 +74,26 @@ export function logAndRespondStripeError(context: string, error: unknown) {
     { status: 500 }
   );
 }
+
+// Filet pour une exception NON attendue (pas une erreur Supabase déjà gérée
+// par un `if (error) return logAndRespond(...)` inline) — audit du 23/07 :
+// plusieurs routes (paiement inclus, group/pay-for-member) n'avaient aucun
+// try/catch englobant, donc un throw (ex: l'appel Stripe lui-même) partait
+// en 500 générique de Next.js, sans log. `Args extends unknown[]` pour rester
+// compatible avec les signatures de route handler App Router (0, 1 ou 2
+// arguments — `req`, ou `req, { params }`).
+export function withErrorHandling<Args extends unknown[]>(
+  context: string,
+  handler: (...args: Args) => Promise<NextResponse>
+): (...args: Args) => Promise<NextResponse> {
+  return async (...args: Args) => {
+    try {
+      return await handler(...args);
+    } catch (error: any) {
+      if (typeof error?.type === 'string' && error.type.startsWith('Stripe')) {
+        return logAndRespondStripeError(context, error);
+      }
+      return logAndRespond(context, error);
+    }
+  };
+}
