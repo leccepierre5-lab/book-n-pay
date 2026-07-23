@@ -39,6 +39,9 @@ verify-*.png
 .DS_Store
 Thumbs.db
 
+# Fichiers verrou temporaires Office/Word (préfixe ~$)
+~$*
+
 # Logs
 *.log
 npm-debug.log*
