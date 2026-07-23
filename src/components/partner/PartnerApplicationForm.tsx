@@ -294,7 +294,7 @@ export default function PartnerApplicationForm() {
           color: loading || !acceptedCgu ? '#94a3b8' : undefined,
         }}
       >
-        {loading ? 'Envoi...' : 'Continuer →'}
+        {loading ? 'Envoi...' : 'Créer mon dossier'}
       </button>
 
       <p className="text-center text-[11px] text-slate-700">
