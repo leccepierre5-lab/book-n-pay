@@ -7,6 +7,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { getParisDateOffsetStr } from '@/lib/booking-utils';
 import { isValidBearerSecret } from '@/lib/constant-time';
+import { processBatch } from '@/lib/cron-batch';
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -40,22 +41,30 @@ export async function GET(req: NextRequest) {
       .map((s) => s.biz_id)
   );
 
-  let sent = 0;
-
+  // Aplati (booking × membre) en une liste plate de destinataires — un
+  // sendEmail() qui échoue pour l'un ne doit isoler que lui, pas bloquer les
+  // suivants (même classe de bug qu'expire-groups, incident 22/07).
+  const recipients: { booking: NonNullable<typeof bookings>[number]; member: any; email: string }[] = [];
   for (const booking of bookings || []) {
     if (optedOutBizIds.has(booking.biz_id)) continue;
-    const recipients = (booking.booking_members || []).filter((m: any) => m.status === 'paid');
+    const paidMembers = (booking.booking_members || []).filter((m: any) => m.status === 'paid');
 
-    for (const member of recipients) {
+    for (const member of paidMembers) {
       if (!member.name) continue;
-
       const email = member.phone === booking.client_phone ? booking.client_email : null;
-
       if (!email) {
         console.warn(`[Rappels J-2] Pas d'email pour ${member.name} — rappel ignoré`);
         continue;
       }
+      recipients.push({ booking, member, email });
+    }
+  }
 
+  const result = await processBatch(
+    recipients,
+    'send-rdv-reminders-j2',
+    (r) => `${r.member.name} <${r.email}> (${r.booking.biz_name} ${r.booking.date})`,
+    async ({ booking, member, email }) => {
       await sendEmail({
         to: email,
         subject: `📅 Rappel : votre RDV dans 2 jours chez ${booking.biz_name}`,
@@ -68,9 +77,13 @@ Petit rappel : vous avez un rendez-vous le ${booking.date} à ${booking.time} ch
 À bientôt,
 L'équipe Book'nPay`,
       });
-      sent++;
     }
-  }
+  );
 
-  return NextResponse.json({ success: true, rdvDansDeuxJours: bookings?.length || 0, emailsEnvoyes: sent });
+  return NextResponse.json({
+    success: true,
+    rdvDansDeuxJours: bookings?.length || 0,
+    emailsEnvoyes: result.processed,
+    failed: result.failed,
+  });
 }

@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { isValidBearerSecret } from '@/lib/constant-time';
+import { processBatch } from '@/lib/cron-batch';
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -33,30 +34,44 @@ export async function GET(req: NextRequest) {
   const affectedBookingIds = [...new Set(expiredMembers.map((m) => m.booking_id))];
   let cancelledBookings = 0;
 
-  for (const member of expiredMembers) {
-    await supabase.from('booking_members').update({ status: 'cancelled' }).eq('id', member.id);
-  }
-
-  for (const bookingId of affectedBookingIds) {
-    const { data: remaining } = await supabase
-      .from('booking_members')
-      .select('status')
-      .eq('booking_id', bookingId)
-      .in('status', ['paid', 'arrived']);
-
-    if (!remaining || remaining.length === 0) {
-      await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
-      cancelledBookings++;
+  // processBatch (lib/cron-batch.ts) isole chaque item — un échec sur un
+  // membre ou un booking ne doit plus bloquer le traitement des suivants
+  // (même classe de bug qu'expire-groups, incident 22/07).
+  const memberResult = await processBatch(
+    expiredMembers,
+    'cleanup-expired-invites:members',
+    (m) => `membre ${m.id} (booking ${m.booking_id})`,
+    async (member) => {
+      await supabase.from('booking_members').update({ status: 'cancelled' }).eq('id', member.id);
     }
-  }
+  );
+
+  const bookingResult = await processBatch(
+    affectedBookingIds,
+    'cleanup-expired-invites:bookings',
+    (bookingId) => `booking ${bookingId}`,
+    async (bookingId) => {
+      const { data: remaining } = await supabase
+        .from('booking_members')
+        .select('status')
+        .eq('booking_id', bookingId)
+        .in('status', ['paid', 'arrived']);
+
+      if (!remaining || remaining.length === 0) {
+        await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
+        cancelledBookings++;
+      }
+    }
+  );
 
   console.log(
-    `[CleanupExpiredInvites] ${expiredMembers.length} invite(s) expirée(s) nettoyée(s), ${cancelledBookings} booking(s) annulé(s)`
+    `[CleanupExpiredInvites] ${memberResult.processed} invite(s) expirée(s) nettoyée(s), ${cancelledBookings} booking(s) annulé(s)`
   );
 
   return NextResponse.json({
-    processed: expiredMembers.length,
+    processed: memberResult.processed,
     affectedBookings: affectedBookingIds.length,
     cancelledBookings,
+    failed: memberResult.failed + bookingResult.failed,
   });
 }

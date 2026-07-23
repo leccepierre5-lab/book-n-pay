@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { attemptOverageCharge, type OverageChargeRow } from '@/lib/stripe/overageCharge';
 import { isValidBearerSecret } from '@/lib/constant-time';
+import { processBatch } from '@/lib/cron-batch';
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -26,12 +27,23 @@ export async function GET(req: NextRequest) {
   let paid = 0;
   let failed = 0;
 
-  for (const charge of dueCharges || []) {
-    const result = await attemptOverageCharge(supabase, charge as OverageChargeRow);
-    if (result === 'paid') paid++;
-    if (result === 'failed') failed++;
-  }
+  // processBatch (lib/cron-batch.ts) isole chaque charge — attemptOverageCharge
+  // catch déjà l'échec Stripe lui-même en interne, mais pas une exception en
+  // amont (ex: getStripeClient) qui tuerait sinon le retry de toutes les
+  // charges suivantes (même classe de bug qu'expire-groups, incident 22/07).
+  // `result.failed` (exceptions) est distinct de la variable `failed`
+  // ci-dessus (issue métier Stripe, ex. carte refusée).
+  const result = await processBatch(
+    dueCharges || [],
+    'retry-overage-charges',
+    (c) => `charge ${c.id} (biz ${c.biz_id})`,
+    async (charge) => {
+      const outcome = await attemptOverageCharge(supabase, charge as OverageChargeRow);
+      if (outcome === 'paid') paid++;
+      if (outcome === 'failed') failed++;
+    }
+  );
 
   console.log(`[retryOverageCharges] ${dueCharges?.length ?? 0} charge(s) retentée(s) — ${paid} payée(s), ${failed} échouée(s)`);
-  return NextResponse.json({ success: true, retried: dueCharges?.length ?? 0, paid, failed });
+  return NextResponse.json({ success: true, retried: dueCharges?.length ?? 0, paid, failed, erred: result.failed });
 }

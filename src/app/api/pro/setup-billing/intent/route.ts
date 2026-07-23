@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getStripeClient } from '@/lib/stripe/client';
+import { withErrorHandling } from '@/lib/api-error';
 
-export async function GET() {
+export const GET = withErrorHandling('[SetupBillingIntent]', async () => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -64,4 +65,4 @@ export async function GET() {
     clientSecret: intent.client_secret,
     planKey: settings?.plan_key ?? 'starter',
   });
-}
+});

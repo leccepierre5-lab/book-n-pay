@@ -4,8 +4,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getStripeClientWithMode } from '@/lib/stripe/client';
+import { withErrorHandling } from '@/lib/api-error';
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandling('[PayForMember]', async (req: NextRequest) => {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user?.email) {
@@ -136,4 +137,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ checkoutUrl: session.url });
-}
+});
