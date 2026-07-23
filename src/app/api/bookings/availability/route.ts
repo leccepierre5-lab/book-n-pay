@@ -1,7 +1,9 @@
 // src/app/api/bookings/availability/route.ts
 // Renvoie le nombre de personnes déjà inscrites par créneau pour un biz/date
-// donné — équivalent de guestsAtSlot() mais calculé côté serveur avec des
-// données fraîches (pas de risque de désync avec un state client périmé).
+// donné — calculé côté serveur avec des données fraîches (pas de risque de
+// désync avec un state client périmé). Reprend le même calcul que l'ancien
+// helper booking-utils.ts::guestsAtSlot(), supprimé le 23/07 (plus aucun
+// appelant, cette route en est le seul vrai consommateur depuis longtemps).
 //
 // `counts` (occupation par tête) :
 // - Pour un service collectif (allow_group === true) : isolée par

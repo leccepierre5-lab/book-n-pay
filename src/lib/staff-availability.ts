@@ -7,9 +7,11 @@
 // (route API, ou routes de création côté serveur).
 //
 // Ne concerne pas les services collectifs (cours, allow_group === true), qui
-// gardent le calcul d'occupation par tête existant (guestsAtSlot / counts
-// dans availability/route.ts) — un praticien/une salle y sert plusieurs
-// personnes en même temps, ce n'est pas le même mécanisme.
+// gardent le calcul d'occupation par tête existant (`counts`, calculé en
+// inline côté serveur dans availability/route.ts — l'ancien helper partagé
+// guestsAtSlot() faisait la même chose mais n'était plus appelé nulle part,
+// supprimé le 23/07) — un praticien/une salle y sert plusieurs personnes en
+// même temps, ce n'est pas le même mécanisme.
 import { generateSlots, isSlotClosed, parseParisDatetime } from './booking-utils';
 
 export interface StaffRow {

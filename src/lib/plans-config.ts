@@ -91,6 +91,8 @@ export function getEngagementEndDate(startDate: Date, planKey: string): Date {
   return end;
 }
 
+// Non appelée aujourd'hui — point d'ancrage prévu pour l'annulation par le
+// pro (question C15 du dossier CCI). Ne pas supprimer comme code mort.
 // Retourne true si l'abonnement est encore dans sa période d'engagement.
 export function isInEngagementPeriod(startDate: Date, planKey: string): boolean {
   return new Date() < getEngagementEndDate(startDate, planKey);

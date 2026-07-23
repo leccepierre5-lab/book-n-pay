@@ -52,6 +52,16 @@ export function generateQrCode(): string {
 }
 
 // ── Sérénité Score — calculé à partir de l'historique de bookings d'un client ──
+// ⚠️ Non appelée aujourd'hui — point d'ancrage, pas du code mort (vérifié
+// 23/07 : c'est la SEULE fonction qui produit ce type ; le score affiché
+// dans FicheClientIntelligente.tsx / api/pro/client-stats est une forme
+// différente et plus simple — {total, noShow, score}, sans level/levelColor/
+// levelIcon/honored — donc pas un remplacement). calcTrustScore + TrustScore
+// forment une paire avec calcDeposit (plus bas dans ce fichier) : dépôt
+// majoré selon l'historique de fiabilité, feature testée (7 cas,
+// tests/unit/booking-fees.test.ts) mais jamais branchée dans la création de
+// réservation réelle. Ne pas supprimer comme code mort — la brancher ou
+// trancher explicitement de l'abandonner, mais pas la retirer par audit.
 export interface TrustScore {
   score: number;
   total: number;
@@ -171,24 +181,6 @@ export function getParisDateOffsetStr(offsetDays: number): string {
   return new Date(Date.UTC(y, mo - 1, d + offsetDays)).toISOString().split('T')[0];
 }
 
-// ── Disponibilité ────────────────────────────────────────────────────────────
-export function guestsAtSlot(
-  bizId: string,
-  date: string,
-  time: string,
-  bookings: (Booking & { booking_members: BookingMember[] })[]
-): number {
-  let count = 0;
-  bookings.forEach((b) => {
-    if (b.biz_id === bizId && b.date === date && b.time === time && b.status !== 'cancelled') {
-      b.booking_members?.forEach((m) => {
-        if (m.status !== 'cancelled') count++;
-      });
-    }
-  });
-  return count;
-}
-
 export interface BizHoraires {
   open_time: string | null;
   close_time: string | null;
@@ -278,6 +270,10 @@ export function calcFraisGestion(servicePrice: number): number {
 }
 
 // ── Dépôt dynamique selon l'historique de fiabilité ──────────────────────────
+// ⚠️ Non appelée aujourd'hui — même statut d'ancrage que calcTrustScore/
+// TrustScore ci-dessus (dont calcDeposit consomme le type) : testée
+// (tests/unit/booking-fees.test.ts) mais jamais branchée dans la création de
+// réservation réelle. Ne pas supprimer comme code mort.
 export interface DepositResult {
   amount: number;
   reason: string | null;
