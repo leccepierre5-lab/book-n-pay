@@ -7,8 +7,13 @@
 // partenaire réel : seed de démo (slug "demo-*") ou anciennes fiches vitrine
 // générées en masse (owner_id NULL, même created_at à la milliseconde près
 // pour toutes — vérifié, ce ne sont PAS de vrais pros malgré leur apparence).
-// Les slugs "test-*" sont un résidu de QA distinct (owner_id non-null car
-// créés via un vrai compte de test) — exclus à part.
+// Les slugs "test-*" sont un résidu de QA distinct dans l'intention (créés
+// pour tester une fonctionnalité, pas générés en masse), mais PAS forcément
+// à owner_id non-null en pratique — vérifié en base le 23/07 (visibilité
+// fiches génériques) : `test-staffplan-a-...` a bien owner_id NULL, comme
+// un seed de démo. La ligne `|| slug.startsWith('test-')` ci-dessous reste
+// utile si un futur résidu de test a un owner_id non-null, mais ne pas
+// supposer que "test-*" implique systématiquement l'un ou l'autre.
 export function isNonRealBusiness(business: { slug: string; owner_id: string | null }): boolean {
   return business.owner_id === null || business.slug.startsWith('test-');
 }

@@ -166,6 +166,18 @@ export default async function EtablissementPage({
 
   if (!business) notFound();
 
+  // Session lue AVANT tout rendu — jamais un paramètre client. Fiche
+  // générique (owner_id NULL, jamais passée par l'approbation partenaire
+  // réelle) : 404 pour le public, comme si elle n'existait pas. Réservé aux
+  // testeurs whitelist (DEMO_TESTER_EMAILS) pour continuer à démontrer le
+  // catalogue complet. Filtre sur owner_id seul (pas isNonRealBusiness),
+  // même choix que searchBusinesses (catalog.ts) — voir ce fichier pour le
+  // cas du résidu QA "test-*", qui tombe aussi dans ce filtre.
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+  const isDemoTester = isDemoTesterEmail(authData.user?.email);
+  if (business.owner_id === null && !isDemoTester) notFound();
+
   if (business.frozen) {
     return (
       <div className="flex min-h-dvh items-center justify-center px-4 text-center">
@@ -179,9 +191,6 @@ export default async function EtablissementPage({
       </div>
     );
   }
-
-  const supabase = await createClient();
-  const { data: authData } = await supabase.auth.getUser();
 
   // favorites et isProAccount ne dépendent que de authData.user, pas l'un de
   // l'autre — Promise.all pour éviter 2 aller-retours DB séquentiels.
@@ -203,7 +212,6 @@ export default async function EtablissementPage({
           : Promise.resolve(false),
       ])
     : [false, false];
-  const isDemoTester = isDemoTesterEmail(authData.user?.email);
 
   const photos = (business.business_photos ?? []).sort((a, b) => a.sort_order - b.sort_order);
   const hasSocial =

@@ -13,6 +13,8 @@ import {
   CATEGORIES,
   type SearchFilters,
 } from '@/lib/queries/catalog';
+import { createClient } from '@/lib/supabase/server';
+import { isDemoTesterEmail } from '@/lib/demo-mode';
 import { SearchResults } from './_components/SearchResults';
 import { CityAutocomplete } from './_components/CityAutocomplete';
 import { BusinessNameAutocomplete } from './_components/BusinessNameAutocomplete';
@@ -45,8 +47,14 @@ export default async function SearchPage({
     minRating: params.minRating ? Number(params.minRating) : undefined,
   };
 
+  // Session lue côté serveur uniquement — jamais un paramètre client — pour
+  // décider si le catalogue inclut les fiches génériques (voir searchBusinesses).
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+  const isTester = isDemoTesterEmail(authData.user?.email);
+
   const [businesses, flashSlots, cities] = await Promise.all([
-    searchBusinesses(filters),
+    searchBusinesses(filters, { isTester }),
     getActiveFlashSlots(),
     getAvailableCities(),
   ]);

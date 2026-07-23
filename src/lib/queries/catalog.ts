@@ -28,7 +28,10 @@ export interface SearchFilters {
   minRating?: number;
 }
 
-export async function searchBusinesses(filters: SearchFilters): Promise<BusinessWithDetails[]> {
+export async function searchBusinesses(
+  filters: SearchFilters,
+  opts?: { isTester?: boolean }
+): Promise<BusinessWithDetails[]> {
   const supabase = await createClient();
 
   // staff(*) volontairement absent : aucun consommateur de /recherche ne lit
@@ -66,6 +69,19 @@ export async function searchBusinesses(filters: SearchFilters): Promise<Business
   // sur sa page détail (getBusinessBySlug le filtre déjà), incohérence trouvée
   // en diagnostiquant un vrai 404 en prod sur les 45 établissements vitrine.
   queryBuilder = queryBuilder.eq('frozen', false).eq('is_published', true);
+
+  // Fiches génériques (owner_id NULL — jamais passées par le flux
+  // d'approbation partenaire réel, 1124 en base au 23/07) : invisibles pour
+  // le catalogue public, réservées à la démonstration testeur (whitelist
+  // DEMO_TESTER_EMAILS, lue côté serveur par l'appelant — jamais un paramètre
+  // venant du client). Filtre volontairement sur owner_id seul, pas
+  // isNonRealBusiness() : le seul résidu QA "test-*" existant a en réalité
+  // owner_id NULL (vérifié en base 23/07, voir business-helpers.ts) — il
+  // tombe donc dans ce filtre au même titre que les autres fiches
+  // génériques, décision assumée (ce n'est pas un vrai partenaire).
+  if (!opts?.isTester) {
+    queryBuilder = queryBuilder.not('owner_id', 'is', null);
+  }
 
   // Vitrines commerciales (voir /tarifs) : publiées et réservables pour rester
   // accessibles en lien direct, mais volontairement absentes du catalogue
