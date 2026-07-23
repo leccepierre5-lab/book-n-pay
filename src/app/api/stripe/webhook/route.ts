@@ -25,8 +25,15 @@ function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | undefined {
   return parent?.subscription_details?.subscription;
 }
 
+// Épinglée explicitement (audit 23/07, voir lib/stripe/client.ts) — cette
+// route construit son propre client Stripe (toujours en mode live, jamais
+// test — un webhook ne peut arriver que du compte réellement configuré côté
+// Stripe Dashboard) au lieu de passer par getStripeClient. Même version que
+// les appels sortants centralisés, pour rester cohérent.
+const STRIPE_API_VERSION = '2025-02-24.acacia' as const;
+
 export async function POST(req: NextRequest) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: STRIPE_API_VERSION });
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;

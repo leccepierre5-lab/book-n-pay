@@ -10,6 +10,17 @@
 import Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+// Épinglée explicitement (audit 23/07) — sans ça, la version d'API Stripe
+// des appels sortants dépendait silencieusement du SDK installé (défaut
+// compilé de stripe-node, jamais choisi). Un `npm update stripe` ou une CI
+// qui résout `^17.5.0` différemment aurait pu faire changer la version
+// d'API sans qu'aucune ligne de ce repo ne bouge — déjà repéré en
+// production côté webhooks (voir stripe/webhook/route.ts, le compte tourne
+// en 2026-05-27.dahlia côté webhooks alors que les appels sortants étaient
+// jusqu'ici sur le défaut acacia du SDK). Cette valeur fige le comportement
+// ACTUEL des appels sortants — aucun changement fonctionnel voulu ici.
+const STRIPE_API_VERSION = '2025-02-24.acacia' as const;
+
 async function resolveTestMode(supabase: SupabaseClient): Promise<boolean> {
   const { data } = await supabase
     .from('app_config')
@@ -33,6 +44,9 @@ export async function getStripeClientWithMode(
   supabase: SupabaseClient
 ): Promise<{ stripe: Stripe; isTestMode: boolean }> {
   const isTestMode = await resolveTestMode(supabase);
-  const stripe = new Stripe(isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!);
+  const stripe = new Stripe(
+    isTestMode ? process.env.STRIPE_TEST_SECRET_KEY! : process.env.STRIPE_SECRET_KEY!,
+    { apiVersion: STRIPE_API_VERSION }
+  );
   return { stripe, isTestMode };
 }
