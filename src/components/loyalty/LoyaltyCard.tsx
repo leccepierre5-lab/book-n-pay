@@ -1,13 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { AppUser } from '@/lib/database.types';
-
-const TIERS = [
-  { key: 'Standard', rdv: 0, jokers: 1, pct: 100 },
-  { key: 'Bronze',   rdv: 16, jokers: 2, pct: 100 },
-  { key: 'Argent',   rdv: 31, jokers: 3, pct: 100 },
-  { key: 'Gold',     rdv: 51, jokers: 4, pct: 100 },
-] as const;
+import { TIERS } from '@/lib/booking-utils';
 
 const TIER_ICON: Record<string, string> = { Bronze: '🥉', Argent: '🥈', Gold: '🏆' };
 

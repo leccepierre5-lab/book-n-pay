@@ -355,23 +355,25 @@ export function getOverageStatus(bookingCountThisMonth: number, planKey: PlanKey
 
 // ── Fidélité "Sérénité" — paliers et jokers ──────────────────────────────────
 // Port de calculerStatutFidelite (Base44 Edge Function)
-export const JOKERS_LIMITES: Record<string, number> = {
-  Standard: 1,
-  Bronze: 2,
-  Argent: 3,
-  Gold: 4,
-};
+// Source unique des paliers — JOKERS_LIMITES, JOKERS_PCT et computeStatut en
+// sont dérivés ci-dessous plutôt que redéfinis, pour ne jamais diverger entre
+// le calcul serveur et l'affichage (LoyaltyCard importe ce même tableau).
+export const TIERS = [
+  { key: 'Standard', rdv: 0, jokers: 1, pct: 100 },
+  { key: 'Bronze', rdv: 16, jokers: 2, pct: 100 },
+  { key: 'Argent', rdv: 31, jokers: 3, pct: 100 },
+  { key: 'Gold', rdv: 51, jokers: 4, pct: 100 },
+] as const;
 
-export const JOKERS_PCT: Record<string, number> = {
-  Standard: 1.0,
-  Bronze: 1.0,
-  Argent: 1.0,
-  Gold: 1.0,
-};
+export const JOKERS_LIMITES: Record<string, number> = Object.fromEntries(
+  TIERS.map((tier) => [tier.key, tier.jokers])
+);
+
+export const JOKERS_PCT: Record<string, number> = Object.fromEntries(
+  TIERS.map((tier) => [tier.key, tier.pct / 100])
+);
 
 export function computeStatut(rdvHonores: number): { statut: string; jokers: number } {
-  if (rdvHonores >= 51) return { statut: 'Gold', jokers: 4 };
-  if (rdvHonores >= 31) return { statut: 'Argent', jokers: 3 };
-  if (rdvHonores >= 16) return { statut: 'Bronze', jokers: 2 };
-  return { statut: 'Standard', jokers: 1 };
+  const tier = [...TIERS].reverse().find((t) => rdvHonores >= t.rdv) ?? TIERS[0];
+  return { statut: tier.key, jokers: tier.jokers };
 }
