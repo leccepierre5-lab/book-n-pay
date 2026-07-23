@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import MonCompteClient from '@/components/client/MonCompteClient';
+import { getUpcomingActiveBookingIds } from '@/lib/queries/client';
 import type { EnrichedReferralEvent } from '@/lib/database.types';
 
 export default async function MonComptePage({
@@ -34,6 +35,8 @@ export default async function MonComptePage({
   const params = await searchParams;
   const initialReset = params.reset === '1';
 
+  const upcomingBookingIds = await getUpcomingActiveBookingIds(admin, authData.user.id, profile.phone);
+
   return (
     <div>
       <MonCompteClient
@@ -41,6 +44,7 @@ export default async function MonComptePage({
         email={authData.user.email ?? ''}
         referralEvents={(referralEvents || []) as EnrichedReferralEvent[]}
         initialReset={initialReset}
+        upcomingBookingsCount={upcomingBookingIds.length}
       />
     </div>
   );

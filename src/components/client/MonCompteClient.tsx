@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import type { AppUser, EnrichedReferralEvent } from '@/lib/database.types';
 import LoyaltyCard from '@/components/loyalty/LoyaltyCard';
@@ -9,16 +10,20 @@ type Section = 'main' | 'password' | 'delete';
 
 const inputClass = "w-full rounded-xl bg-navy-950 border border-white/[0.08] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-mint-500/40 focus:ring-1 focus:ring-mint-500/15 transition-all";
 
+const DELETE_CONFIRM_PHRASE = 'supprimer mon compte';
+
 export default function MonCompteClient({
   profile,
   email,
   referralEvents,
   initialReset,
+  upcomingBookingsCount,
 }: {
   profile: AppUser;
   email: string;
   referralEvents: EnrichedReferralEvent[];
   initialReset: boolean;
+  upcomingBookingsCount: number;
 }) {
   const [section, setSection] = useState<Section>(initialReset ? 'password' : 'main');
 
@@ -31,10 +36,14 @@ export default function MonCompteClient({
   const [pwSuccess, setPwSuccess] = useState(false);
 
   // ── Supprimer le compte ──
-  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
+  // Un seul écran (plus d'étape 1/2) : le blocage sur RDV à venir remplace
+  // l'ancienne étape 1, la saisie du mot de passe + de la phrase de
+  // confirmation forment l'unique écran de confirmation restant.
   const [deletePw, setDeletePw] = useState('');
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const isDeleteConfirmValid = deleteConfirmText.trim().toLowerCase() === DELETE_CONFIRM_PHRASE;
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +82,18 @@ export default function MonCompteClient({
     });
     const d = await res.json().catch(() => ({}));
     setDeleteLoading(false);
-    if (!res.ok) { setDeleteError(d.error || 'Erreur'); return; }
+    if (!res.ok) {
+      // 409 upcoming_bookings : course entre le chargement de la page (où
+      // upcomingBookingsCount valait 0) et la soumission — un RDV a été pris
+      // entre-temps. Le serveur reste l'autorité, le blocage client n'était
+      // qu'un raccourci UX.
+      setDeleteError(
+        d.error === 'upcoming_bookings'
+          ? 'Un rendez-vous a été ajouté depuis l’ouverture de cette page — rechargez et réessayez.'
+          : d.error || 'Erreur'
+      );
+      return;
+    }
     // Déconnexion côté client puis redirect
     await createClient().auth.signOut();
     window.location.href = '/?compte-supprime=1';
@@ -154,7 +174,7 @@ export default function MonCompteClient({
                 <svg className="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="7 10 12 15 17 10"/><polyline points="12 15 12 3"/></svg>
               </a>
               <button
-                onClick={() => { setSection('delete'); setDeleteStep(1); setDeleteError(null); setDeletePw(''); }}
+                onClick={() => { setSection('delete'); setDeleteError(null); setDeletePw(''); setDeleteConfirmText(''); }}
                 className="w-full flex items-center justify-between px-4 py-3.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/[0.04] transition-colors text-left"
               >
                 Supprimer mon compte
@@ -227,34 +247,48 @@ export default function MonCompteClient({
           <div className="rounded-2xl bg-navy-900 border border-red-500/20 p-5">
             <p className="text-sm font-semibold text-red-400 mb-1">Supprimer mon compte</p>
 
-            {deleteStep === 1 && (
+            {upcomingBookingsCount > 0 ? (
               <div>
                 <p className="text-xs text-slate-400 leading-relaxed mb-5">
-                  Cette action est <strong className="text-white">irréversible</strong>. Tes données personnelles
-                  seront effacées, mais tes réservations passées restent anonymisées pour des raisons légales.
+                  Vous avez <strong className="text-white">{upcomingBookingsCount} rendez-vous à venir</strong>.
+                  {upcomingBookingsCount > 1 ? ' Annulez-les' : ' Annulez-le'} d&apos;abord, ou attendez
+                  qu&apos;{upcomingBookingsCount > 1 ? 'ils soient passés' : 'il soit passé'}, avant de
+                  supprimer votre compte.
                 </p>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setDeleteStep(2)}
-                    className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white bg-red-500/15 border border-red-500/25 hover:bg-red-500/25 transition-colors"
+                  <Link
+                    href="/mes-reservations"
+                    className="flex-1 text-center rounded-xl py-2.5 text-sm font-semibold text-navy-950 bg-mint-500 hover:bg-mint-400 transition-colors"
                   >
-                    Oui, supprimer mon compte
-                  </button>
+                    Voir mes réservations
+                  </Link>
                   <button
                     onClick={() => setSection('main')}
                     className="rounded-xl bg-white/[0.05] border border-white/[0.08] px-4 py-2.5 text-sm text-slate-400 hover:text-white transition-colors"
                   >
-                    Annuler
+                    Retour
                   </button>
                 </div>
               </div>
-            )}
-
-            {deleteStep === 2 && (
+            ) : (
               <div className="space-y-3">
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Saisis ton mot de passe pour confirmer définitivement la suppression.
+                  Cette action est <strong className="text-white">irréversible</strong> :
                 </p>
+                <ul className="text-xs text-slate-400 leading-relaxed list-disc pl-4 space-y-1">
+                  <li>
+                    Vos <strong className="text-white">réservations passées</strong> sont conservées
+                    anonymisées (nom et coordonnées effacés) pour nos obligations légales de facturation.
+                  </li>
+                  <li>
+                    Vos <strong className="text-white">favoris</strong> sont définitivement supprimés.
+                  </li>
+                  <li>
+                    Votre <strong className="text-white">compte de connexion</strong> est supprimé — vous ne
+                    pourrez plus vous reconnecter avec cet email.
+                  </li>
+                </ul>
+
                 <input
                   type="password"
                   placeholder="Ton mot de passe"
@@ -262,6 +296,20 @@ export default function MonCompteClient({
                   onChange={(e) => setDeletePw(e.target.value)}
                   className={inputClass}
                 />
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1.5">
+                    Recopiez <strong className="text-white">« {DELETE_CONFIRM_PHRASE} »</strong> pour confirmer
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={DELETE_CONFIRM_PHRASE}
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
                 {deleteError && (
                   <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
                     <p className="text-xs text-red-400">{deleteError}</p>
@@ -269,13 +317,13 @@ export default function MonCompteClient({
                 )}
                 <button
                   onClick={handleDeleteAccount}
-                  disabled={deleteLoading || !deletePw}
+                  disabled={deleteLoading || !deletePw || !isDeleteConfirmValid}
                   className="w-full rounded-xl py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-40 transition-colors"
                 >
                   {deleteLoading ? '...' : 'Confirmer la suppression définitive'}
                 </button>
-                <button onClick={() => setDeleteStep(1)} className="w-full text-xs text-slate-500 hover:text-slate-300 py-1 transition-colors">
-                  ← Annuler
+                <button onClick={() => setSection('main')} className="w-full text-xs text-slate-500 hover:text-slate-300 py-1 transition-colors">
+                  Annuler
                 </button>
               </div>
             )}

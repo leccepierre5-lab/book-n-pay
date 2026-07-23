@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond } from '@/lib/api-error';
+import { getUpcomingActiveBookingIds } from '@/lib/queries/client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,6 +25,26 @@ export async function POST(req: NextRequest) {
 
     const userId = auth.user.id;
     const admin = createServiceRoleClient();
+
+    // Garde-fou (autorité serveur — le client bloque déjà en amont, ceci
+    // couvre la course si un RDV est pris entre le chargement de la page et
+    // la soumission) : art. 17.3 RGPD, l'effacement n'a pas à céder devant
+    // l'exécution d'un contrat en cours. On refuse tant qu'un engagement
+    // actif à venir existe plutôt que de l'annuler nous-mêmes (annulation
+    // auto = remboursement + notification pro déclenchés sans que le client
+    // l'ait explicitement demandé).
+    const { data: profileRow } = await admin
+      .from('app_users')
+      .select('phone')
+      .eq('id', userId)
+      .maybeSingle();
+    const upcomingBookingIds = await getUpcomingActiveBookingIds(admin, userId, profileRow?.phone ?? null);
+    if (upcomingBookingIds.length > 0) {
+      return NextResponse.json(
+        { error: 'upcoming_bookings', count: upcomingBookingIds.length },
+        { status: 409 }
+      );
+    }
 
     // Anonymisation : on efface les données personnelles mais on garde
     // les bookings/transactions pour les obligations légales de facturation
