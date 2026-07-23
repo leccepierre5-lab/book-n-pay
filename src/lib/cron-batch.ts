@@ -8,6 +8,10 @@ export interface BatchResult<T> {
   processed: number;
   failed: number;
   failedItems: T[];
+  // Même identifiant lisible que celui loggé (describe(item)) — réutilisé par
+  // notifyAdminOnFailure (lib/notify-admin.ts) pour le corps de l'email,
+  // sans que l'appelant ait besoin de reproduire describe() une 2e fois.
+  failedDescriptions: string[];
 }
 
 export async function processBatch<T>(
@@ -22,14 +26,17 @@ export async function processBatch<T>(
 ): Promise<BatchResult<T>> {
   let processed = 0;
   const failedItems: T[] = [];
+  const failedDescriptions: string[] = [];
 
   for (const item of items) {
     try {
       await fn(item);
       processed++;
     } catch (err: any) {
-      console.error(`[${label}] Échec sur ${describe(item)}:`, err?.message ?? err);
+      const desc = describe(item);
+      console.error(`[${label}] Échec sur ${desc}:`, err?.message ?? err);
       failedItems.push(item);
+      failedDescriptions.push(desc);
     }
   }
 
@@ -37,5 +44,5 @@ export async function processBatch<T>(
     console.error(`[${label}] ${failedItems.length} échec(s) sur ${items.length}`);
   }
 
-  return { processed, failed: failedItems.length, failedItems };
+  return { processed, failed: failedItems.length, failedItems, failedDescriptions };
 }

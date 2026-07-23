@@ -8,6 +8,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime } from '@/lib/booking-utils';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { processBatch } from '@/lib/cron-batch';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 export async function GET(req: NextRequest) {
   // Protection : seul Vercel Cron (avec le bon secret) peut déclencher ceci.
@@ -90,6 +91,9 @@ export async function GET(req: NextRequest) {
       );
     }
   );
+
+  await notifyAdminOnFailure('check-no-shows:flash-slots', flashResult);
+  await notifyAdminOnFailure('check-no-shows', noShowResult);
 
   return NextResponse.json({
     checked: bookings?.length || 0,

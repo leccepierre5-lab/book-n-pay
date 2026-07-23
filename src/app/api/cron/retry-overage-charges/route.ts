@@ -9,6 +9,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { attemptOverageCharge, type OverageChargeRow } from '@/lib/stripe/overageCharge';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { processBatch } from '@/lib/cron-batch';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -45,5 +46,8 @@ export async function GET(req: NextRequest) {
   );
 
   console.log(`[retryOverageCharges] ${dueCharges?.length ?? 0} charge(s) retentée(s) — ${paid} payée(s), ${failed} échouée(s)`);
+
+  await notifyAdminOnFailure('retry-overage-charges', result);
+
   return NextResponse.json({ success: true, retried: dueCharges?.length ?? 0, paid, failed, erred: result.failed });
 }

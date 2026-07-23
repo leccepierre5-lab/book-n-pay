@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { processBatch } from '@/lib/cron-batch';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -67,6 +68,9 @@ export async function GET(req: NextRequest) {
   console.log(
     `[CleanupExpiredInvites] ${memberResult.processed} invite(s) expirée(s) nettoyée(s), ${cancelledBookings} booking(s) annulé(s)`
   );
+
+  await notifyAdminOnFailure('cleanup-expired-invites:members', memberResult);
+  await notifyAdminOnFailure('cleanup-expired-invites:bookings', bookingResult);
 
   return NextResponse.json({
     processed: memberResult.processed,

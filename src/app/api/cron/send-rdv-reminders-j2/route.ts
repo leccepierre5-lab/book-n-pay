@@ -8,6 +8,7 @@ import { sendEmail } from '@/lib/email/send';
 import { getParisDateOffsetStr } from '@/lib/booking-utils';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { processBatch } from '@/lib/cron-batch';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -79,6 +80,8 @@ L'équipe Book'nPay`,
       });
     }
   );
+
+  await notifyAdminOnFailure('send-rdv-reminders-j2', result);
 
   return NextResponse.json({
     success: true,

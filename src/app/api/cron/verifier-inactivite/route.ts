@@ -10,6 +10,7 @@ import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { JOKERS_LIMITES } from '@/lib/booking-utils';
 import { processBatch } from '@/lib/cron-batch';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 const JOURS_ALERTE_DOUCE = 45;
 const JOURS_ALERTE_URGENCE = 55;
@@ -127,6 +128,8 @@ export async function GET(req: NextRequest) {
       }
     }
   );
+
+  await notifyAdminOnFailure('verifier-inactivite', result);
 
   return NextResponse.json({
     success: true,
