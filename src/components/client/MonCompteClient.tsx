@@ -250,10 +250,10 @@ export default function MonCompteClient({
             {upcomingBookingsCount > 0 ? (
               <div>
                 <p className="text-xs text-slate-400 leading-relaxed mb-5">
-                  Vous avez <strong className="text-white">{upcomingBookingsCount} rendez-vous à venir</strong>.
-                  {upcomingBookingsCount > 1 ? ' Annulez-les' : ' Annulez-le'} d&apos;abord, ou attendez
-                  qu&apos;{upcomingBookingsCount > 1 ? 'ils soient passés' : 'il soit passé'}, avant de
-                  supprimer votre compte.
+                  Vous avez <strong className="text-white">{upcomingBookingsCount} rendez-vous à venir</strong>.{' '}
+                  {upcomingBookingsCount > 1
+                    ? "Annulez-les d'abord, ou attendez qu'ils soient passés, avant de supprimer votre compte."
+                    : "Annulez-le d'abord, ou attendez qu'il soit passé, avant de supprimer votre compte."}
                 </p>
                 <div className="flex gap-2">
                   <Link
