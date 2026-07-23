@@ -134,6 +134,7 @@ export interface Booking {
   group_ref: string | null;
   payment_deadline: string | null;
   organizer_token: string;
+  is_demo: boolean;
   client_id: string | null;
   client_phone: string | null;
   client_name: string | null;
@@ -165,6 +166,7 @@ export interface BookingMember {
   paid_by_member_id: string | null;
   paid_for_at: string | null;
   post_visit_popup_shown: boolean;
+  is_demo: boolean;
   created_at: string;
   updated_at: string;
 }

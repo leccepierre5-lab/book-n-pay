@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     if (bookingMeta?.bookingId) {
       const { data: booking } = await supabase
         .from('bookings')
-        .select('service_id, biz_id')
+        .select('service_id, biz_id, is_demo')
         .eq('id', bookingMeta.bookingId)
         .maybeSingle();
 
@@ -115,13 +115,18 @@ export async function POST(req: NextRequest) {
       // session — cancel/refund-gesture/use-joker, puis connect-onboarding/
       // connect-status, avaient chacun le même bug dupliqué séparément).
       // Même helper que le noindex SEO / bookings/create — source unique.
+      // `booking.is_demo` (migration 0040) contourne ce garde-fou pour les
+      // groupes démo mode B : l'appelant ici peut être un invité anonyme qui
+      // a suivi le lien, pas forcément le testeur whitelisté qui a créé le
+      // groupe — le vetting a déjà eu lieu à la création (bookings/create-
+      // group), inutile et impossible de revérifier l'email de l'appelant ici.
       if (booking?.biz_id) {
         const { data: bizOwner } = await supabase
           .from('businesses')
           .select('owner_id, slug')
           .eq('id', booking.biz_id)
           .maybeSingle();
-        if (!bizOwner || isNonRealBusiness(bizOwner)) {
+        if (!bizOwner || (isNonRealBusiness(bizOwner) && !booking.is_demo)) {
           console.error(`[Checkout] Tentative de paiement sur une fiche non réelle — booking=${bookingMeta.bookingId} biz=${booking.biz_id}`);
           return NextResponse.json({ error: "Cet établissement n'est pas disponible à la réservation." }, { status: 423 });
         }

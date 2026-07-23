@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/retry-overage-charges",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/purge-demo",
+      "schedule": "0 3 * * *"
     }
   ]
 }

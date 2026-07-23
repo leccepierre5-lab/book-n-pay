@@ -86,20 +86,19 @@ export async function POST(req: NextRequest) {
     // Même garde-fou que bookings/create/route.ts (isNonRealBusiness, source
     // unique partagée avec le noindex SEO) — voir ce fichier pour le
     // raisonnement complet (fiches démo réservables ET payables).
+    // Testeur whitelisté sur une fiche non réelle : mode A reste simulé
+    // (zéro écriture, inchangé). Mode B écrit réellement en base depuis le
+    // 23/07 (is_demo=true, purgé par cron/purge-demo) — le mode invitation
+    // par lien est structurellement incompatible avec "rien en base", il
+    // faut une vraie ligne à laquelle le lien peut pointer. `isDemoBooking`
+    // sert aussi plus bas à marquer les lignes créées.
+    const isDemoBooking = !!biz && isNonRealBusiness(biz) && isDemoTesterEmail(authData.user?.email);
+
     if (!biz || isNonRealBusiness(biz)) {
-      // Mode démo — même mécanisme que bookings/create/route.ts (voir ce
-      // fichier pour le raisonnement complet). Mode A seulement (paiement
-      // groupé en un coup, tout connu à l'avance) : le mode B (invitation
-      // par lien, ouvert plus tard dans une AUTRE session) est
-      // structurellement incompatible avec "rien écrit en base" — il n'y
-      // aurait rien en base à quoi le lien pourrait pointer.
-      if (biz && isNonRealBusiness(biz) && isDemoTesterEmail(authData.user?.email)) {
-        if (mode === 'b') {
-          return NextResponse.json(
-            { error: "Le mode invitation par lien n'est pas disponible en mode démo. Choisis un paiement groupé (mode A) ou une réservation solo." },
-            { status: 400 }
-          );
-        }
+      if (!isDemoBooking) {
+        return NextResponse.json({ error: "Cet établissement n'est pas disponible à la réservation." }, { status: 423 });
+      }
+      if (mode !== 'b') {
         return NextResponse.json({
           demo: true,
           groupRef: 'demo',
@@ -110,7 +109,9 @@ export async function POST(req: NextRequest) {
           booking: { biz_name: bizName, service_name: serviceName, date, slots, participants: slots.length },
         });
       }
-      return NextResponse.json({ error: "Cet établissement n'est pas disponible à la réservation." }, { status: 423 });
+      // mode === 'b' && isDemoBooking : on continue l'exécution normale
+      // ci-dessous au lieu de retourner ici — voir marquage is_demo avant
+      // le return final.
     }
 
     // Séparation stricte rôles pro/client (voir lib/demo-mode.ts) — même
@@ -432,6 +433,14 @@ export async function POST(req: NextRequest) {
 
     const organizer = created[0];
     const guestData = created.slice(1);
+
+    // Marquage a posteriori plutôt que dans chaque RPC de création (0024/
+    // 0026/0027/0035) — un seul point à maintenir, pas de risque d'oublier
+    // ce flag dans l'une des trois branches de création ci-dessus.
+    if (isDemoBooking) {
+      await supabaseService.from('bookings').update({ is_demo: true }).in('id', createdBookingIds);
+      await supabaseService.from('booking_members').update({ is_demo: true }).in('id', createdMemberIds);
+    }
 
     return NextResponse.json({
       groupRef,
