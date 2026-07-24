@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { AppUser } from '@/lib/database.types';
 import { TIERS } from '@/lib/booking-utils';
+import Modal from '@/components/ui/Modal';
 
 const TIER_ICON: Record<string, string> = { Bronze: '🥉', Argent: '🥈', Gold: '🏆' };
 
@@ -25,19 +26,17 @@ function LoyaltyModal({ profile, onClose }: { profile: AppUser; onClose: () => v
   const statut = profile.statut || 'Standard';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
-      onClick={onClose}
+    <Modal
+      onClose={onClose}
+      overlayClassName="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
+      panelClassName="w-full max-w-lg rounded-t-3xl bg-[#111827] border-t border-white/[0.08] p-5 pb-10"
+      ariaLabelledBy="loyalty-modal-title"
     >
-      <div
-        className="w-full max-w-lg rounded-t-3xl bg-[#111827] border-t border-white/[0.08] p-5 pb-10"
-        onClick={(e) => e.stopPropagation()}
-      >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <span className="text-emerald-400 text-base">☆</span>
-            <p className="font-bold text-white text-base">Book'nPay Sérénité</p>
+            <p id="loyalty-modal-title" className="font-bold text-white text-base">Book'nPay Sérénité</p>
           </div>
           <button
             onClick={onClose}
@@ -105,8 +104,7 @@ function LoyaltyModal({ profile, onClose }: { profile: AppUser; onClose: () => v
             et vos Jokers non utilisés seront perdus.
           </p>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

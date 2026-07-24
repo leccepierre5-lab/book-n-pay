@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Modal from '@/components/ui/Modal';
 import type { Business } from '@/lib/database.types';
 import type { ProStats } from '@/lib/queries/pro';
 import { formatTime } from '@/lib/booking-utils';
@@ -316,8 +317,13 @@ export default function ProDashboard({
 
         {/* No-show modal */}
         {selectedNoShow && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-            <div className="w-full max-w-sm">
+          <Modal
+            onClose={() => setSelectedNoShow(null)}
+            overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
+            panelClassName="w-full max-w-sm"
+            ariaLabel="Décision no-show"
+            closeOnBackdrop={false}
+          >
               <FicheClientIntelligente
                 member={selectedNoShow.member}
                 onRembourser={handleRefundGesture}
@@ -326,14 +332,18 @@ export default function ProDashboard({
               <button onClick={() => setSelectedNoShow(null)} className="mt-2 w-full rounded-xl bg-navy-900 border border-white/[0.08] py-2.5 text-xs text-slate-400 hover:text-white transition-colors">
                 Fermer
               </button>
-            </div>
-          </div>
+          </Modal>
         )}
 
         {/* Caisse modal */}
         {selectedCaisse && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-            <div className="w-full max-w-sm">
+          <Modal
+            onClose={() => setSelectedCaisse(null)}
+            overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
+            panelClassName="w-full max-w-sm"
+            ariaLabel="Caisse — clôture de la prestation"
+            closeOnBackdrop={false}
+          >
               <CaisseEncaissement
                 member={selectedCaisse.member}
                 booking={selectedCaisse.booking}
@@ -350,8 +360,7 @@ export default function ProDashboard({
               <button onClick={() => setSelectedCaisse(null)} className="mt-2 w-full rounded-xl bg-navy-900 border border-white/[0.08] py-2.5 text-xs text-slate-400 hover:text-white transition-colors">
                 Fermer
               </button>
-            </div>
-          </div>
+          </Modal>
         )}
 
         {/* View toggle */}

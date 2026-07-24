@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import Modal from '@/components/ui/Modal';
 
 interface PostVisit {
   pending: true;
@@ -73,10 +74,15 @@ export default function PostVisitPopup() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 py-6">
-      <div className="w-full max-w-sm rounded-2xl bg-navy-900 border border-white/[0.08] p-6 animate-slide-in">
+    <Modal
+      onClose={() => setData(null)}
+      overlayClassName="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 py-6"
+      panelClassName="w-full max-w-sm rounded-2xl bg-navy-900 border border-white/[0.08] p-6 animate-slide-in"
+      ariaLabelledBy="post-visit-popup-title"
+      closeOnBackdrop={false}
+    >
         <div className="text-center mb-5">
-          <p className="text-lg font-bold text-white">Merci pour votre visite ! 🎉</p>
+          <p id="post-visit-popup-title" className="text-lg font-bold text-white">Merci pour votre visite ! 🎉</p>
         </div>
 
         {referralLink && (
@@ -123,7 +129,6 @@ export default function PostVisitPopup() {
         >
           Fermer
         </button>
-      </div>
-    </div>
+    </Modal>
   );
 }

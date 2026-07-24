@@ -4,6 +4,7 @@
 // package.json). ⚠️ Dépendance non vérifiée par exécution dans cette session
 // (pas d'accès npm) ; teste l'installation avant de compter sur ce composant.
 import { useEffect, useRef, useState } from 'react';
+import Modal from '@/components/ui/Modal';
 
 export default function QRScanner({
   onScan,
@@ -43,10 +44,15 @@ export default function QRScanner({
   }, [onScan]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85">
-      <div className="mx-4 w-full max-w-sm overflow-hidden rounded-2xl bg-white">
+    <Modal
+      onClose={onClose}
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/85"
+      panelClassName="mx-4 w-full max-w-sm overflow-hidden rounded-2xl bg-white"
+      ariaLabelledBy="qr-scanner-title"
+      closeOnBackdrop={false}
+    >
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-          <span className="text-sm font-semibold text-navy-950">Scanner le QR Code</span>
+          <span id="qr-scanner-title" className="text-sm font-semibold text-navy-950">Scanner le QR Code</span>
           <button onClick={onClose} className="rounded-lg p-1 hover:bg-gray-100">
             ✕
           </button>
@@ -71,7 +77,6 @@ export default function QRScanner({
             </>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
