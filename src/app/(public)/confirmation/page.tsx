@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import ShareGroupLink from '@/components/group/ShareGroupLink';
 import ShareGuestLinks from '@/components/group/ShareGuestLinks';
+import { formatTime } from '@/lib/booking-utils';
 
 export default async function ConfirmationPage({
   searchParams,
@@ -125,7 +126,7 @@ export default async function ConfirmationPage({
               <span className="text-slate-500">le </span>
               <span className="text-mint-400 font-medium">{formatDate(booking.date)}</span>
               <span className="text-slate-500"> à </span>
-              <span className="text-mint-400 font-medium">{booking.time}</span>
+              <span className="text-mint-400 font-medium">{formatTime(booking.time)}</span>
               {booking.staff_name && (
                 <>
                   <br />

@@ -11,6 +11,7 @@ import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
+import { formatTime } from '@/lib/booking-utils';
 
 export async function POST(req: NextRequest) {
   try {
@@ -103,7 +104,7 @@ Le professionnel vous a remboursé vos frais de réservation, à titre de geste 
 📍 Établissement : ${booking.biz_name}
 💆 Prestation : ${booking.service_name}
 📅 Date du rendez-vous concerné : ${dateFormatted}
-🕐 Heure : ${booking.time}
+🕐 Heure : ${formatTime(booking.time)}
 💶 Montant remboursé : ${amountFormatted}€
 ✅ Crédit sous 5 à 10 jours ouvrés selon votre banque.
 

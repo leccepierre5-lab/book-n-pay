@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
-import { getParisTomorrowStr } from '@/lib/booking-utils';
+import { getParisTomorrowStr, formatTime } from '@/lib/booking-utils';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { processBatch } from '@/lib/cron-batch';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
         subject: `📅 Rappel : votre RDV demain chez ${booking.biz_name}`,
         text: `Bonjour ${member.name},
 
-Rappel : vous avez un rendez-vous demain ${booking.date} à ${booking.time} chez ${booking.biz_name} pour "${booking.service_name}".
+Rappel : vous avez un rendez-vous demain ${booking.date} à ${formatTime(booking.time)} chez ${booking.biz_name} pour "${booking.service_name}".
 
 Pensez à être à l'heure. Votre code QR d'accès : ${member.qr_code}
 

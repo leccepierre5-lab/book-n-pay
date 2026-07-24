@@ -11,6 +11,7 @@ import { sendEmail } from '@/lib/email/send';
 import { depositRefundAmountCents } from '@/lib/refunds';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
+import { formatTime } from '@/lib/booking-utils';
 
 export async function POST(req: NextRequest) {
   try {
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
                 await sendEmail({
                   to: emailTo,
                   subject: `💸 Remboursement — Réservation annulée chez ${business.name}`,
-                  text: `Bonjour ${member.name || 'vous'},\n\nL'établissement ${business.name} est temporairement indisponible, votre réservation a donc été annulée.\n\n💆 ${booking.service_name}\n📅 ${dateFormatted} à ${booking.time}\n\nVos frais de réservation (${member.deposit ?? 0}€) vous seront remboursés sous 5 à 10 jours ouvrés.\n\nNous sommes désolés pour la gêne occasionnée.\nL'équipe Book'nPay`,
+                  text: `Bonjour ${member.name || 'vous'},\n\nL'établissement ${business.name} est temporairement indisponible, votre réservation a donc été annulée.\n\n💆 ${booking.service_name}\n📅 ${dateFormatted} à ${formatTime(booking.time)}\n\nVos frais de réservation (${member.deposit ?? 0}€) vous seront remboursés sous 5 à 10 jours ouvrés.\n\nNous sommes désolés pour la gêne occasionnée.\nL'équipe Book'nPay`,
                 }).catch(() => {});
               }
             } catch (err: any) {
@@ -153,7 +154,7 @@ Bonne nouvelle ! L'établissement qui avait dû annuler votre réservation a rep
 
 📍 Établissement : ${business.name}
 💆 Prestation concernée : ${booking.service_name}
-📅 Rendez-vous annulé le : ${dateFormatted} à ${booking.time}
+📅 Rendez-vous annulé le : ${dateFormatted} à ${formatTime(booking.time)}
 
 Vous pouvez dès maintenant reprendre rendez-vous directement sur Book'nPay.
 

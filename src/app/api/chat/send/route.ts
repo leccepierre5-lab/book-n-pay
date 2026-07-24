@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
+import { formatTime } from '@/lib/booking-utils';
 
 export async function POST(req: NextRequest) {
   try {
@@ -131,6 +132,6 @@ async function notifyRecipient(
   await sendEmail({
     to: recipientEmail,
     subject: `${subjectPrefix} — ${booking.service_name || booking.biz_name}`,
-    text: `Bonjour ${recipientName},\n\nVous avez reçu un nouveau message concernant votre réservation :\n\n📍 ${booking.biz_name}\n💆 ${booking.service_name}\n📅 ${dateLabel} à ${booking.time}\n\n${senderName} : « ${text} »\n\nConnectez-vous à Book'nPay pour répondre.\n\nL'équipe Book'nPay`,
+    text: `Bonjour ${recipientName},\n\nVous avez reçu un nouveau message concernant votre réservation :\n\n📍 ${booking.biz_name}\n💆 ${booking.service_name}\n📅 ${dateLabel} à ${formatTime(booking.time)}\n\n${senderName} : « ${text} »\n\nConnectez-vous à Book'nPay pour répondre.\n\nL'équipe Book'nPay`,
   });
 }

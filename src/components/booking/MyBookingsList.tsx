@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { AppUser, Booking, BookingMember, EnrichedReferralEvent } from '@/lib/database.types';
 import type { GroupMap } from '@/app/(public)/mes-reservations/page';
-import { phonesMatch } from '@/lib/booking-utils';
+import { phonesMatch, formatTime } from '@/lib/booking-utils';
 import WeekCalendar from './WeekCalendar';
 import GroupTimer from './GroupTimer';
 
@@ -102,8 +102,8 @@ function GroupCard({
 
   const dateLabel = formatBookingDate(first.date);
   const timeRange = groupBookings.length > 1
-    ? `${groupBookings[0].time} – ${groupBookings[groupBookings.length - 1].time}`
-    : first.time;
+    ? `${formatTime(groupBookings[0].time)} – ${formatTime(groupBookings[groupBookings.length - 1].time)}`
+    : formatTime(first.time);
 
   return (
     <div className="rounded-2xl bg-navy-900 border border-white/[0.08] overflow-hidden">
@@ -262,7 +262,7 @@ function GroupCard({
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                       </svg>
-                      {(m as any)._bookingTime}
+                      {formatTime((m as any)._bookingTime)}
                     </div>
                   </div>
                 </div>
@@ -353,7 +353,7 @@ function BookingCard({
             <svg className="w-3.5 h-3.5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
-            {booking.time}
+            {formatTime(booking.time)}
           </div>
         </div>
       </div>

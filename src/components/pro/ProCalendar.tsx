@@ -18,6 +18,7 @@ import {
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import CaisseEncaissement from './CaisseEncaissement';
+import { formatTime } from '@/lib/booking-utils';
 
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
@@ -279,7 +280,7 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
                   <div key={b.id} className="px-4 py-3">
                     <div className="mb-2 flex items-start gap-3">
                       <span className="mt-0.5 shrink-0 font-mono text-sm font-bold text-white">
-                        {b.time}
+                        {formatTime(b.time)}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-white">{b.service_name}</p>

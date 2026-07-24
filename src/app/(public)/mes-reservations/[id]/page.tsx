@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import ChatThread from '@/components/chat/ChatThread';
+import { formatTime } from '@/lib/booking-utils';
 
 export default async function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -36,7 +37,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
           <div>
             <h1 className="text-lg font-semibold text-white">{booking.biz_name}</h1>
             <p className="text-xs text-white/50">
-              {booking.service_name} · {booking.date} à {booking.time}
+              {booking.service_name} · {booking.date} à {formatTime(booking.time)}
             </p>
             {booking.staff_name && (
               <p className="text-xs text-white/40">avec {booking.staff_name}</p>

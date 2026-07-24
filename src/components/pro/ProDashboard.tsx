@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Business } from '@/lib/database.types';
 import type { ProStats } from '@/lib/queries/pro';
+import { formatTime } from '@/lib/booking-utils';
 import QRScanner from './QRScanner';
 import ProCalendar from './ProCalendar';
 import FicheClientIntelligente from './FicheClientIntelligente';
@@ -382,7 +383,7 @@ export default function ProDashboard({
               <div key={b.id} className="rounded-2xl bg-navy-900 border border-white/[0.08] overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
                   <div>
-                    <p className="text-sm font-semibold text-white">{b.time} · {b.service_name}</p>
+                    <p className="text-sm font-semibold text-white">{formatTime(b.time)} · {b.service_name}</p>
                     {b.staff_name && <p className="text-xs text-slate-500 mt-0.5">{b.staff_name}</p>}
                   </div>
                   <span className="text-xs text-slate-600 bg-navy-800 border border-white/[0.06] rounded-full px-2 py-0.5">

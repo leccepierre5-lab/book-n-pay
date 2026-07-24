@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, escapeHtml } from '@/lib/email/send';
+import { formatTime } from '@/lib/booking-utils';
 import { logAndRespond } from '@/lib/api-error';
 
 const MODE_LABEL: Record<string, string> = {
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
   <p style="font-size: 15px; color: #2A2A3A;">Bonjour <strong>${escapeHtml(member.name)}</strong>, votre prestation chez <strong>${escapeHtml(booking.biz_name)}</strong> a bien été clôturée.</p>
   <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 16px 0;">
     <p style="font-size: 13px; color: #7A7A8C; margin: 4px 0;">Prestation : <strong style="color:#0D0D14;">${escapeHtml(booking.service_name)}</strong></p>
-    <p style="font-size: 13px; color: #7A7A8C; margin: 4px 0;">Date : <strong style="color:#0D0D14;">${booking.date} à ${booking.time}</strong></p>
+    <p style="font-size: 13px; color: #7A7A8C; margin: 4px 0;">Date : <strong style="color:#0D0D14;">${booking.date} à ${formatTime(booking.time)}</strong></p>
     <p style="font-size: 13px; color: #7A7A8C; margin: 4px 0;">Mode de paiement : <strong style="color:#059669;">${MODE_EMOJI[paymentMode]} ${MODE_LABEL[paymentMode]}</strong></p>
   </div>
   <p style="font-size: 12px; color: #7A7A8C; text-align: center;">Merci d'avoir utilisé Book'nPay 🙏</p>

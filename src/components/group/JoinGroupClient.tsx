@@ -8,6 +8,7 @@
 // animations avancées — l'original avait beaucoup plus de polish visuel.
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { formatTime } from '@/lib/booking-utils';
 
 interface Member {
   id: string;
@@ -181,7 +182,7 @@ export default function JoinGroupClient({
         <div className="mb-5 text-center">
           <h1 className="text-lg font-semibold text-white">{booking.biz_name}</h1>
           <p className="text-sm text-white/60">
-            {booking.service_name} · {booking.date} à {booking.time}
+            {booking.service_name} · {booking.date} à {formatTime(booking.time)}
           </p>
         </div>
 

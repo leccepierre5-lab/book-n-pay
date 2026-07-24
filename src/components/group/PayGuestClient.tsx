@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { calcFraisGestion } from '@/lib/booking-utils';
+import { calcFraisGestion, formatTime } from '@/lib/booking-utils';
 
 interface Booking {
   id: string;
@@ -137,7 +137,7 @@ export default function PayGuestClient({ member, booking }: { member: Member; bo
                 <svg className="w-3.5 h-3.5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
-                {booking.time}
+                {formatTime(booking.time)}
               </div>
             </div>
           </div>

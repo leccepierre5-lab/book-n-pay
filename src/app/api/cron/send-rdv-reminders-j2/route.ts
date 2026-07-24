@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
-import { getParisDateOffsetStr } from '@/lib/booking-utils';
+import { getParisDateOffsetStr, formatTime } from '@/lib/booking-utils';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { processBatch } from '@/lib/cron-batch';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
         subject: `📅 Rappel : votre RDV dans 2 jours chez ${booking.biz_name}`,
         text: `Bonjour ${member.name},
 
-Petit rappel : vous avez un rendez-vous le ${booking.date} à ${booking.time} chez ${booking.biz_name} pour "${booking.service_name}".
+Petit rappel : vous avez un rendez-vous le ${booking.date} à ${formatTime(booking.time)} chez ${booking.biz_name} pour "${booking.service_name}".
 
 ⚠️ En cas d'empêchement, vous pouvez annuler depuis l'application Book'nPay (remboursement possible jusqu'à 48h avant le RDV).
 

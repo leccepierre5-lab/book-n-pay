@@ -17,7 +17,7 @@
 // l'appartenance avant toute action.
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { parseParisDatetime, phonesMatch } from '@/lib/booking-utils';
+import { parseParisDatetime, phonesMatch, formatTime } from '@/lib/booking-utils';
 import { depositRefundAmountCents } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
@@ -154,7 +154,7 @@ Votre réservation a bien été annulée.
 📍 Établissement : ${booking.biz_name}
 💆 Prestation : ${booking.service_name}
 📅 Date : ${dateFormatted}
-🕐 Heure : ${booking.time}
+🕐 Heure : ${formatTime(booking.time)}
 
 ${refundLine}
 

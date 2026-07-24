@@ -35,6 +35,15 @@ export function phonesMatch(
   return normalizePhone(a) === normalizePhone(b);
 }
 
+// `bookings.time`/`flash_slots.time` sont des colonnes Postgres de type `time`,
+// sérialisées par PostgREST en "HH:MM:SS" — le front affiche en "HH:MM".
+// Source unique pour cette troncature d'AFFICHAGE uniquement : les
+// comparaisons/calculs (toMinutes, parseParisDatetime...) gèrent déjà les
+// deux formats nativement et n'ont pas besoin de ce helper.
+export function formatTime(time: string | null | undefined): string {
+  return time ? time.slice(0, 5) : '';
+}
+
 // Anciennement 6 caractères Math.random() (~31 bits) — bien trop faible pour
 // un identifiant qui finit par circuler comme clé de jointure sur des lignes
 // `bookings` d'autrui (voir mémoire pitfall #35). crypto.randomUUID() est

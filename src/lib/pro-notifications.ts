@@ -9,6 +9,7 @@
 // l'annulation qu'elle accompagne, déjà traités avant l'appel.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email/send';
+import { formatTime } from '@/lib/booking-utils';
 
 interface NotifBookingInfo {
   biz_id: string;
@@ -78,7 +79,7 @@ export async function notifyProNewBooking(
     await sendEmail({
       to: ownerEmail,
       subject: `✅ Nouvelle réservation — ${booking.service_name}`,
-      text: `Bonjour,\n\nVous avez une nouvelle réservation confirmée${groupNote} !\n\n💆 Prestation : ${booking.service_name}${booking.staff_name ? `\n👤 Praticien : ${booking.staff_name}` : ''}\n📅 Date : ${formatDateFr(booking.date)}\n🕐 Heure : ${booking.time}\n💶 Frais de réservation reçus : ${opts.depositAmount}€\n\nRetrouvez le détail dans votre espace pro.\nL'équipe Book'nPay`,
+      text: `Bonjour,\n\nVous avez une nouvelle réservation confirmée${groupNote} !\n\n💆 Prestation : ${booking.service_name}${booking.staff_name ? `\n👤 Praticien : ${booking.staff_name}` : ''}\n📅 Date : ${formatDateFr(booking.date)}\n🕐 Heure : ${formatTime(booking.time)}\n💶 Frais de réservation reçus : ${opts.depositAmount}€\n\nRetrouvez le détail dans votre espace pro.\nL'équipe Book'nPay`,
     }).catch(() => {});
   } catch (err: any) {
     console.error('[ProNotif] notifyProNewBooking échouée:', err.message);
@@ -114,7 +115,7 @@ export async function notifyProBookingCancelled(
     await sendEmail({
       to: ownerEmail,
       subject: `❌ Annulation — ${booking.service_name}`,
-      text: `Bonjour,\n\n${opts.memberName || 'Un client'} a annulé sa réservation.\n\n💆 Prestation : ${booking.service_name}${booking.staff_name ? `\n👤 Praticien : ${booking.staff_name}` : ''}\n📅 Date : ${formatDateFr(booking.date)}\n🕐 Heure : ${booking.time}\n\n${refundLine}\n\nCe créneau est de nouveau disponible à la réservation.\nL'équipe Book'nPay`,
+      text: `Bonjour,\n\n${opts.memberName || 'Un client'} a annulé sa réservation.\n\n💆 Prestation : ${booking.service_name}${booking.staff_name ? `\n👤 Praticien : ${booking.staff_name}` : ''}\n📅 Date : ${formatDateFr(booking.date)}\n🕐 Heure : ${formatTime(booking.time)}\n\n${refundLine}\n\nCe créneau est de nouveau disponible à la réservation.\nL'équipe Book'nPay`,
     }).catch(() => {});
   } catch (err: any) {
     console.error('[ProNotif] notifyProBookingCancelled échouée:', err.message);

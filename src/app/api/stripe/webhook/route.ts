@@ -10,6 +10,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { maybeCreateOverageCharge, invoiceUnpaidOverageCharges } from '@/lib/stripe/overageCharge';
 import { notifyProNewBooking } from '@/lib/pro-notifications';
+import { formatTime } from '@/lib/booking-utils';
 
 // ⚠️ CORRECTIF (test E2E billing) : sur ce compte Stripe (version d'API
 // 2026-05-27.dahlia), invoice.subscription n'est plus peuplé — confirmé en
@@ -310,7 +311,7 @@ export async function POST(req: NextRequest) {
               await sendEmail({
                 to: email,
                 subject: `🎉 Groupe complet — ${(bk as any).biz_name}`,
-                text: `Bonne nouvelle !\n\nVotre groupe est complet : ${totalParticipants} participant${totalParticipants > 1 ? 's ont' : ' a'} confirmé.\n\n📍 Établissement : ${(bk as any).biz_name}\n💆 Prestation : ${(bk as any).service_name}${(bk as any).staff_name ? `\n👤 Praticien : ${(bk as any).staff_name}` : ''}\n📅 Date : ${dateFormatted}\n🕐 Créneau : ${(bk as any).time}\n\nVotre place est réservée. À bientôt !\nL'équipe Book'nPay`,
+                text: `Bonne nouvelle !\n\nVotre groupe est complet : ${totalParticipants} participant${totalParticipants > 1 ? 's ont' : ' a'} confirmé.\n\n📍 Établissement : ${(bk as any).biz_name}\n💆 Prestation : ${(bk as any).service_name}${(bk as any).staff_name ? `\n👤 Praticien : ${(bk as any).staff_name}` : ''}\n📅 Date : ${dateFormatted}\n🕐 Créneau : ${formatTime((bk as any).time)}\n\nVotre place est réservée. À bientôt !\nL'équipe Book'nPay`,
               }).catch(() => {});
             }
           }
@@ -343,7 +344,7 @@ Votre réservation est confirmée ! 🎉
 📍 Établissement : ${booking.biz_name}
 💆 Prestation : ${booking.service_name}${booking.staff_name ? `\n👤 Praticien : ${booking.staff_name}` : ''}
 📅 Date : ${dateFormatted}
-🕐 Heure : ${booking.time}
+🕐 Heure : ${formatTime(booking.time)}
 💶 Frais de réservation versés : ${dep}€
 
 Votre code QR de check-in : ${member.qr_code || 'N/A'}

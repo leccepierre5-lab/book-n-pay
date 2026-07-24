@@ -8,6 +8,7 @@
 // plus tard, on peut le remplacer par Supabase Realtime (déjà activé dans
 // la migration 0005 sur bookings/booking_members).
 import { useEffect, useState } from 'react';
+import { formatTime } from '@/lib/booking-utils';
 
 interface BookingMemberRow {
   id: string;
@@ -52,7 +53,7 @@ function computeAlerts(bookings: BookingRow[], today: string, prefs: Record<stri
           id: `soon-${b.id}-${member.id}`,
           type: 'warning',
           title: 'RDV imminent',
-          msg: `${member.name} — ${b.service_name} à ${b.time} (dans ${Math.ceil(minsUntil)} min)`,
+          msg: `${member.name} — ${b.service_name} à ${formatTime(b.time)} (dans ${Math.ceil(minsUntil)} min)`,
         });
       }
       if (noShowAutoEnabled && member.status === 'paid' && minsUntil < -5 && minsUntil > -120) {
@@ -60,7 +61,7 @@ function computeAlerts(bookings: BookingRow[], today: string, prefs: Record<stri
           id: `noshow-${b.id}-${member.id}`,
           type: 'danger',
           title: 'No-show probable',
-          msg: `${member.name} — ${b.service_name} à ${b.time} (retard : ${Math.abs(Math.floor(minsUntil))} min)`,
+          msg: `${member.name} — ${b.service_name} à ${formatTime(b.time)} (retard : ${Math.abs(Math.floor(minsUntil))} min)`,
         });
       }
     }
