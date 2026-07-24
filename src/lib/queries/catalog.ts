@@ -6,6 +6,7 @@ import { unstable_cache } from 'next/cache';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import type { Business, BusinessLocation, BusinessPhoto, FlashSlot, Service, Staff } from '@/lib/database.types';
 import { SHOWCASE_SLUGS } from '@/lib/business-helpers';
+import { getParisDateOffsetStr } from '@/lib/booking-utils';
 
 export interface BusinessWithDetails extends Business {
   services: Service[];
@@ -181,7 +182,7 @@ export const getAvailableCities = unstable_cache(
 export const getActiveFlashSlots = unstable_cache(
   async (): Promise<FlashSlot[]> => {
     const supabase = createServiceRoleClient();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getParisDateOffsetStr(0);
     const { data, error } = await supabase
       .from('flash_slots')
       .select('*')

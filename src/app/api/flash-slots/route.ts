@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond, withErrorHandling } from '@/lib/api-error';
+import { getParisDateOffsetStr } from '@/lib/booking-utils';
 
 export const GET = withErrorHandling('[FlashSlots]', async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
@@ -12,7 +13,7 @@ export const GET = withErrorHandling('[FlashSlots]', async (req: NextRequest) =>
     .from('flash_slots')
     .select('*')
     .eq('active', true)
-    .gte('date', new Date().toISOString().split('T')[0])
+    .gte('date', getParisDateOffsetStr(0))
     .order('date', { ascending: true })
     .order('time', { ascending: true });
 

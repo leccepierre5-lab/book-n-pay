@@ -11,7 +11,7 @@ import { sendEmail } from '@/lib/email/send';
 import { depositRefundAmountCents } from '@/lib/refunds';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
-import { formatTime } from '@/lib/booking-utils';
+import { formatTime, getParisDateOffsetStr } from '@/lib/booking-utils';
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         .update({ frozen: true, frozen_reason: reason || null })
         .eq('id', bizId);
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = getParisDateOffsetStr(0);
       const { data: futureBookings } = await serviceSupabase
         .from('bookings')
         .select(

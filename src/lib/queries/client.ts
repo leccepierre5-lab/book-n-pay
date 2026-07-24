@@ -1,7 +1,7 @@
 // src/lib/queries/client.ts
 // Requêtes pour l'espace client (hors dashboard pro, voir queries/pro.ts).
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { normalizePhone } from '@/lib/booking-utils';
+import { normalizePhone, getParisDateOffsetStr } from '@/lib/booking-utils';
 
 // "Mes réservations à venir actives" — même définition d'appartenance que
 // mes-reservations/page.tsx (client_id organisateur OU téléphone en
@@ -17,7 +17,7 @@ export async function getUpcomingActiveBookingIds(
   userId: string,
   phone: string | null
 ): Promise<string[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getParisDateOffsetStr(0);
   const bookingIdSet = new Set<string>();
 
   if (phone) {

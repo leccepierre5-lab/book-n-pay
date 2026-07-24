@@ -2,7 +2,7 @@
 // Requêtes pour l'espace pro — s'appuient sur RLS (owns_biz) pour la sécurité,
 // donc utilisables directement depuis le client une fois authentifié.
 import { createClient } from '@/lib/supabase/server';
-import { isCreatedOffHours, type BizHoraires } from '@/lib/booking-utils';
+import { isCreatedOffHours, getParisDateOffsetStr, type BizHoraires } from '@/lib/booking-utils';
 
 export async function getProBookingsForMonth(bizId: string, year: number, month: number) {
   const supabase = await createClient();
@@ -126,7 +126,7 @@ export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProS
   // "À venir" reste volontairement sans borne haute (tout RDV futur compte,
   // peu importe le mois) — requête count-only séparée pour ne pas re-élargir
   // la requête ci-dessus, qui doit rester bornée au mois courant.
-  const today = new Date().toISOString().split('T')[0];
+  const today = getParisDateOffsetStr(0);
   const { count: upcomingCount } = await supabase
     .from('bookings')
     .select('id', { count: 'exact', head: true })

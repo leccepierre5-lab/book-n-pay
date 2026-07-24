@@ -1,7 +1,7 @@
 // src/app/api/loyalty/update-status/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { computeStatut } from '@/lib/booking-utils';
+import { computeStatut, getParisDateOffsetStr } from '@/lib/booking-utils';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { logAndRespond } from '@/lib/api-error';
 
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
         rdv_honores: currentRdv,
         statut: newStatut,
         jokers_disponibles: jokersDisponibles,
-        derniere_activite: new Date().toISOString().split('T')[0],
+        derniere_activite: getParisDateOffsetStr(0),
       })
       .eq('id', user.id);
 

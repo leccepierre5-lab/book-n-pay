@@ -5,6 +5,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getProBookings, getProStats } from '@/lib/queries/pro';
 import ProDashboard from '@/components/pro/ProDashboard';
 import type { Business } from '@/lib/database.types';
+import { getParisDateOffsetStr } from '@/lib/booking-utils';
 
 export default async function ProPage() {
   const supabase = await createClient();
@@ -47,7 +48,7 @@ export default async function ProPage() {
     redirect('/pro/onboarding');
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getParisDateOffsetStr(0);
   const [todayBookings, stats] = await Promise.all([
     getProBookings(profile.biz_id, { from: today, to: today }),
     getProStats(profile.biz_id, {

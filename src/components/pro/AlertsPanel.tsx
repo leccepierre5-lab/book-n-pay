@@ -8,7 +8,7 @@
 // plus tard, on peut le remplacer par Supabase Realtime (déjà activé dans
 // la migration 0005 sur bookings/booking_members).
 import { useEffect, useState } from 'react';
-import { formatTime } from '@/lib/booking-utils';
+import { formatTime, getParisDateOffsetStr } from '@/lib/booking-utils';
 
 interface BookingMemberRow {
   id: string;
@@ -81,7 +81,7 @@ export default function AlertsPanel({
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getParisDateOffsetStr(0);
     const update = () => setAlerts(computeAlerts(bookings, today, notificationPrefs ?? null));
     update();
     const interval = setInterval(update, 60_000);

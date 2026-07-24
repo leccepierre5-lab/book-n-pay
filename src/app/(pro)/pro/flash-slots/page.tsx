@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import FlashSlotsManager from '@/components/pro/FlashSlotsManager';
+import { getParisDateOffsetStr } from '@/lib/booking-utils';
 
 export default async function FlashSlotsPage() {
   const supabase = await createClient();
@@ -18,7 +19,7 @@ export default async function FlashSlotsPage() {
   }
 
   const serviceRole = createServiceRoleClient();
-  const today = new Date().toISOString().split('T')[0];
+  const today = getParisDateOffsetStr(0);
   const { data: slots } = await serviceRole
     .from('flash_slots')
     .select('*')
