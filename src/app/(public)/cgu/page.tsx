@@ -260,15 +260,35 @@ export default function CGUPage() {
 
           <section>
             <h2 className="mb-2 text-base font-semibold text-white">8. Données personnelles</h2>
-            <p>
+            <p className="mb-3">
               Les données collectées (nom, téléphone, email) sont traitées exclusivement pour la
               gestion des réservations et ne sont jamais revendues à des tiers. Conformément au
-              RGPD, vous disposez d'un droit d'accès, de rectification et de suppression de vos
-              données en contactant :{' '}
-              <a href="mailto:contact@book-n-pay.com" className="text-emerald-500 underline">
-                contact@book-n-pay.com
-              </a>
+              RGPD, vous disposez des droits suivants :
             </p>
+            <ul className="list-disc space-y-2 pl-5">
+              <li>
+                <strong className="text-white/80">Accès et portabilité :</strong> vous pouvez
+                télécharger l&apos;ensemble de vos données personnelles à tout moment depuis votre
+                espace « Mon compte » (« Télécharger mes données »).
+              </li>
+              <li>
+                <strong className="text-white/80">Suppression :</strong> vous pouvez supprimer
+                votre compte à tout moment depuis votre espace « Mon compte », sous réserve de
+                n&apos;avoir aucun rendez-vous à venir en cours. Vos réservations passées sont
+                alors conservées sous forme anonymisée (nom et coordonnées effacés) pour nos
+                obligations légales de facturation ; vos favoris sont définitivement supprimés ;
+                votre compte de connexion est supprimé.
+              </li>
+              <li>
+                <strong className="text-white/80">Rectification :</strong> pour toute correction
+                de vos données que vous ne pouvez pas effectuer vous-même depuis votre espace,
+                contactez-nous à{' '}
+                <a href="mailto:contact@book-n-pay.com" className="text-emerald-500 underline">
+                  contact@book-n-pay.com
+                </a>
+                .
+              </li>
+            </ul>
           </section>
 
           <section>
