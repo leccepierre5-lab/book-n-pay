@@ -53,7 +53,12 @@ interface BookingRow {
 function exportDayToICS(date: string, dayBookings: BookingRow[]) {
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BooknPay//Pro//FR'];
   dayBookings.forEach((b) => {
-    const dtStart = `${b.date.replace(/-/g, '')}T${b.time.replace(':', '')}00`;
+    // formatTime() normalise d'abord en "HH:MM" (un seul ':') — b.time peut
+    // arriver en "HH:MM:SS" (colonne Postgres `time` via PostgREST) ou déjà
+    // en "HH:MM" selon l'appelant ; sans cette normalisation, .replace(':','')
+    // sur "HH:MM:SS" ne retire que le premier ':' et le "00" ajouté ensuite
+    // produit un DTSTART invalide (ex: "1430:0000" au lieu de "143000").
+    const dtStart = `${b.date.replace(/-/g, '')}T${formatTime(b.time).replace(':', '')}00`;
     const members = b.booking_members
       .filter((m) => m.status !== 'cancelled')
       .map((m) => m.name)

@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { addWeeks, subWeeks, startOfWeek, addDays, format, isSameDay, isBefore, startOfDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Booking, BookingMember } from '@/lib/database.types';
-import { phonesMatch } from '@/lib/booking-utils';
+import { phonesMatch, formatTime } from '@/lib/booking-utils';
 
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
@@ -181,7 +181,7 @@ export default function WeekCalendar({
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-semibold text-white">{b.biz_name}</p>
                     <p className="mt-0.5 truncate text-[11px] text-white/50">{b.service_name}</p>
-                    <p className="mt-1 text-xs font-bold text-white/70">{b.time}</p>
+                    <p className="mt-1 text-xs font-bold text-white/70">{formatTime(b.time)}</p>
                   </div>
                   <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusColor}`}>
                     {statusLabel}
