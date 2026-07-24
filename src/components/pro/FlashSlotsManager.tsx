@@ -27,8 +27,19 @@ export default function FlashSlotsManager({
 
   const selectedService = services.find((s) => s.id === form.service_id);
 
+  // Champ vide = pas de tarif flash (null, légitime). Une saisie non vide
+  // doit être un nombre valide > 0, sinon on refuse d'envoyer plutôt que de
+  // laisser une saisie invalide devenir un null silencieux côté serveur
+  // (parseFloat('abc') => NaN => JSON.stringify => null, indiscernable
+  // d'une absence de saisie volontaire).
+  const trimmedFlashDeposit = form.flash_deposit.trim();
+  const flashDepositValue = trimmedFlashDeposit === '' ? null : Number(trimmedFlashDeposit);
+  const flashDepositInvalid =
+    flashDepositValue != null && (!Number.isFinite(flashDepositValue) || flashDepositValue <= 0);
+
   const handleCreate = async () => {
     if (!form.date || !form.time) { setMsg('Date et heure requis'); return; }
+    if (flashDepositInvalid) { setMsg('Dépôt flash invalide — nombre positif requis'); return; }
     setSaving(true);
     setMsg(null);
     const res = await fetch('/api/flash-slots', {
@@ -40,7 +51,7 @@ export default function FlashSlotsManager({
         date: form.date,
         time: form.time,
         original_deposit: selectedService?.deposit ?? null,
-        flash_deposit: form.flash_deposit ? parseFloat(form.flash_deposit) : null,
+        flash_deposit: flashDepositValue,
       }),
     });
     const data = await res.json();
@@ -130,13 +141,16 @@ export default function FlashSlotsManager({
               placeholder={selectedService ? `${selectedService.deposit}€ habituel` : '0'}
               className="w-full rounded-lg bg-navy-800 px-3 py-2 text-sm text-slate-100 outline-none"
             />
+            {flashDepositInvalid && (
+              <p className="text-xs text-red-400 mt-1">Doit être un nombre positif (ou laisser vide)</p>
+            )}
           </div>
 
           {msg && <p className="text-sm text-mint-400">{msg}</p>}
 
           <button
             onClick={handleCreate}
-            disabled={saving}
+            disabled={saving || flashDepositInvalid}
             className="w-full rounded-lg bg-mint-500 py-2 text-sm font-semibold text-navy-950 disabled:opacity-50"
           >
             {saving ? 'Publication...' : '⚡ Publier le créneau flash'}
