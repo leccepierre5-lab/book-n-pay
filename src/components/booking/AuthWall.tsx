@@ -113,16 +113,54 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
 
       <form onSubmit={handleSubmit} className="space-y-3">
         {mode === 'signup' && (
-          <input type="text" placeholder="Nom et prénom" value={fullName} onChange={(e) => setFullName(e.target.value)} required className={inputClass} />
+          <input
+            type="text"
+            placeholder="Nom et prénom"
+            aria-label="Nom et prénom"
+            autoComplete="name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            className={inputClass}
+          />
         )}
         {mode === 'signup' && (
-          <input type="tel" placeholder="Téléphone" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+          <input
+            type="tel"
+            placeholder="Téléphone"
+            aria-label="Téléphone"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className={inputClass}
+          />
         )}
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
-        <input type="password" placeholder="Mot de passe (6 min.)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className={inputClass} />
+        <input
+          type="email"
+          placeholder="Email"
+          aria-label="Email"
+          autoComplete="email"
+          aria-describedby={error ? 'authwall-error' : undefined}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className={inputClass}
+        />
+        <input
+          type="password"
+          placeholder="Mot de passe (6 min.)"
+          aria-label="Mot de passe, 6 caractères minimum"
+          autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+          aria-describedby={error ? 'authwall-error' : undefined}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={6}
+          className={inputClass}
+        />
 
         {error && (
-          <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
+          <div id="authwall-error" role="alert" className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
             <p className="text-xs text-red-400">{error}</p>
           </div>
         )}

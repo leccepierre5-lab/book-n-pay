@@ -353,6 +353,8 @@ function ModeAPayment({
               <input
                 type="text"
                 placeholder={i === 0 ? 'Votre prénom' : 'Prénom (optionnel)'}
+                aria-label={i === 0 ? 'Votre prénom' : `Prénom de la personne ${i + 1} (optionnel)`}
+                autoComplete={i === 0 ? 'given-name' : 'off'}
                 value={guestNames[i]}
                 onChange={(e) => setGuestNames((prev) => {
                   const n = [...prev]; n[i] = e.target.value; return n;
@@ -413,7 +415,7 @@ function ModeAPayment({
       </label>
 
       {error && (
-        <div className="mb-4 rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
+        <div role="alert" className="mb-4 rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
         </div>
       )}
@@ -632,6 +634,8 @@ function ModeBPayment({
           <input
             type="text"
             placeholder="Prénom (optionnel)"
+            aria-label={`Prénom de l'invité ${idx + 1} (optionnel)`}
+            autoComplete="off"
             value={guest.name}
             onChange={(e) => updateGuest(idx, 'name', e.target.value)}
             className="w-full rounded-xl bg-navy-800 border border-white/[0.08] px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/40 mb-2"
@@ -639,6 +643,10 @@ function ModeBPayment({
           <input
             type="tel"
             placeholder="Téléphone (obligatoire) *"
+            aria-label={`Téléphone de l'invité ${idx + 1}, obligatoire`}
+            autoComplete="off"
+            aria-describedby={!allPhonesSet ? 'guest-phone-warning' : undefined}
+            required
             value={guest.phone}
             onChange={(e) => updateGuest(idx, 'phone', e.target.value)}
             className="w-full rounded-xl bg-navy-800 border border-white/[0.08] px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/40"
@@ -679,7 +687,7 @@ function ModeBPayment({
       </label>
 
       {!allPhonesSet && guests.length > 0 && (
-        <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2.5 mb-3 flex items-center gap-2">
+        <div id="guest-phone-warning" role="alert" className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2.5 mb-3 flex items-center gap-2">
           <span className="text-amber-400 shrink-0 text-sm">⚠</span>
           <p className="text-xs text-amber-300">
             Renseignez le numéro de téléphone de chaque invité pour qu'ils puissent retrouver la réservation.
@@ -688,7 +696,7 @@ function ModeBPayment({
       )}
 
       {error && (
-        <div className="mb-4 rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
+        <div role="alert" className="mb-4 rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
         </div>
       )}
@@ -894,7 +902,7 @@ function SoloPayment({
       </div>
 
       {error && (
-        <div className="mb-4 rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
+        <div role="alert" className="mb-4 rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
         </div>
       )}
