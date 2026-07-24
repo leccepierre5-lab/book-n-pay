@@ -4,29 +4,12 @@ Migration depuis Base44.
 
 ## Garde-fou git : seul Pierre pousse sur ce repo
 
-Un hook `pre-push` bloque tout `git push` sauf si la variable d'environnement
-`ALLOW_PUSH=1` est posée sur la commande. Objectif : empêcher un push
-automatisé (agent IA ou script) sans action explicite de Pierre.
-
-Le hook lui-même vit dans `scripts/git-hooks/pre-push` (versionné — `.git/hooks/`
-ne l'est jamais, donc un clone frais ne l'a pas tant qu'il n'est pas installé).
-Pour l'activer sur un clone :
-
-```sh
-git config core.hooksPath scripts/git-hooks
-```
-
-ou, en copie manuelle :
-
-```sh
-cp scripts/git-hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
-```
-
-Pour pousser une fois le hook actif :
-
-```sh
-ALLOW_PUSH=1 git push
-```
+⚠️ **Mécanisme obsolète décrit ci-dessous** (le hook `pre-push`/`ALLOW_PUSH`
+n'existe plus — `scripts/git-hooks/` est aujourd'hui vide). Le garde-fou
+réellement actif : `.claude/settings.local.json` (deny sur `git push`/`gh pr`)
++ un hook `PreToolUse` (`.claude/hooks/block-git-write.ps1`) qui inspecte
+les commandes Bash composées. Objectif inchangé : empêcher tout push
+automatisé par Claude Code sans action explicite de Pierre.
 
 ## ⚠️ Important — lis ça avant de déployer
 
@@ -189,6 +172,13 @@ tels quels (ce qui demanderait de revoir le format de stockage de `time`).
 
 ## Audit de robustesse des migrations SQL (cette session)
 
+⚠️ **Numérotation obsolète** : cette section date de la session de portage
+initiale et parle des fichiers `0001` à `0007` tels qu'ils existaient alors.
+`supabase/migrations/` ne contient plus ces fichiers sous ces noms — la
+numérotation réelle actuelle va de `0008` à `0040`. Section gardée comme
+trace historique des correctifs faits à l'époque, pas comme référence aux
+fichiers actuels du dépôt.
+
 Relecture dédiée des 7 fichiers `.sql` eux-mêmes — équilibre des
 parenthèses, cohérence des slugs entre `insert`/`delete`/`select`,
 échappement des apostrophes dans le seed, et surtout **idempotence**
@@ -270,35 +260,23 @@ configuration TypeScript (`strict: true`) ne cache pas de pattern fragile.
 - Vérifié et confirmé sain : tous les autres imports externes
   (`@supabase/*`, `stripe`, `date-fns`, `html5-qrcode`, `next/*`) sont
   bien déclarés ; aucun import vers un package non installé ; le pattern
-  `params: Promise<...>` (Next.js 15) est utilisé de façon cohérente sur
-  les 3 pages qui en ont besoin, sans mélange avec l'ancien style
+  `params: Promise<...>` (Next.js 15+, toujours d'actualité en 16 — ce
+  repo tourne sur Next.js 16.2.9) est utilisé de façon cohérente sur
+  les pages qui en ont besoin, sans mélange avec l'ancien style
   synchrone ; tous les `catch` sont typés `(error: any)` de façon
   cohérente (en TypeScript strict, un `catch (error)` sans type aurait
   cassé tout accès à `error.message`) ; les `as any` restants (4
   occurrences) sont limités aux jointures Supabase imbriquées
   difficiles à typer sans génération de types réels depuis le schéma.
 
-## Observation : `bookings.status = 'completed'` n'est jamais utilisé
+## ⚠️ Note obsolète : `bookings.status = 'completed'` EST utilisé aujourd'hui
 
-En vérifiant la cohérence entre les enums PostgreSQL et leurs usages réels
-dans le code, j'ai remarqué que `booking_status` définit trois valeurs
-(`active`, `cancelled`, `completed`), mais **rien dans le code — ni dans
-l'original Base44, ni dans cette migration — ne met jamais un booking à
-`completed`**. Une réservation honorée reste `active` au niveau du
-booking ; seul le statut du *membre* (`booking_members.status = 'arrived'`)
-reflète qu'elle a eu lieu. Ce n'est pas une régression introduite par la
-migration — c'est un comportement hérité de l'entité `Booking` Base44
-d'origine, qui définissait déjà cette valeur sans jamais l'assigner.
-
-Conséquence pratique : pour distinguer "réservation à venir" de
-"réservation passée et honorée", il faut systématiquement croiser
-`bookings.date` avec le statut des `booking_members`, jamais se fier à
-`bookings.status` seul. J'ai vérifié les 6 endroits qui filtrent sur
-`status = 'active'` dans ce repo — tous sont cohérents avec ce
-fonctionnement (no-show, rappels, gel d'établissement, comptage RDV à
-venir), aucun ne suppose à tort que `completed` pourrait apparaître. Pas
-de correctif nécessaire, mais utile de savoir si tu construis une
-nouvelle fonctionnalité qui filtre sur le statut du booking.
+Cette section affirmait initialement que `completed` n'était jamais posé.
+**Ce n'est plus vrai** : `src/app/api/stripe/webhook/route.ts` met
+explicitement `status: 'completed'` sur un booking (et sur les bookings
+d'un groupe une fois tous les membres traités) une fois la prestation
+honorée. Gardé ici comme repère historique, mais ne pas s'y fier pour
+comprendre le comportement actuel — vérifier directement le webhook.
 
 ## Audit des retours d'erreur silencieux (cette session)
 
@@ -456,11 +434,9 @@ compilation réelle.
 
 ## Ce qui N'EST PAS fait (périmètre restant)
 
-- ⚪ **Flash Slots UI** : la table et le cron de désactivation existent
-  côté backend, mais `src/components/FlashSlots.jsx` dans l'original
-  Base44 est déjà désactivé ("Ventes Flash supprimées" — `return null`).
-  Décision produit déjà prise par toi avant la migration ; je n'ai donc
-  pas reconstruit cette UI. Dis-moi si tu veux la réactiver.
+- ✅ **Flash Slots UI** — obsolète : reconstruite depuis (`/pro/flash-slots`,
+  `FlashSlotsManager.tsx`), publiée côté pro. Cette entrée décrivait un état
+  antérieur où l'UI n'existait pas encore.
 - ❌ **Sync calendrier externe** (`CalendarSyncButton.jsx`).
 - ✅ Pages CGU (`/cgu`), Pricing publique (`/tarifs`), gel de compte pro
   (`/admin`, onglet Établissements + `/api/admin/freeze-business`) — faits
@@ -511,33 +487,25 @@ compilation réelle.
   une fonction PostgreSQL transactionnelle (`select ... for update` ou une
   contrainte d'unicité applicative) plutôt qu'un lire-puis-écrire côté
   Next.js.
-- ❌ Tests automatisés (aucun test n'existe).
+- ✅ **Tests automatisés** — obsolète : 118 tests unitaires (`vitest`,
+  10 fichiers sous `tests/unit/`) existent aujourd'hui. Reste vrai en
+  revanche : pas de tests E2E automatisés (Playwright est une dépendance
+  du projet mais aucune suite E2E n'est écrite).
 
 ## ⚠️ Si tu as déjà exécuté les migrations d'une session précédente
 
-Si tu pars d'une base Supabase **neuve**, ignore cette section : `0001` à
-`0006` couvrent déjà tout, dans l'ordre. `0007` est redondant dans ce cas
-(les `if not exists` ne feront rien) — tu peux l'exécuter sans risque, ou le
-sauter.
-
-Si tu avais déjà exécuté une **version antérieure de 0001** sur ton
-Supabase (avant que je n'ajoute `member_ref`, `payment_mode`,
-`referral_code`/`referred_by`/`referral_reward_granted`,
-`notification_prefs`) : exécute `0007_alter_added_columns.sql` après tes
-migrations existantes — il ajoute uniquement les colonnes manquantes
-(`alter table add column if not exists`), sans toucher à tes données.
-
-Le trigger (`0003`) peut être ré-exécuté sans risque dans tous les cas :
-`create or replace function` et `drop trigger if exists` le rendent
-rejouable. `0006` (seed app_config) est idempotent (`on conflict do
-nothing`).
+⚠️ **Section obsolète** (renvoyait à `0001`-`0007`, qui n'existent plus sous
+ces noms — voir note de numérotation plus haut). La base Supabase de prod
+tourne depuis le 21/06/2026 et a déjà toutes les migrations jusqu'à `0040`
+appliquées ; sur un clone frais, exécute simplement tous les fichiers de
+`supabase/migrations/` dans l'ordre numérique (`0008` → `0040`) dans
+l'éditeur SQL Supabase.
 
 ## Prochaines étapes recommandées
 
 1. `npm install`, configurer `.env.local` depuis `.env.example`, `npm run dev`
-2. Exécuter les migrations SQL dans l'ordre (`0001` → `0006`, puis `0007`
-   uniquement si tu avais déjà une base existante — voir section ci-dessus)
-   dans l'éditeur SQL Supabase
+2. Exécuter les migrations SQL dans l'ordre (`supabase/migrations/`, `0008`
+   → `0040` sur un clone frais) dans l'éditeur SQL Supabase
 3. Suis **`TEST_PROTOCOL.md`** (à la racine de ce repo) — c'est une liste de
    vérifications concrètes dans l'ordre, avec des critères de succès/échec
    précis pour chaque flux (auth, paiement, group booking, espace pro,
@@ -554,3 +522,12 @@ nothing`).
 Voir `.env.example`. Tu as déjà l'URL Supabase
 (`suyfsuvrbdpnnijxspge.supabase.co`) — récupère `anon key` et
 `service_role key` dans Project Settings > API du dashboard.
+
+Deux variables utilisées dans le code n'apparaissent pas dans
+`.env.example` (à ajouter si tu veux les configurer) :
+- `DEMO_TESTER_EMAILS` — liste d'emails whitelistés (séparés par virgule)
+  autorisés à voir/utiliser la vitrine démo (`src/lib/demo-mode.ts`).
+- `NEXT_PUBLIC_APP_URL` — base URL utilisée par
+  `/api/group/pay-for-member` pour construire les liens de retour Stripe ;
+  a un fallback codé en dur (`https://www.book-n-pay.com`) si absente, donc
+  optionnelle sauf besoin de pointer ailleurs (preview Vercel, etc.).
