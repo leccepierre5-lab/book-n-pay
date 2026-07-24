@@ -91,14 +91,17 @@ export interface ProStats {
 
 export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProStats> {
   const supabase = await createClient();
-  const firstOfMonth = new Date();
-  firstOfMonth.setDate(1);
-  const fromDate = firstOfMonth.toISOString().split('T')[0];
+  // Ancré sur le mois Paris (pas "local"/runtime) — sur Vercel (UTC), setDate/
+  // getMonth/le constructeur Date(y,m,d) opèrent en UTC, décalant les bornes
+  // d'un mois entier pendant les ~2h qui suivent minuit Paris le 1er de
+  // chaque mois (audit TZ 24/07, même famille que le bug "aujourd'hui").
+  const [parisYear, parisMonth] = getParisDateOffsetStr(0).split('-').map(Number);
+  const fromDate = `${parisYear}-${String(parisMonth).padStart(2, '0')}-01`;
   // Borne haute ajoutée (audit 19/07) : sans elle, "CA ce mois"/"Réservations"
   // incluaient aussi tout RDV pris à l'avance pour un mois futur — grossit
   // avec le volume ET fausse le libellé "ce mois".
-  const lastOfMonth = new Date(firstOfMonth.getFullYear(), firstOfMonth.getMonth() + 1, 0);
-  const toDate = lastOfMonth.toISOString().split('T')[0];
+  const lastDayOfMonth = new Date(Date.UTC(parisYear, parisMonth, 0)).getUTCDate();
+  const toDate = `${parisYear}-${String(parisMonth).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
 
   const { data: bookings } = await supabase
     .from('bookings')
