@@ -27,6 +27,26 @@ export const PATCH = withErrorHandling('[FlashSlots]', async (
   const updates = Object.fromEntries(Object.entries(body).filter(([k]) => allowed.includes(k)));
 
   const serviceRole = createServiceRoleClient();
+
+  if (updates.flash_deposit != null) {
+    const value = updates.flash_deposit;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      return NextResponse.json({ error: 'flash_deposit doit être un nombre positif' }, { status: 400 });
+    }
+    const { data: current } = await serviceRole
+      .from('flash_slots')
+      .select('original_deposit')
+      .eq('id', id)
+      .eq('biz_id', profile.biz_id!)
+      .maybeSingle();
+    if (current?.original_deposit != null && value > current.original_deposit) {
+      return NextResponse.json(
+        { error: 'flash_deposit ne peut pas dépasser original_deposit' },
+        { status: 400 }
+      );
+    }
+  }
+
   const { data, error } = await serviceRole
     .from('flash_slots')
     .update(updates)

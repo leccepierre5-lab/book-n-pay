@@ -45,6 +45,18 @@ export const POST = withErrorHandling('[FlashSlots]', async (req: NextRequest) =
     return NextResponse.json({ error: 'date et time requis' }, { status: 400 });
   }
 
+  for (const [label, value] of [['original_deposit', original_deposit], ['flash_deposit', flash_deposit]] as const) {
+    if (value != null && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)) {
+      return NextResponse.json({ error: `${label} doit être un nombre positif` }, { status: 400 });
+    }
+  }
+  if (original_deposit != null && flash_deposit != null && flash_deposit > original_deposit) {
+    return NextResponse.json(
+      { error: 'flash_deposit ne peut pas dépasser original_deposit' },
+      { status: 400 }
+    );
+  }
+
   const serviceRole = createServiceRoleClient();
   const { data, error } = await serviceRole
     .from('flash_slots')
