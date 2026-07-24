@@ -185,9 +185,19 @@ export function getParisTomorrowStr(): string {
 
 // Renvoie la date à J+offsetDays (heure de Paris) au format "YYYY-MM-DD".
 export function getParisDateOffsetStr(offsetDays: number): string {
-  const todayParis = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+  const todayParis = toParisDateStr(new Date());
   const [y, mo, d] = todayParis.split('-').map(Number);
   return new Date(Date.UTC(y, mo - 1, d + offsetDays)).toISOString().split('T')[0];
+}
+
+// Convertit un instant (Date) quelconque en sa date calendaire Europe/Paris
+// "YYYY-MM-DD" — contrairement à getParisDateOffsetStr (toujours ancrée sur
+// "maintenant"), sert à dater un instant déjà connu à l'avance (timestamp
+// Stripe, date de fin d'engagement calculée). `.toISOString().split('T')[0]`
+// sur ce même instant renverrait la date UTC, pas Paris (audit TZ 24/07,
+// voir tests/unit/paris-date-offset.test.ts pour le bug que ça a causé).
+export function toParisDateStr(instant: Date): string {
+  return instant.toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
 }
 
 export interface BizHoraires {

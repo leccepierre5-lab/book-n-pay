@@ -9,7 +9,7 @@
 // passe par Intl.DateTimeFormat({timeZone:'Europe/Paris'}) et est donc
 // indépendant du fuseau du runtime qui l'exécute.
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { getParisDateOffsetStr, getParisTomorrowStr } from '@/lib/booking-utils';
+import { getParisDateOffsetStr, getParisTomorrowStr, toParisDateStr } from '@/lib/booking-utils';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -57,5 +57,34 @@ describe('getParisDateOffsetStr — fenêtre de décalage nocturne Paris/UTC', (
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-15T12:00:00.000Z')); // 14h Paris
     expect(getParisDateOffsetStr(0)).toBe('2026-08-15');
+  });
+});
+
+// toParisDateStr — même bug, forme différente : convertit un instant DÉJÀ
+// CONNU (pas "maintenant") en date Paris — cas de setup-billing/route.ts
+// (engagement_end_date = startDate + N mois, next_billing_date = timestamp
+// Stripe) et admin/applications/route.ts, qui stockaient auparavant l'ISO
+// UTC complet (`.toISOString()`) au lieu d'une date Paris. Pas besoin
+// d'horloge simulée ici : l'instant est un paramètre explicite, comparé à un
+// littéral ISO connu (même méthodologie que parse-paris-datetime.test.ts).
+describe('toParisDateStr — instant arbitraire (pas "maintenant")', () => {
+  it('été : 22h30 UTC = 00h30 Paris le lendemain → date Paris, pas date UTC', () => {
+    expect(toParisDateStr(new Date('2026-08-14T22:30:00.000Z'))).toBe('2026-08-15');
+  });
+
+  it('hiver : 23h30 UTC = 00h30 Paris le lendemain → date Paris, pas date UTC', () => {
+    expect(toParisDateStr(new Date('2026-11-14T23:30:00.000Z'))).toBe('2026-11-15');
+  });
+
+  it('milieu de journée : Paris et UTC concordent', () => {
+    expect(toParisDateStr(new Date('2026-08-15T12:00:00.000Z'))).toBe('2026-08-15');
+  });
+
+  it('reproduit le scénario setup-billing : un timestamp Stripe (next_billing_date) proche de minuit Paris', () => {
+    // Stripe current_period_end à 22:15 UTC (= 00:15 Paris CEST le lendemain).
+    // toISOString().split('T')[0] aurait renvoyé '2026-09-30' (faux) au lieu
+    // du vrai jour de prélèvement Paris, '2026-10-01'.
+    const stripeTs = Math.floor(new Date('2026-09-30T22:15:00.000Z').getTime() / 1000);
+    expect(toParisDateStr(new Date(stripeTs * 1000))).toBe('2026-10-01');
   });
 });

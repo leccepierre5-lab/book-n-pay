@@ -4,6 +4,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getPlanConfig, getEngagementEndDate } from '@/lib/plans-config';
 import { logAndRespondStripeError } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
+import { toParisDateStr } from '@/lib/booking-utils';
 
 function getFirstOfNextMonth(): number {
   const now = new Date();
@@ -100,9 +101,9 @@ export async function POST(req: NextRequest) {
     });
 
     const now = new Date();
-    const startDate = now.toISOString().split('T')[0];
-    const engagementEnd = getEngagementEndDate(now, planKey).toISOString().split('T')[0];
-    const nextBilling = new Date(getSubscriptionCurrentPeriodEnd(subscription) * 1000).toISOString().split('T')[0];
+    const startDate = toParisDateStr(now);
+    const engagementEnd = toParisDateStr(getEngagementEndDate(now, planKey));
+    const nextBilling = toParisDateStr(new Date(getSubscriptionCurrentPeriodEnd(subscription) * 1000));
 
     // ⚠️ CORRECTIF (audit — Élevé #5) : subscription_status restait auparavant
     // 'active' dès la création de la Subscription Stripe, sans attendre la

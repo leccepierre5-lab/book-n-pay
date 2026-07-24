@@ -8,6 +8,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { getPlanConfig, getEngagementEndDate } from '@/lib/plans-config';
 import { logAndRespond, logAndRespondAuthError } from '@/lib/api-error';
+import { toParisDateStr } from '@/lib/booking-utils';
 
 function slugify(text: string): string {
   return (text || '')
@@ -206,8 +207,8 @@ export async function POST(req: NextRequest) {
       biz_id: biz.id,
       plan_key: planKey,
       subscription_status: 'pending',
-      subscription_start_date: now.toISOString(),
-      engagement_end_date: engagementEnd.toISOString(),
+      subscription_start_date: toParisDateStr(now),
+      engagement_end_date: toParisDateStr(engagementEnd),
       next_billing_date: null,
       stripe_onboarding_complete: false,
       stripe_account_id: null,
