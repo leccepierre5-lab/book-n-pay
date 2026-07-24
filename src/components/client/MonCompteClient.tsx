@@ -151,11 +151,17 @@ export default function MonCompteClient({
               )}
             </div>
 
-            {/* Statut Sérénité */}
-            <LoyaltyCard profile={profile} />
-
-            {/* Parrainage */}
-            <ParrainageCard profile={profile} referralEvents={referralEvents} />
+            {/* Statut Sérénité + parrainage : uniquement client — un compte
+                pro ne réserve jamais (voir demo-mode.ts, PRO_CANNOT_BOOK_MESSAGE),
+                n'honore aucun RDV et ne peut donc avoir ni statut de fidélité
+                ni parrainage. profile.role est déjà en main ici, pas besoin
+                de re-fetch isProAccount(). */}
+            {profile.role !== 'pro' && (
+              <>
+                <LoyaltyCard profile={profile} />
+                <ParrainageCard profile={profile} referralEvents={referralEvents} />
+              </>
+            )}
 
             {/* Actions compte */}
             <div className="rounded-2xl bg-navy-900 border border-white/[0.08] divide-y divide-white/[0.05]">
