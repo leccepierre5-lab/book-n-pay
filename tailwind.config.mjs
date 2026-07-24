@@ -26,12 +26,15 @@ export default {
         // que remplacé fichier par fichier. Vérifié : aucun usage de ces deux
         // nuances sur fond clair dans ce repo (grep bg-white réel, hors
         // variantes bg-white/NN translucides) — la surcharge globale est
-        // donc sûre. Nouvelles valeurs avec marge réelle au-dessus du seuil
-        // (pas au ras du minimum) : 4.94:1 et 4.74:1 sur navy-900 (pire cas,
-        // navy-950 est encore plus favorable).
+        // donc sûre. Marge volontairement large au-dessus du seuil théorique
+        // (4.5:1) : le contraste perçu réel (anti-aliasing, écrans mal
+        // calibrés, luminosité basse en extérieur) est souvent inférieur au
+        // contraste calculé sur couleurs exactes — visé ≥4.8:1 minimum sur
+        // les deux nuances plutôt qu'un calcul au ras du seuil. 5.07:1 et
+        // 4.86:1 sur navy-900 (pire cas, navy-950 est encore plus favorable).
         slate: {
-          500: '#8a97ab',
-          600: '#8694a7',
+          500: '#8c99ad',
+          600: '#8896a9',
         },
       },
     },
