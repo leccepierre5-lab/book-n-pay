@@ -17,9 +17,16 @@ export default function QRScanner({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // `import()` et `scanner.start()` sont tous deux async — si la modale se
+    // ferme avant qu'ils résolvent, sans ce garde-fou le scanner serait quand
+    // même créé/démarré sur un DOM déjà retiré (caméra allumée sans UI pour
+    // l'éteindre, jamais stoppée par le cleanup ci-dessous qui s'est déjà
+    // exécuté entre-temps sur `scannerRef.current` encore `null`).
+    let cancelled = false;
     let scanner: any;
 
     import('html5-qrcode').then(({ Html5Qrcode }) => {
+      if (cancelled) return;
       scanner = new Html5Qrcode('bnp-qr-scanner');
       scannerRef.current = scanner;
 
@@ -33,12 +40,18 @@ export default function QRScanner({
           },
           () => {}
         )
+        .then(() => {
+          // Démarrage terminé après une fermeture entre-temps : le cleanup
+          // n'a rien pu stopper (scanner pas encore assigné à ce moment-là).
+          if (cancelled) scanner.stop().catch(() => {});
+        })
         .catch(() => {
-          setError("Impossible d'accéder à la caméra. Vérifie les permissions.");
+          if (!cancelled) setError("Impossible d'accéder à la caméra. Vérifie les permissions.");
         });
     });
 
     return () => {
+      cancelled = true;
       scannerRef.current?.stop().catch(() => {});
     };
   }, [onScan]);

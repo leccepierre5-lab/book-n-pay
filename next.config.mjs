@@ -9,8 +9,11 @@ const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
   // Réduit les données Referer envoyées aux sites tiers
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // Désactive les APIs sensibles non utilisées — geolocation en self pour le tri "Près de moi" sur /recherche
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self), payment=()' },
+  // Désactive les APIs sensibles non utilisées — geolocation en self pour le tri "Près de moi" sur /recherche,
+  // camera en self pour le check-in QR pro (/pro, QRScanner.tsx) — resté à
+  // "()" par erreur alors que la feature est vendue (offre Starter, /tarifs),
+  // la bloquant totalement en prod. Toujours refusé aux iframes tiers.
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self), payment=()' },
   // Empêche les attaques XSS via Flash/IE
   { key: 'X-XSS-Protection', value: '1; mode=block' },
   // CSP : autorise Stripe, Supabase, Google Fonts + les ressources locales
