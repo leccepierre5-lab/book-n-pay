@@ -1,5 +1,13 @@
 # Rapport d'audit — Bloc 1 (preuves d'exécution)
 
+> **Portée** : audit lecture seule (clé anon) — RLS testée uniquement en
+> lecture (SELECT). Les écritures directes (INSERT/UPDATE via clé anon) sont
+> couvertes séparément par l'audit du 20/07 et la migration 0036
+> (`0036_close_rls_direct_write_holes.sql`), qui a trouvé et fermé 3 trous
+> critiques (`bookings_insert`/`booking_members_insert` en `WITH CHECK(true)`,
+> `bookings_update` sans `WITH CHECK`) postérieurs à ce rapport. Ne pas lire
+> le "0 trou détecté" ci-dessous comme couvrant l'écriture.
+
 Exécuté le 2026-07-14 contre la production (`https://www.book-n-pay.com`,
 projet Supabase `suyfsuvrbdpnnijxspge`). Scripts dans ce dossier, lecture
 seule pour `rls-check.mjs` et `webhook-signature-check.mjs` ; `rate-limit-check.mjs`
