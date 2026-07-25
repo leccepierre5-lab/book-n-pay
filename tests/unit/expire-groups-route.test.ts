@@ -35,7 +35,7 @@ vi.mock('@/lib/constant-time', () => ({
   isValidBearerSecret: vi.fn(() => true),
 }));
 
-const expireGroupByRef = vi.fn(async (ref: string) => {
+const expireGroupByRef = vi.fn(async (ref: string, _supabase?: unknown, _stripe?: unknown) => {
   if (ref === 'group-fail') {
     throw new Error('boom');
   }
