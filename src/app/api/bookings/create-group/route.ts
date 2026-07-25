@@ -7,7 +7,7 @@ import { assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { normalizeStaffChoice, orderExplicitFirst, getCandidateStaffIds } from '@/lib/staff-group-order';
 import { logAndRespond } from '@/lib/api-error';
 import { isNonRealBusiness } from '@/lib/queries/catalog';
-import { isDemoTesterEmail, isProAccount, PRO_CANNOT_BOOK_MESSAGE } from '@/lib/demo-mode';
+import { isDemoTesterEmail, getBookingBlockedRole, bookingBlockedMessage } from '@/lib/demo-mode';
 import type { Booking } from '@/lib/database.types';
 
 interface ParticipantMeta {
@@ -114,13 +114,14 @@ export async function POST(req: NextRequest) {
       // le return final.
     }
 
-    // Séparation stricte rôles pro/client (voir lib/demo-mode.ts) — même
-    // check que bookings/create, placé après le bloc démo pour la même
-    // raison (le chemin démo est déjà retourné à ce stade).
+    // Séparation stricte rôles pro/admin vs client (voir lib/demo-mode.ts) —
+    // même check que bookings/create, placé après le bloc démo pour la
+    // même raison (le chemin démo est déjà retourné à ce stade).
     if (authData.user?.id) {
-      const isPro = await isProAccount(supabaseService, authData.user.id);
-      if (isPro) {
-        return NextResponse.json({ error: PRO_CANNOT_BOOK_MESSAGE, code: 'PRO_ACCOUNT_CANNOT_BOOK' }, { status: 403 });
+      const blockedRole = await getBookingBlockedRole(supabaseService, authData.user.id);
+      if (blockedRole) {
+        const code = blockedRole === 'pro' ? 'PRO_ACCOUNT_CANNOT_BOOK' : 'ADMIN_ACCOUNT_CANNOT_BOOK';
+        return NextResponse.json({ error: bookingBlockedMessage(blockedRole), code }, { status: 403 });
       }
     }
 

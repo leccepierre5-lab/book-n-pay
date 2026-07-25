@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getBusinessBySlug, isNonRealBusiness, isExcludedFromPublicIndex, isTesterOnlyBusiness, CATEGORIES, type BusinessWithDetails } from '@/lib/queries/catalog';
-import { isDemoTesterEmail, isProAccount, PRO_CANNOT_BOOK_MESSAGE } from '@/lib/demo-mode';
+import { isDemoTesterEmail, getBookingBlockedRole, bookingBlockedMessage } from '@/lib/demo-mode';
 import { SITE_URL } from '@/lib/site-config';
 import BookingFlow from '@/components/booking/BookingFlow';
 import FavoriteButton from '@/components/public/FavoriteButton';
@@ -190,13 +190,13 @@ export default async function EtablissementPage({
     );
   }
 
-  // favorites et isProAccount ne dépendent que de authData.user, pas l'un de
-  // l'autre — Promise.all pour éviter 2 aller-retours DB séquentiels.
-  // Masquage confort seulement pour isProBlocked — le rejet dur vit dans
-  // bookings/create[-group] (voir lib/demo-mode.ts). Requêté uniquement pour
-  // une fiche réelle : sur une fiche démo, seul isDemoTester compte, pas la
-  // peine d'interroger le rôle pour rien.
-  const [isFavorited, isProBlocked] = authData.user
+  // favorites et getBookingBlockedRole ne dépendent que de authData.user, pas
+  // l'un de l'autre — Promise.all pour éviter 2 aller-retours DB séquentiels.
+  // Masquage confort seulement pour blockedRole (pro OU admin) — le rejet dur
+  // vit dans bookings/create[-group] (voir lib/demo-mode.ts). Requêté
+  // uniquement pour une fiche réelle : sur une fiche démo, seul isDemoTester
+  // compte, pas la peine d'interroger le rôle pour rien.
+  const [isFavorited, blockedRole] = authData.user
     ? await Promise.all([
         supabase
           .from('favorites')
@@ -206,10 +206,10 @@ export default async function EtablissementPage({
           .maybeSingle()
           .then(({ data }) => !!data),
         !isNonRealBusiness(business)
-          ? isProAccount(supabase, authData.user.id)
-          : Promise.resolve(false),
+          ? getBookingBlockedRole(supabase, authData.user.id)
+          : Promise.resolve(null),
       ])
-    : [false, false];
+    : [false, null];
 
   const photos = (business.business_photos ?? []).sort((a, b) => a.sort_order - b.sort_order);
   const hasSocial =
@@ -386,12 +386,14 @@ export default async function EtablissementPage({
             </p>
           </div>
         </div>
-      ) : isProBlocked ? (
+      ) : blockedRole ? (
         <div className="max-w-4xl mx-auto px-4 pb-8">
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 text-center">
             <p className="mb-1 text-xl">🔒</p>
-            <p className="text-sm font-semibold text-white mb-1">Compte professionnel</p>
-            <p className="text-xs text-slate-500 mb-3">{PRO_CANNOT_BOOK_MESSAGE}</p>
+            <p className="text-sm font-semibold text-white mb-1">
+              {blockedRole === 'pro' ? 'Compte professionnel' : 'Compte administrateur'}
+            </p>
+            <p className="text-xs text-slate-500 mb-3">{bookingBlockedMessage(blockedRole)}</p>
             <Link
               href="/inscription"
               className="inline-block text-xs font-medium text-mint-400 hover:text-mint-300 transition-colors"
