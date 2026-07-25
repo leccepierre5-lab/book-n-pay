@@ -16,13 +16,29 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self), payment=()' },
   // Empêche les attaques XSS via Flash/IE
   { key: 'X-XSS-Protection', value: '1; mode=block' },
-  // CSP : autorise Stripe, Supabase, Google Fonts + les ressources locales
+  // CSP : autorise Stripe, Supabase, Google Fonts + les ressources locales.
+  //
+  // TENTATIVE CSP À NONCE ABANDONNÉE (25/07, audit sécurité) : testé en
+  // conditions réelles (Playwright headless contre le build de prod) —
+  // Next.js 16.2.9 n'ajoute PAS automatiquement de nonce à ses propres
+  // scripts (chunks JS + scripts inline de streaming RSC), contrairement à
+  // ce que documente la recette officielle middleware. Avec 'strict-dynamic'
+  // + nonce seul, TOUT est bloqué (24 violations CSP, y compris les chunks
+  // externes — 'strict-dynamic' désactive l'allowlist par hôte, y compris
+  // 'self', dès qu'aucun script n'a le nonce) : page rendue mais zéro JS
+  // exécuté. 'unsafe-inline' reste donc nécessaire tant qu'aucune solution
+  // de nonce fiable n'est trouvée pour ce setup. Ne pas retenter sans un
+  // vrai mécanisme de propagation du nonce vérifié au préalable.
+  //
+  // 'unsafe-eval' RETIRÉ EN PROD seul (gain sans risque, vérifié en
+  // conditions réelles) : nécessaire uniquement en dev (HMR/Fast Refresh
+  // Turbopack), absent du bundle de production.
   {
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      // Scripts : app, Stripe, analytics Vercel
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://va.vercel-scripts.com",
+      // Scripts : app, Stripe, analytics Vercel. unsafe-eval dev uniquement.
+      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''} https://js.stripe.com https://va.vercel-scripts.com`,
       // Styles : app + Google Fonts
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       // Fonts : Google Fonts
