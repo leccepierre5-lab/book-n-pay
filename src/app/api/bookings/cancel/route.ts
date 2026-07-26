@@ -138,10 +138,13 @@ export async function POST(req: NextRequest) {
       const dateFormatted = new Date(booking.date + 'T12:00:00').toLocaleDateString('fr-FR', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       });
+      // ⚠️ CORRECTIF (audit 26/07) : le montant n'était jamais mentionné ici
+      // (contrairement à expireGroup.ts et au webhook charge.refunded) — le
+      // client savait qu'il serait remboursé, jamais combien.
       const refundLine = eligibleForRefund
         ? refundDone
-          ? `✅ Remboursement de vos frais de réservation initié — crédit sous 5 à 10 jours ouvrés selon votre banque.`
-          : `⚠️ Remboursement initié mais une vérification manuelle peut être nécessaire — contactez-nous si vous ne le recevez pas.`
+          ? `✅ Remboursement de vos frais de réservation (${member.deposit ?? 0}€) initié — crédit sous 5 à 10 jours ouvrés selon votre banque.`
+          : `⚠️ Remboursement de vos frais de réservation (${member.deposit ?? 0}€) initié mais une vérification manuelle peut être nécessaire — contactez-nous si vous ne le recevez pas.`
         : `❌ Annulation à moins de 48h du RDV — les frais de réservation sont conservés par le professionnel (CGV Art. 3).`;
 
       await sendEmail({
