@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, formatTime } from '@/lib/booking-utils';
-import { depositRefundAmountCents } from '@/lib/refunds';
+import { proCancellationRefundAmountCents } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -102,10 +102,12 @@ export async function POST(req: NextRequest) {
 
     // Montant provisoire = CGU Art. 3 actuelle (remboursement intégral des
     // frais de réservation ; les frais de gestion ne sont jamais remboursés,
-    // Art. 2). Paramètre isolé ici pour être trivialement ajustable après le
-    // RDV CCI du 30/07 si Art. 3 change — dans ce cas, mettre à jour aussi
-    // le texte CGU, pas seulement cette constante.
-    const refundAmountCents = depositRefundAmountCents(member.deposit);
+    // Art. 2). Fonction dédiée (lib/refunds.ts), pas le helper générique
+    // partagé par les autres routes d'annulation — ajustable ici seul si le
+    // RDV CCI du 30/07 change la règle spécifiquement pour les annulations
+    // pro. Dans ce cas, mettre à jour aussi le texte CGU, pas seulement
+    // cette fonction.
+    const refundAmountCents = proCancellationRefundAmountCents(member.deposit);
 
     let refundDone = false;
     if (member.stripe_payment_intent_id) {
