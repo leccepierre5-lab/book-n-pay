@@ -26,6 +26,10 @@
 //   Même précision de destinataire que reminderH24 ci-dessus.
 // - rdvImminent / noShowAuto : CÂBLÉ depuis le 23/07 (AlertsPanel.tsx lit
 //   désormais notification_prefs, défaut TRUE, même convention opt-out).
+// - noShowConfirmed : CÂBLÉ depuis le 26/07 (cron/check-no-shows, email pro
+//   + email client) — distinct de noShowAuto ci-dessus (celui-ci = alerte
+//   prédictive temps réel "5 min de retard" ; noShowConfirmed = no-show
+//   effectivement acté par le cron 15 min après l'heure du RDV). Défaut TRUE.
 // - paymentReceived / groupPending : rien ne les a jamais lus côté serveur
 //   (aucune notification n'existe pour ces deux événements — pas un flag
 //   ignoré, une fonctionnalité jamais construite). Masqués de l'UI le
@@ -40,6 +44,7 @@ import { createClient } from '@/lib/supabase/client';
 const DEFAULTS: Record<string, boolean> = {
   rdvImminent: true,
   noShowAuto: true,
+  noShowConfirmed: true,
   newBooking: true,
   cancelBooking: true,
   paymentReceived: true,
@@ -61,6 +66,7 @@ const NOTIF_ITEMS = [
     items: [
       { key: 'newBooking', emoji: '✅', label: 'Nouvelle réservation', desc: 'Quand un client confirme un RDV' },
       { key: 'cancelBooking', emoji: '❌', label: 'Annulation', desc: 'Quand un client annule' },
+      { key: 'noShowConfirmed', emoji: '⚠️', label: 'No-show confirmé', desc: 'Quand un client ne se présente pas (15 min après le RDV)' },
     ],
   },
   {

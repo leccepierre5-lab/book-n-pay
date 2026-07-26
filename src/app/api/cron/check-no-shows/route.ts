@@ -5,10 +5,12 @@
 // les marque 'no_show', et désactive les FlashSlots expirés.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { parseParisDatetime } from '@/lib/booking-utils';
+import { parseParisDatetime, formatTime, resolveMemberRecipientEmail } from '@/lib/booking-utils';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { processBatch } from '@/lib/cron-batch';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
+import { notifyProNoShow } from '@/lib/pro-notifications';
+import { sendEmail } from '@/lib/email/send';
 
 export async function GET(req: NextRequest) {
   // Protection : seul Vercel Cron (avec le bon secret) peut déclencher ceci.
@@ -53,7 +55,7 @@ export async function GET(req: NextRequest) {
 
   const { data: bookings } = await supabase
     .from('bookings')
-    .select('id, biz_name, date, time, booking_members(id, status)')
+    .select('id, biz_name, service_name, date, time, client_email, client_phone, booking_members(id, name, phone, email, status)')
     .neq('status', 'cancelled')
     .gte('date', sevenDaysAgoStr)
     .lte('date', todayStr);
@@ -85,6 +87,25 @@ export async function GET(req: NextRequest) {
         booking_id: booking.id,
         message: 'No-show automatique — frais de réservation retenus',
       });
+
+      // ⚠️ AJOUT (audit LOT 3, 26/07) : jusqu'ici aucune notification —
+      // ni client ni pro n'apprenaient qu'un no-show venait d'être enregistré.
+      // Ton client volontairement neutre : le no-show peut être un empêchement
+      // légitime, on constate une absence, on n'accuse pas.
+      const dateFormatted = new Date((booking as any).date + 'T12:00:00').toLocaleDateString('fr-FR', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      });
+      for (const mb of paidMembers) {
+        const emailTo = resolveMemberRecipientEmail(mb as any, booking as any);
+        if (emailTo) {
+          await sendEmail({
+            to: emailTo,
+            subject: `Absence constatée — ${(booking as any).biz_name}`,
+            text: `Bonjour ${(mb as any).name || ''},\n\nNous n'avons pas pu confirmer votre présence à votre rendez-vous chez ${(booking as any).biz_name}.\n\n💆 Prestation : ${(booking as any).service_name}\n📅 Date : ${dateFormatted}\n🕐 Heure : ${formatTime((booking as any).time)}\n\nSi vous avez été empêché(e), nous en sommes désolés. Conformément à nos conditions, les frais de réservation restent acquis au professionnel en compensation du créneau bloqué.\n\nSi vous pensez qu'il y a une erreur, contactez-nous à contact@book-n-pay.com.\n\nL'équipe Book'nPay`,
+          }).catch(() => {});
+        }
+        await notifyProNoShow(supabase, booking.id, { memberName: (mb as any).name || null });
+      }
 
       console.log(
         `[NoShow] No-show automatique — ${booking.biz_name} | ${booking.date} ${booking.time} | ${paidMembers.length} membre(s)`

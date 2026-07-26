@@ -121,3 +121,37 @@ export async function notifyProBookingCancelled(
     console.error('[ProNotif] notifyProBookingCancelled échouée:', err.message);
   }
 }
+
+// Déclenché par le cron check-no-shows (audit LOT 3, 26/07) — jusqu'ici
+// aucune notification n'existait sur ce chemin : ni le pro ni le client
+// n'apprenaient qu'un no-show venait d'être enregistré, alors que c'est le
+// moment précis où le pro perd de l'argent (frais de réservation conservés,
+// pas de facturation de la prestation). Toggle dédié `noShowConfirmed` —
+// distinct de `noShowAuto` (AlertsPanel.tsx, alerte PRÉDICTIVE "5 min de
+// retard", temps réel) : celui-ci confirme un no-show déjà acté par le cron
+// (15 min après l'heure du RDV), un événement différent malgré le nom voisin.
+export async function notifyProNoShow(
+  supabase: SupabaseClient,
+  bookingId: string,
+  opts: { memberName: string | null }
+): Promise<void> {
+  try {
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('biz_id, biz_name, service_name, staff_name, date, time')
+      .eq('id', bookingId)
+      .maybeSingle<NotifBookingInfo>();
+    if (!booking) return;
+
+    const ownerEmail = await resolveNotifiableOwnerEmail(supabase, booking.biz_id, 'noShowConfirmed');
+    if (!ownerEmail) return;
+
+    await sendEmail({
+      to: ownerEmail,
+      subject: `⚠️ No-show — ${booking.service_name}`,
+      text: `Bonjour,\n\n${opts.memberName || 'Un client'} ne s'est pas présenté à son rendez-vous (aucun check-in enregistré 15 minutes après l'heure prévue).\n\n💆 Prestation : ${booking.service_name}${booking.staff_name ? `\n👤 Praticien : ${booking.staff_name}` : ''}\n📅 Date : ${formatDateFr(booking.date)}\n🕐 Heure : ${formatTime(booking.time)}\n\nLes frais de réservation restent acquis, en compensation du créneau bloqué.\nL'équipe Book'nPay`,
+    }).catch(() => {});
+  } catch (err: any) {
+    console.error('[ProNotif] notifyProNoShow échouée:', err.message);
+  }
+}
