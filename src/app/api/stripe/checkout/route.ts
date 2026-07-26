@@ -103,9 +103,26 @@ export async function POST(req: NextRequest) {
     if (bookingMeta?.bookingId) {
       const { data: booking } = await supabase
         .from('bookings')
-        .select('service_id, biz_id, is_demo')
+        .select('service_id, biz_id, is_demo, status, payment_deadline')
         .eq('id', bookingMeta.bookingId)
         .maybeSingle();
+
+      // ⚠️ CORRECTIF (audit 26/07) : cette route (partagée solo + groupe, voir
+      // le scope de sessionParams.expires_at plus bas) ne vérifiait jamais
+      // payment_deadline ni bookings.status avant de créer une session Stripe
+      // — contrairement à group/pay-for-member/route.ts qui, lui, le fait.
+      // Un invité pouvait donc obtenir une session de paiement valide pour un
+      // groupe déjà expiré/dissous côté base (le seul filet réel dépendait de
+      // l'expiration effective — cron 1x/jour ou polling lazy — pas d'un
+      // blocage à la source). `payment_deadline` n'est jamais posé sur une
+      // réservation solo (voir bookings/create/route.ts) : ce check ne
+      // s'applique donc naturellement qu'aux réservations de groupe.
+      if (booking?.status === 'cancelled') {
+        return NextResponse.json({ error: 'Cette réservation a été annulée.' }, { status: 410 });
+      }
+      if (booking?.payment_deadline && booking.payment_deadline <= new Date().toISOString()) {
+        return NextResponse.json({ error: 'Le délai de paiement pour cette réservation est expiré.' }, { status: 410 });
+      }
 
       // Défense en profondeur — bookings/create[-group] bloque déjà la
       // création sur une fiche démo (isNonRealBusiness), mais ce point-ci
