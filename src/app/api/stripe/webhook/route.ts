@@ -10,6 +10,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { maybeCreateOverageCharge, invoiceUnpaidOverageCharges } from '@/lib/stripe/overageCharge';
 import { notifyProNewBooking } from '@/lib/pro-notifications';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 import { formatTime } from '@/lib/booking-utils';
 
 // ⚠️ CORRECTIF (test E2E billing) : sur ce compte Stripe (version d'API
@@ -78,8 +79,52 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       // Idempotence : si déjà payé/arrivé, on ignore (webhook potentiellement rejoué)
-      if (member?.status === 'paid' || member?.status === 'arrived') {
-        console.warn(`[Webhook] Membre ${memberId} déjà 'paid' — ignoré (idempotent)`);
+      //
+      // ⚠️ CORRECTIF (audit LOT 3, 26/07) — 'cancelled' DOIT être exclu ici
+      // au même titre que 'paid'/'arrived', sinon la garantie de livraison
+      // "at-least-once" de Stripe (webhook rejoué après un premier succès)
+      // ressuscite en 'paid' un membre qu'un client a entre-temps annulé et
+      // qui a déjà été remboursé — sans qu'aucun attaquant n'ait rien fait.
+      if (member?.status === 'paid' || member?.status === 'arrived' || member?.status === 'cancelled') {
+        console.warn(`[Webhook] Membre ${memberId} déjà '${member?.status}' — ignoré (idempotent)`);
+
+        // Cas distinct du simple rejeu : ce paiement vient réellement d'être
+        // capturé sur un membre déjà annulé (ex. le deadline a expiré ou un
+        // admin a annulé le booking pendant que la session Checkout restait
+        // ouverte côté client, qui a fini par payer). On ne le sait qu'ici,
+        // en comparant au registre Stripe : s'il n'existe encore AUCUN
+        // remboursement pour ce payment_intent, ce n'est pas un rejeu d'un
+        // paiement déjà traité — c'est un paiement orphelin, à rembourser
+        // immédiatement (le client ne doit jamais payer pour un créneau
+        // qui n'existe plus).
+        if (member?.status === 'cancelled' && typeof session.payment_intent === 'string') {
+          try {
+            const existingRefunds = await stripe.refunds.list({
+              payment_intent: session.payment_intent,
+              limit: 1,
+            });
+            if (existingRefunds.data.length === 0) {
+              await stripe.refunds.create({ payment_intent: session.payment_intent });
+              console.warn(
+                `[Webhook] Paiement orphelin remboursé — membre ${memberId} déjà 'cancelled', payment_intent ${session.payment_intent}`
+              );
+            }
+          } catch (refundErr: any) {
+            console.error(
+              `[Webhook] ❌ Échec remboursement paiement orphelin — membre ${memberId}:`,
+              refundErr.message
+            );
+            await notifyAdminOnFailure('stripe/webhook:orphan-refund', {
+              processed: 0,
+              failed: 1,
+              failedItems: [memberId],
+              failedDescriptions: [
+                `membre ${memberId} (booking ${bookingId}, payment_intent ${session.payment_intent}) — ${refundErr.message}`,
+              ],
+            });
+          }
+        }
+
         return NextResponse.json({ received: true });
       }
 
