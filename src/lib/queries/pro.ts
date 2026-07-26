@@ -88,7 +88,7 @@ export interface ProStats {
   upcomingCount: number;
   // "Ce que Book'nPay vous apporte" (19/07) — volontairement factuels, pas de
   // chiffre spéculatif (ex. "temps gagné" écarté faute de vraie mesure).
-  depositSecuredCount: number;   // nb de RDV avec acompte réellement encaissé, CUMUL depuis l'inscription
+  depositSecuredCount: number;   // nb de RDV avec frais de réservation réellement encaissés, CUMUL depuis l'inscription
   depositSecuredAmount: number;  // idem en €. Portée volontairement différente de onlineRevenue (mois
                                   // courant) — un cumul depuis l'inscription, pas le même chiffre sous
                                   // un autre nom (relecture 19/07 : le doublon nuisait à la crédibilité

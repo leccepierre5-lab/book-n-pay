@@ -288,7 +288,7 @@ export default function ProDashboard({
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ce que Book'nPay vous apporte depuis votre inscription</p>
             <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
               <p className="text-sm text-white">
-                <span className="font-bold text-mint-400">{stats.depositSecuredCount}</span> RDV sécurisé{stats.depositSecuredCount > 1 ? 's' : ''} par acompte
+                <span className="font-bold text-mint-400">{stats.depositSecuredCount}</span> RDV sécurisé{stats.depositSecuredCount > 1 ? 's' : ''} par frais de réservation
                 <span className="text-slate-500"> · </span>
                 <span className="font-bold text-mint-400">{stats.depositSecuredAmount}€</span> couverts depuis votre inscription
               </p>
