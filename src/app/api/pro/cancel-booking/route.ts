@@ -108,11 +108,28 @@ export async function POST(req: NextRequest) {
     // pro. Dans ce cas, mettre à jour aussi le texte CGU, pas seulement
     // cette fonction.
     const refundAmountCents = proCancellationRefundAmountCents(member.deposit);
+    const stripe = await getStripeClient(serviceSupabase);
+
+    // Montant des frais de gestion réellement facturés à l'origine (jamais
+    // remboursés, CGV Art. 2) — pour l'afficher explicitement dans l'email
+    // ci-dessous plutôt qu'un rappel vague. Stocké en metadata sur la
+    // SESSION Checkout (stripe/checkout/route.ts), pas sur le PaymentIntent
+    // — d'où stripe_checkout_session_id, pas stripe_payment_intent_id.
+    // Best-effort : un échec ici ne doit jamais bloquer l'annulation.
+    let managementFeeAmount: number | null = null;
+    if (member.stripe_checkout_session_id) {
+      try {
+        const session = await stripe.checkout.sessions.retrieve(member.stripe_checkout_session_id);
+        const raw = session.metadata?.fraisGestion;
+        if (raw) managementFeeAmount = parseFloat(raw);
+      } catch (e: any) {
+        console.warn('[ProCancelBooking] Impossible de récupérer les frais de gestion pour l\'email:', e.message);
+      }
+    }
 
     let refundDone = false;
     if (member.stripe_payment_intent_id) {
       try {
-        const stripe = await getStripeClient(serviceSupabase);
         await stripe.refunds.create({
           payment_intent: member.stripe_payment_intent_id,
           amount: refundAmountCents,
@@ -166,9 +183,19 @@ export async function POST(req: NextRequest) {
       const dateFormatted = new Date(booking.date + 'T12:00:00').toLocaleDateString('fr-FR', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       });
+      // Deux lignes chiffrées distinctes plutôt qu'un rappel vague — un
+      // client qui a payé en une seule fois (ex. 11,99€) ne devine pas de
+      // lui-même la répartition remboursé/conservé.
       const refundLine = refundDone
-        ? `✅ Remboursement intégral de vos frais de réservation (${(refundAmountCents / 100).toFixed(2)}€) initié — crédit sous 5 à 10 jours ouvrés selon votre banque.`
-        : `⚠️ Remboursement de vos frais de réservation (${member.deposit ?? 0}€) initié mais une vérification manuelle peut être nécessaire — contactez-nous si vous ne le recevez pas.`;
+        ? `✅ Remboursé : ${(refundAmountCents / 100).toFixed(2)}€ (frais de réservation, intégral)`
+        : `⚠️ Remboursement de ${member.deposit ?? 0}€ (frais de réservation) initié mais une vérification manuelle peut être nécessaire — contactez-nous si vous ne le recevez pas.`;
+      const managementFeeLine = managementFeeAmount != null
+        ? `❌ Conservé : ${managementFeeAmount.toFixed(2)}€ (frais de gestion Book'nPay, CGV Art. 2 — jamais remboursés)`
+        : `⚠️ Les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).`;
+
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app';
+      const { data: biz } = await serviceSupabase.from('businesses').select('slug').eq('id', booking.biz_id).maybeSingle();
+      const rebookUrl = biz?.slug ? `${siteUrl}/etablissement/${biz.slug}` : `${siteUrl}/recherche`;
 
       await sendEmail({
         to: clientEmail,
@@ -183,10 +210,9 @@ Nous sommes désolés de vous l'annoncer : le professionnel a dû annuler votre 
 🕐 Heure : ${formatTime(booking.time)}
 
 ${refundLine}
+${managementFeeLine}
 
-⚠️ Les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).
-
-Vous pouvez reprendre une réservation dès maintenant si vous le souhaitez.
+Vous pouvez reprendre une réservation dès maintenant si vous le souhaitez : ${rebookUrl}
 
 Si vous avez des questions : contact@book-n-pay.com
 

@@ -20,8 +20,12 @@ const mockGetUser = vi.fn();
 let authProfile: any = null;
 
 const mockRefundsCreate = vi.fn(async () => ({ id: 're_test' }));
+const mockSessionsRetrieve = vi.fn(async () => ({ metadata: {} }));
 vi.mock('@/lib/stripe/client', () => ({
-  getStripeClient: vi.fn(async () => ({ refunds: { create: mockRefundsCreate } })),
+  getStripeClient: vi.fn(async () => ({
+    refunds: { create: mockRefundsCreate },
+    checkout: { sessions: { retrieve: mockSessionsRetrieve } },
+  })),
 }));
 
 const mockCheckRateLimit = vi.fn(async (..._args: any[]) => ({ allowed: true, currentCount: 1 }));
@@ -152,6 +156,7 @@ describe('POST /api/pro/cancel-booking', () => {
     // cancelBookingIfNoActiveMembers doit fermer le booking.
     chains.booking_members = makeChain([], PAID_MEMBER);
     chains.booking_logs = makeChain([]);
+    chains.businesses = makeChain([], null); // pas de slug → email retombe sur /recherche
 
     const { POST } = await import('@/app/api/pro/cancel-booking/route');
     const res = await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
@@ -185,11 +190,47 @@ describe('POST /api/pro/cancel-booking', () => {
     expect(mockNotifyAdminOnFailure).not.toHaveBeenCalled();
   });
 
+  it('email : deux montants distincts (remboursé/conservé) + lien de reprise vers la fiche établissement', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
+    chains.bookings = makeChain([], FUTURE_BOOKING);
+    chains.booking_members = makeChain([], { ...PAID_MEMBER, stripe_checkout_session_id: 'cs_123' });
+    chains.booking_logs = makeChain([]);
+    chains.businesses = makeChain([], { slug: 'salon-test' });
+    mockSessionsRetrieve.mockResolvedValueOnce({ metadata: { fraisGestion: '1.99' } });
+
+    const { POST } = await import('@/app/api/pro/cancel-booking/route');
+    await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
+
+    expect(mockSessionsRetrieve).toHaveBeenCalledWith('cs_123');
+    const emailText = mockSendEmail.mock.calls[0][0].text as string;
+    expect(emailText).toContain('Remboursé : 15.00€');
+    expect(emailText).toContain('Conservé : 1.99€ (frais de gestion Book\'nPay, CGV Art. 2');
+    expect(emailText).toContain('https://book-n-pay-next.vercel.app/etablissement/salon-test');
+  });
+
+  it('email : lookup frais de gestion en échec → ne bloque pas l\'envoi, rappel générique conservé', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
+    chains.bookings = makeChain([], FUTURE_BOOKING);
+    chains.booking_members = makeChain([], { ...PAID_MEMBER, stripe_checkout_session_id: 'cs_123' });
+    chains.booking_logs = makeChain([]);
+    chains.businesses = makeChain([], null);
+    mockSessionsRetrieve.mockRejectedValueOnce(new Error('session introuvable'));
+
+    const { POST } = await import('@/app/api/pro/cancel-booking/route');
+    const res = await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
+
+    expect(res.status).toBe(200);
+    const emailText = mockSendEmail.mock.calls[0][0].text as string;
+    expect(emailText).toContain('frais de gestion Book\'nPay ne sont jamais remboursés');
+    expect(emailText).toContain('https://book-n-pay-next.vercel.app/recherche');
+  });
+
   it('échec Stripe : le membre est quand même annulé et le créneau libéré, log refund_status=echec, alerte admin envoyée', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
     chains.bookings = makeChain([], FUTURE_BOOKING);
     chains.booking_members = makeChain([], PAID_MEMBER);
     chains.booking_logs = makeChain([]);
+    chains.businesses = makeChain([], null);
     mockRefundsCreate.mockRejectedValueOnce(new Error('solde Connect insuffisant'));
 
     const { POST } = await import('@/app/api/pro/cancel-booking/route');
