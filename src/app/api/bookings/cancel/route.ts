@@ -21,6 +21,7 @@ import { parseParisDatetime, phonesMatch, formatTime } from '@/lib/booking-utils
 import { depositRefundAmountCents } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
@@ -105,6 +106,21 @@ export async function POST(req: NextRequest) {
         console.log(`[CancelClient] ✅ Remboursement OK — booking=${bookingId} membre=${memberId}`);
       } catch (stripeErr: any) {
         console.error('[CancelClient] Erreur Stripe:', stripeErr.message);
+        // ⚠️ CORRECTIF (audit 26/07, même classe que le BLOQUANT expireGroup) —
+        // NUANCE : contrairement au groupe, il n'existe ICI aucun cron ni
+        // filet lazy qui repasse sur un membre 'cancelled' non remboursé —
+        // le client a explicitement demandé l'annulation, la place doit se
+        // libérer (ci-dessous) quoi qu'il arrive côté Stripe. Cette alerte
+        // admin est donc le SEUL filet : sans elle, un refund en échec ne
+        // remonte à personne, le client attend un remboursement qui ne
+        // viendra jamais tant qu'un humain n'a pas traité manuellement le
+        // remboursement Stripe (dashboard) après lecture de cette alerte.
+        await notifyAdminOnFailure('bookings/cancel:refund', {
+          processed: 0,
+          failed: 1,
+          failedItems: [memberId],
+          failedDescriptions: [`membre ${memberId} (booking ${bookingId}, ${member.deposit ?? 0}€) — ${stripeErr.message}`],
+        });
       }
     }
 

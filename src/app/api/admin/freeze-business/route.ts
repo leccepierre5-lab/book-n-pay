@@ -12,6 +12,7 @@ import { depositRefundAmountCents } from '@/lib/refunds';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
 import { formatTime, getParisDateOffsetStr } from '@/lib/booking-utils';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,6 +67,14 @@ export async function POST(req: NextRequest) {
 
       let cancelledCount = 0;
       let refundedCount = 0;
+      // ⚠️ CORRECTIF (audit 26/07, même classe que le BLOQUANT expireGroup) —
+      // NUANCE : contrairement au groupe, il n'existe ici aucun cron/filet
+      // lazy qui repasse sur un membre 'cancelled' non remboursé, et un gel
+      // d'établissement est une décision admin déjà actée — la réservation
+      // doit se libérer quoi qu'il arrive côté Stripe. L'alerte admin
+      // groupée en fin de boucle est donc le SEUL filet pour les refunds en
+      // échec : sans elle, ils ne remontaient qu'en console.
+      const refundFailures: { bookingId: string; memberId: string; deposit: number; message: string }[] = [];
       for (const booking of futureBookings || []) {
         await serviceSupabase.from('bookings').update({ status: 'cancelled' }).eq('id', booking.id);
         await serviceSupabase.from('booking_logs').insert({
@@ -109,6 +118,16 @@ export async function POST(req: NextRequest) {
             } catch (err: any) {
               console.error(`[FreezeBusiness] Remboursement échoué membre ${member.id}:`, err.message);
               await serviceSupabase.from('booking_members').update({ status: 'cancelled' }).eq('id', member.id);
+              await serviceSupabase.from('booking_logs').insert({
+                booking_id: booking.id,
+                message: `Remboursement gel établissement échoué — membre ${member.id}, ${member.deposit ?? 0}€ — à vérifier manuellement (pas de retry automatique sur ce flux)`,
+              });
+              refundFailures.push({
+                bookingId: booking.id,
+                memberId: member.id,
+                deposit: member.deposit ?? 0,
+                message: err.message,
+              });
             }
           } else {
             // Statut paid/arrived mais pas d'ID de paiement (paiement especes/tpe) — pas de remboursement Stripe possible.
@@ -118,8 +137,19 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      console.log(`[FreezeBusiness] ${business.name} gelé — ${cancelledCount} membre(s) annulé(s), ${refundedCount} remboursement(s)`);
-      return NextResponse.json({ success: true, frozen: true, cancelledMembers: cancelledCount, refundedMembers: refundedCount });
+      if (refundFailures.length > 0) {
+        await notifyAdminOnFailure('admin/freeze-business:refunds', {
+          processed: refundedCount,
+          failed: refundFailures.length,
+          failedItems: refundFailures,
+          failedDescriptions: refundFailures.map(
+            (f) => `membre ${f.memberId} (booking ${f.bookingId}, ${f.deposit}€) — ${f.message}`
+          ),
+        });
+      }
+
+      console.log(`[FreezeBusiness] ${business.name} gelé — ${cancelledCount} membre(s) annulé(s), ${refundedCount} remboursement(s), ${refundFailures.length} échec(s)`);
+      return NextResponse.json({ success: true, frozen: true, cancelledMembers: cancelledCount, refundedMembers: refundedCount, refundFailures: refundFailures.length });
     }
 
     // ── unfreeze ──────────────────────────────────────────────────────────
