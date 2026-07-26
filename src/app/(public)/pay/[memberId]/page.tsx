@@ -2,12 +2,29 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import PayGuestClient from '@/components/group/PayGuestClient';
 import GroupTimer from '@/components/booking/GroupTimer';
 import Link from 'next/link';
+import { GROUP_BOOKING_ENABLED } from '@/lib/feature-flags';
 
 export default async function PayGuestPage({
   params,
 }: {
   params: Promise<{ memberId: string }>;
 }) {
+  // Flag OFF (26/07, feature-flags.ts) — cette page ne sert QUE le flux
+  // groupe (invité rejoint via /rejoindre, ou "Finaliser ma place" de
+  // GroupPendingBanner) : aucun flux solo ne construit de lien /pay/[id]
+  // (vérifié — StepPayment.tsx paie inline dans le tunnel).
+  if (!GROUP_BOOKING_ENABLED) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center px-4 text-center">
+        <div>
+          <p className="text-3xl mb-3">🚧</p>
+          <p className="text-white font-semibold mb-1">Fonctionnalité indisponible</p>
+          <p className="text-slate-400 text-sm">La réservation de groupe n&apos;est pas active pour le moment.</p>
+        </div>
+      </div>
+    );
+  }
+
   const { memberId } = await params;
   const supabase = createServiceRoleClient();
 

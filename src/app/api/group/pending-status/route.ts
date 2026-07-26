@@ -5,8 +5,19 @@ import { NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { expireGroupByRef } from '@/lib/group/expireGroup';
 import { getStripeClient } from '@/lib/stripe/client';
+import { GROUP_BOOKING_ENABLED } from '@/lib/feature-flags';
 
 export async function GET() {
+  // Flag OFF (26/07, feature-flags.ts) — le front (GroupPendingBanner) ne
+  // l'appelle déjà plus, ceci ferme aussi l'accès direct. Contrat inchangé
+  // ({pending:false}) plutôt qu'un 404 : cette route est consommée
+  // silencieusement par un poll, pas un point d'entrée navigable — un 404
+  // n'apporterait rien de plus qu'un {pending:false} pour cet appelant-là,
+  // et évite un throw non géré côté client sur un ancien build en cache.
+  if (!GROUP_BOOKING_ENABLED) {
+    return NextResponse.json({ pending: false });
+  }
+
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user?.email) {

@@ -5,8 +5,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getStripeClientWithMode } from '@/lib/stripe/client';
 import { withErrorHandling } from '@/lib/api-error';
+import { GROUP_BOOKING_ENABLED } from '@/lib/feature-flags';
 
 export const POST = withErrorHandling('[PayForMember]', async (req: NextRequest) => {
+  // Flag OFF (26/07, feature-flags.ts) — bloqué à la source.
+  if (!GROUP_BOOKING_ENABLED) {
+    return NextResponse.json({ error: "La réservation de groupe n'est pas disponible pour le moment." }, { status: 404 });
+  }
+
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
   if (!authData.user?.email) {

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
 import type { Service, Staff } from '@/lib/database.types';
 import { isSlotClosed, isSlotPast } from '@/lib/booking-utils';
+import { GROUP_BOOKING_ENABLED } from '@/lib/feature-flags';
 
 type StaffAvailability = Record<string, { freeCount: number; freeStaffIds: string[] }>;
 
@@ -134,7 +135,16 @@ export default function StepDateTime({
   // `staff === null` obligatoire : un praticien précis déjà choisi à
   // l'étape service doit rester mono-personne, sinon la soumission finit
   // toujours en 409 (staffId unique envoyé à tout le groupe, cf. CONCEPTION_CAS2_STAFF_GROUPE.md étape 3).
-  const maxPersons = service.allow_group === true
+  // Flag OFF (26/07, feature-flags.ts) : V1 solo uniquement — quel que soit
+  // service.allow_group, on ne propose jamais plus d'une personne par
+  // soumission. Ni create-group ni le flux multi-staff (CAS 2) ne sont donc
+  // atteignables depuis l'UI (les deux exigent slots.length >= 2 côté
+  // serveur — voir create-group/route.ts). Ne change rien à la réservation
+  // solo d'un service collectif (participants=1 passe déjà par le chemin
+  // capacité de bookings/create/route.ts, indépendant de create-group).
+  const maxPersons = !GROUP_BOOKING_ENABLED
+    ? 1
+    : service.allow_group === true
     ? (service.max_persons ?? 23)
     : (staff === null && business.staff.length >= 2 ? business.staff.length : 1);
   const isCollective = service.allow_group === true;

@@ -10,10 +10,18 @@ import { calcFraisGestion, generateQrCode, normalizePhone, INVITE_EXPIRY_MS } fr
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import { constantTimeEqual } from '@/lib/constant-time';
+import { GROUP_BOOKING_ENABLED } from '@/lib/feature-flags';
 
 const MAX_GROUP_SIZE = 23;
 
 export async function POST(req: NextRequest) {
+  // Flag OFF (26/07, feature-flags.ts) — couvre les 3 actions de cette route
+  // multi-actions (addMemberAndGetCheckout/removeInvite/cancelExpiredBooking)
+  // en un seul point, avant même de lire le body.
+  if (!GROUP_BOOKING_ENABLED) {
+    return NextResponse.json({ error: "La réservation de groupe n'est pas disponible pour le moment." }, { status: 404 });
+  }
+
   const supabase = createServiceRoleClient();
   const body = await req.json();
   const { action, bookingId, memberId, memberData, token } = body;

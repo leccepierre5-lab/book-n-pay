@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { GROUP_BOOKING_ENABLED } from '@/lib/feature-flags';
 
 interface PendingGroup {
   pending: true;
@@ -73,16 +74,22 @@ export default function GroupPendingBanner() {
   }, []);
 
   useEffect(() => {
+    // Flag OFF (26/07, feature-flags.ts) : pas de poll de
+    // /api/group/pending-status pour rien — la route reste bloquée
+    // côté serveur de toute façon (défense en profondeur).
+    if (!GROUP_BOOKING_ENABLED) return;
     fetchStatus();
     const poll = setInterval(fetchStatus, 30_000);
     return () => clearInterval(poll);
   }, [fetchStatus]);
 
   useEffect(() => {
+    if (!GROUP_BOOKING_ENABLED) return;
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(tick);
   }, []);
 
+  if (!GROUP_BOOKING_ENABLED) return null;
   // Masquer sur la page de paiement (redondant avec le timer déjà présent)
   if (pathname.startsWith('/pay/')) return null;
   if (!group) return null;

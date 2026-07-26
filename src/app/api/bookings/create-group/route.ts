@@ -8,6 +8,7 @@ import { normalizeStaffChoice, orderExplicitFirst, getCandidateStaffIds } from '
 import { logAndRespond } from '@/lib/api-error';
 import { isNonRealBusiness } from '@/lib/queries/catalog';
 import { isDemoTesterEmail, getBookingBlockedRole, bookingBlockedMessage } from '@/lib/demo-mode';
+import { GROUP_BOOKING_ENABLED } from '@/lib/feature-flags';
 import type { Booking } from '@/lib/database.types';
 
 interface ParticipantMeta {
@@ -21,6 +22,12 @@ interface ParticipantMeta {
 }
 
 export async function POST(req: NextRequest) {
+  // Flag OFF (26/07, feature-flags.ts) — bloqué à la source, pas seulement
+  // en UI (StepDateTime force déjà maxPersons=1, défense en profondeur ici).
+  if (!GROUP_BOOKING_ENABLED) {
+    return NextResponse.json({ error: "La réservation de groupe n'est pas disponible pour le moment." }, { status: 404 });
+  }
+
   // Hissés hors du try : le catch a besoin d'y accéder pour le rollback
   // applicatif des insertions partielles (pas de transaction SQL possible
   // via PostgREST, chaque .insert() est un appel séparé).
