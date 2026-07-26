@@ -18,7 +18,7 @@ import {
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import CaisseEncaissement from './CaisseEncaissement';
-import { formatTime } from '@/lib/booking-utils';
+import { formatTime, parseParisDatetime } from '@/lib/booking-utils';
 import Modal from '@/components/ui/Modal';
 
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -88,6 +88,35 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCaisse, setSelectedCaisse] = useState<{ booking: BookingRow; member: BookingMemberRow } | null>(null);
+  // C15 — annulation d'un RDV à venir par le pro (pro/cancel-booking/route.ts).
+  const [cancelTarget, setCancelTarget] = useState<{ booking: BookingRow; member: BookingMemberRow } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const confirmCancelBooking = useCallback(() => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    setCancelError(null);
+    fetch('/api/pro/cancel-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId: cancelTarget.booking.id, memberId: cancelTarget.member.id }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "L'annulation a échoué.");
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === cancelTarget.booking.id
+              ? { ...b, booking_members: b.booking_members.map((m) => (m.id === cancelTarget.member.id ? { ...m, status: 'cancelled' } : m)) }
+              : b
+          )
+        );
+        setCancelTarget(null);
+      })
+      .catch((e: Error) => setCancelError(e.message))
+      .finally(() => setCancelling(false));
+  }, [cancelTarget]);
 
   const loadMonth = useCallback(
     (date: Date) => {
@@ -282,6 +311,7 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
             <div className="max-h-72 divide-y divide-white/10 overflow-y-auto">
               {selectedDayBookings.map((b) => {
                 const activeMembers = b.booking_members?.filter((m) => m.status !== 'cancelled') || [];
+                const isFutureRdv = parseParisDatetime(b.date, b.time).getTime() > Date.now();
                 return (
                   <div key={b.id} className="px-4 py-3">
                     <div className="mb-2 flex items-start gap-3">
@@ -309,13 +339,23 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
                                 </span>
                               )}
                               {m.status === 'paid' ? (
-                                <button
-                                  onClick={() => setSelectedCaisse({ booking: b, member: m })}
-                                  className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-navy-950"
-                                  style={{ background: 'linear-gradient(135deg, #34d399, #6ee7b7)' }}
-                                >
-                                  Clôturer
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => setSelectedCaisse({ booking: b, member: m })}
+                                    className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-navy-950"
+                                    style={{ background: 'linear-gradient(135deg, #34d399, #6ee7b7)' }}
+                                  >
+                                    Clôturer
+                                  </button>
+                                  {isFutureRdv && (
+                                    <button
+                                      onClick={() => setCancelTarget({ booking: b, member: m })}
+                                      className="rounded-full border border-rose-500/40 px-2.5 py-0.5 text-[10px] font-semibold text-rose-400 hover:bg-rose-500/10"
+                                    >
+                                      Annuler
+                                    </button>
+                                  )}
+                                </>
                               ) : (
                                 <span
                                   className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
@@ -361,6 +401,57 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
             <button onClick={() => setSelectedCaisse(null)} className="mt-2 w-full rounded-xl bg-navy-900 border border-white/[0.08] py-2.5 text-xs text-slate-400 hover:text-white transition-colors">
               Fermer
             </button>
+        </Modal>
+      )}
+
+      {cancelTarget && (
+        <Modal
+          onClose={() => {
+            if (cancelling) return;
+            setCancelTarget(null);
+            setCancelError(null);
+          }}
+          overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
+          panelClassName="w-full max-w-sm rounded-2xl border border-white/10 bg-navy-900 p-5"
+          ariaLabel="Annuler ce rendez-vous"
+          closeOnBackdrop={!cancelling}
+        >
+          <h3 className="text-sm font-semibold text-white">Annuler ce rendez-vous ?</h3>
+          <p className="mt-2 text-xs text-white/60">
+            Client : <span className="font-semibold text-white">{cancelTarget.member.name || 'Participant'}</span>
+          </p>
+          <p className="mt-1 text-xs text-white/60">
+            Montant remboursé au client :{' '}
+            <span className="font-semibold text-white">{(cancelTarget.member.deposit ?? 0)}€</span> (frais de
+            réservation intégraux — les frais de gestion Book&apos;nPay ne sont jamais remboursés).
+          </p>
+          <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] font-medium text-rose-300">
+            Action irréversible : le créneau sera libéré et le client sera notifié par email.
+          </p>
+          {cancelError && (
+            <p role="alert" className="mt-2 text-[11px] font-medium text-rose-400">
+              {cancelError}
+            </p>
+          )}
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => {
+                setCancelTarget(null);
+                setCancelError(null);
+              }}
+              disabled={cancelling}
+              className="flex-1 rounded-xl border border-white/[0.08] bg-navy-800 py-2.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors disabled:opacity-50"
+            >
+              Retour
+            </button>
+            <button
+              onClick={confirmCancelBooking}
+              disabled={cancelling}
+              className="flex-1 rounded-xl bg-rose-600 py-2.5 text-xs font-semibold text-white hover:bg-rose-500 transition-colors disabled:opacity-50"
+            >
+              {cancelling ? 'Annulation...' : 'Confirmer l\'annulation'}
+            </button>
+          </div>
         </Modal>
       )}
     </div>
