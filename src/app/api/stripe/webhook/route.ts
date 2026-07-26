@@ -356,7 +356,7 @@ Présentez ce code à l'accueil le jour J.
 • Vous annulez < 48h avant ou no-show → frais conservés par le professionnel.
 • Le professionnel annule → remboursement intégral de vos frais de réservation.
 
-⚠️ Note : les frais de gestion Book'nPay ne sont pas remboursés (CGV Art. 3).
+⚠️ Note : les frais de gestion Book'nPay ne sont pas remboursés (CGV Art. 2).
 
 À bientôt !
 L'équipe Book'nPay`,
@@ -481,7 +481,7 @@ Votre remboursement de ${refundedAmount}€ a bien été traité.
 
 Le montant sera crédité sur votre moyen de paiement d'origine sous 5 à 10 jours ouvrés selon votre banque.
 
-⚠️ Note : les frais de gestion Book'nPay ne sont pas remboursés conformément aux CGV Art. 3.
+⚠️ Note : les frais de gestion Book'nPay ne sont pas remboursés conformément aux CGV Art. 2.
 
 Si vous avez des questions, contactez-nous à contact@book-n-pay.com
 

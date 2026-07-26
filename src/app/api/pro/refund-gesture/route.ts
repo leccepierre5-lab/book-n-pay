@@ -108,7 +108,7 @@ Le professionnel vous a remboursé vos frais de réservation, à titre de geste 
 💶 Montant remboursé : ${amountFormatted}€
 ✅ Crédit sous 5 à 10 jours ouvrés selon votre banque.
 
-⚠️ Rappel : les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 3).
+⚠️ Rappel : les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).
 
 Si vous avez des questions : contact@book-n-pay.com
 

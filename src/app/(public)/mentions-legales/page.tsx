@@ -110,7 +110,7 @@ export default function MentionsLegalesPage() {
               des éléments composant la plateforme (textes, code source, design, base de données,
               algorithmes) sont protégés par le droit de la propriété intellectuelle. Toute
               reproduction ou exploitation non autorisée est interdite. Voir également l&apos;article
-              16 des{' '}
+              15 des{' '}
               <Link href="/cgu" className="text-emerald-500 underline">
                 CGU/CGV
               </Link>
@@ -121,7 +121,7 @@ export default function MentionsLegalesPage() {
           <section>
             <h2 className="mb-2 text-base font-semibold text-white">6. Données personnelles</h2>
             <p>
-              Le traitement des données personnelles est détaillé à l&apos;article 8 des{' '}
+              Le traitement des données personnelles est détaillé à l&apos;article 7 des{' '}
               <Link href="/cgu" className="text-emerald-500 underline">
                 CGU/CGV
               </Link>

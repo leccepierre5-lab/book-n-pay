@@ -10,7 +10,7 @@ import Link from 'next/link';
 export const metadata: Metadata = {
   title: "Conditions Générales d'Utilisation et de Vente",
   description:
-    "Conditions générales d'utilisation et de vente de Book'nPay : frais de réservation, annulation, réservations de groupe et données personnelles.",
+    "Conditions générales d'utilisation et de vente de Book'nPay : frais de réservation, annulation et données personnelles.",
   alternates: { canonical: '/cgu' },
 };
 
@@ -165,67 +165,21 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">5. Réservations de groupe</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">5. Conditions d'annulation par le client</h2>
             <div className="space-y-3">
               <p>
-                <strong className="text-white">5.1. Processus de réservation :</strong> Lorsqu'un
-                utilisateur crée une réservation de groupe, les places réservées sont maintenues
-                pendant une période de trente (30) minutes.
-              </p>
-              <p>
-                <strong className="text-white">5.2. Condition de finalisation :</strong>
-                L'intégralité du paiement des frais de réservation doit être effectuée par chaque
-                membre du groupe dans ce délai imparti de 30 minutes, tel qu'affiché par le compte à
-                rebours présent sur l'interface.
-              </p>
-              <p>
-                <strong className="text-white">5.3. Annulation automatique :</strong> Passé ce délai
-                de 30 minutes, si la transaction totale du groupe n'est pas finalisée, la réservation
-                est automatiquement annulée et les places sont remises à disposition des autres
-                utilisateurs de la plateforme. La responsabilité de la finalisation du paiement
-                incombe à chaque participant invité par le chef de groupe.
-              </p>
-              <p>
-                <strong className="text-white">5.4. Modification du groupe :</strong> Le créateur du
-                groupe (ou "chef de groupe") dispose de la faculté de modifier le nombre de
-                participants au sein de la réservation.
-              </p>
-              <p>
-                <strong className="text-white">5.5. Conditions de modification :</strong> Toute
-                modification du nombre de participants doit impérativement être effectuée avant
-                l'expiration du délai de 30 minutes imparti à la réservation initiale. Passé ce
-                délai, la réservation est considérée comme définitive et aucune modification du
-                nombre de participants ne pourra être prise en compte via la plateforme.
-              </p>
-              <p>
-                <strong className="text-white">5.6. Complétude du groupe et remboursement :</strong>{' '}
-                La réservation de groupe est considérée comme effective uniquement si l'intégralité
-                des places réservées fait l'objet d'un paiement dans le délai imparti de 30 minutes.
-                À défaut de paiement de l'ensemble des participants, la réservation globale sera
-                automatiquement annulée. En cas d'annulation automatique, Book'nPay procédera au
-                remboursement des frais de réservation aux membres ayant effectué leur paiement.
-                Toutefois, les frais de gestion restent définitivement acquis à Book'nPay et ne
-                feront l'objet d'aucun remboursement, quel que soit le motif de l'annulation.
-              </p>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="mb-2 text-base font-semibold text-white">6. Conditions d'annulation par le client</h2>
-            <div className="space-y-3">
-              <p>
-                <strong className="text-white">6.1. Annulation flexible :</strong> Tout Utilisateur
+                <strong className="text-white">5.1. Annulation flexible :</strong> Tout Utilisateur
                 peut annuler gratuitement sa réservation jusqu'à 48 heures avant l'heure prévue du
                 rendez-vous. Dans ce cas, les frais de réservation seront intégralement remboursés à
                 l'Utilisateur.
               </p>
               <p>
-                <strong className="text-white">6.2. Frais non remboursables :</strong> Conformément à
+                <strong className="text-white">5.2. Frais non remboursables :</strong> Conformément à
                 nos conditions, les frais de gestion ne sont en aucun cas remboursables, quelle que
                 soit la date d'annulation.
               </p>
               <p>
-                <strong className="text-white">6.3. Annulation tardive :</strong> Passé le délai de
+                <strong className="text-white">5.3. Annulation tardive :</strong> Passé le délai de
                 48 heures avant l'heure du rendez-vous, la réservation est considérée comme ferme et
                 définitive. Aucun remboursement des frais de réservation ne sera effectué par
                 Book'nPay, ces derniers étant acquis au professionnel en compensation du créneau
@@ -235,7 +189,7 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">7. Responsabilités</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">6. Responsabilités</h2>
             <p className="mb-3">
               Book'nPay agit exclusivement en qualité d'intermédiaire technique pour la gestion des
               transactions financières. Book'nPay n'est pas partie au contrat de prestation de
@@ -259,7 +213,7 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">8. Données personnelles</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">7. Données personnelles</h2>
             <p className="mb-3">
               Les données collectées (nom, téléphone, email) sont traitées exclusivement pour la
               gestion des réservations et ne sont jamais revendues à des tiers. Conformément au
@@ -293,28 +247,28 @@ export default function CGUPage() {
 
           <section>
             <h2 className="mb-2 text-base font-semibold text-white">
-              9. Programme de parrainage "Sérénité"
+              8. Programme de parrainage "Sérénité"
             </h2>
             <div className="space-y-3">
               <p>
-                <strong className="text-white">9.1. Principe :</strong> Tout Utilisateur peut
+                <strong className="text-white">8.1. Principe :</strong> Tout Utilisateur peut
                 parrainer un ami via son lien ou code de parrainage personnel disponible dans son
                 espace "Mes réservations".
               </p>
               <p>
-                <strong className="text-white">9.2. Avantage :</strong> Lorsque l'ami parrainé
+                <strong className="text-white">8.2. Avantage :</strong> Lorsque l'ami parrainé
                 effectue son premier rendez-vous honoré, le parrain et le filleul reçoivent chacun un
                 crédit de <strong className="text-white">+5 rendez-vous honorés</strong> sur leur
                 compteur de fidélité, ainsi qu'un Joker bonus valable jusqu'au 31 décembre de l'année
                 en cours.
               </p>
               <p>
-                <strong className="text-white">9.3. Conditions :</strong> Le bénéfice du parrainage
+                <strong className="text-white">8.3. Conditions :</strong> Le bénéfice du parrainage
                 n'est accordé qu'une seule fois par parrain/filleul. Toute tentative de fraude
                 (auto-parrainage, faux comptes) entraîne la suppression des avantages accordés.
               </p>
               <p>
-                <strong className="text-white">9.4. Réduction financière de parrainage :</strong> En
+                <strong className="text-white">8.4. Réduction financière de parrainage :</strong> En
                 complément du crédit de RDV honorés et du Joker bonus, lorsque le filleul effectue son
                 premier rendez-vous honoré, le parrain bénéficie d'une réduction de{' '}
                 <strong className="text-white">20%</strong> et le filleul d'une réduction de{' '}
@@ -328,7 +282,7 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">10. Avis et évaluations</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">9. Avis et évaluations</h2>
             <p className="mb-3">
               Après un rendez-vous honoré, Book'nPay peut inviter l'Utilisateur, via une
               notification affichée sur la plateforme, à laisser un avis sur l'établissement
@@ -339,7 +293,7 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">11. Favoris et notifications</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">10. Favoris et notifications</h2>
             <p>
               L'Utilisateur peut marquer des établissements partenaires comme "Favoris". Book'nPay
               peut envoyer des notifications ponctuelles à ces Utilisateurs en cas de nouveaux
@@ -348,7 +302,7 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">12. Litiges</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">11. Litiges</h2>
             <p>
               En cas de litige relatif à l'utilisation de la plateforme ou aux transactions gérées
               par Book'nPay, une solution amiable sera recherchée en priorité. À défaut, les
@@ -357,23 +311,23 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">13. Litiges entre Client et Professionnel</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">12. Litiges entre Client et Professionnel</h2>
             <div className="space-y-3">
               <p>
-                <strong className="text-white">13.1.</strong> Book'nPay agit exclusivement en qualité
+                <strong className="text-white">12.1.</strong> Book'nPay agit exclusivement en qualité
                 d'intermédiaire technique facilitant la mise en relation et le paiement entre Clients et
                 Professionnels. Book'nPay n'est ni partie ni garant du contrat de prestation de service
                 conclu directement entre le Client et le Professionnel.
               </p>
               <p>
-                <strong className="text-white">13.2.</strong> En cas de désaccord sur la qualité, le
+                <strong className="text-white">12.2.</strong> En cas de désaccord sur la qualité, le
                 déroulement ou les modalités d'une prestation, le Client et le Professionnel s'engagent
                 à rechercher une solution amiable directement entre eux. Book'nPay peut, à sa discrétion
                 et sans obligation, faciliter cette mise en relation mais ne tranche aucun litige relatif
                 à l'exécution de la prestation elle-même.
               </p>
               <p>
-                <strong className="text-white">13.3.</strong> En cas de no-show contesté (le Client
+                <strong className="text-white">12.3.</strong> En cas de no-show contesté (le Client
                 affirmant s'être présenté alors que le Professionnel indique le contraire, ou
                 inversement), Book'nPay peut examiner les éléments objectifs disponibles (horodatage de
                 connexion, QR code scanné le cas échéant, historique de fiabilité) mais ne peut garantir
@@ -382,7 +336,7 @@ export default function CGUPage() {
                 rendez-vous.
               </p>
               <p>
-                <strong className="text-white">13.4.</strong> Book'nPay se réserve le droit de suspendre
+                <strong className="text-white">12.4.</strong> Book'nPay se réserve le droit de suspendre
                 ou de geler le compte d'un Professionnel ou d'un Client en cas de litiges répétés, de
                 signalements multiples, ou de comportement manifestement abusif, sans que cela constitue
                 une reconnaissance de responsabilité de la part de Book'nPay.
@@ -391,23 +345,23 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">14. Disponibilité du Service et Limitation de Responsabilité</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">13. Disponibilité du Service et Limitation de Responsabilité</h2>
             <div className="space-y-3">
               <p>
-                <strong className="text-white">14.1.</strong> Book'nPay met en œuvre des moyens
+                <strong className="text-white">13.1.</strong> Book'nPay met en œuvre des moyens
                 raisonnables pour assurer la disponibilité et le bon fonctionnement de la plateforme,
                 sans garantir une disponibilité continue ou sans interruption. Des interruptions peuvent
                 survenir pour maintenance, mise à jour, ou pour des causes indépendantes de la volonté
                 de Book'nPay (panne d'un prestataire technique tiers, incident réseau, etc.).
               </p>
               <p>
-                <strong className="text-white">14.2.</strong> Book'nPay ne saurait être tenu responsable
+                <strong className="text-white">13.2.</strong> Book'nPay ne saurait être tenu responsable
                 des conséquences directes ou indirectes d'une indisponibilité temporaire du service,
                 notamment en cas de réservation manquée, de paiement non traité, ou de notification non
                 reçue, dans la limite de ce qui est permis par la loi applicable.
               </p>
               <p>
-                <strong className="text-white">14.3.</strong> En cas de dysfonctionnement avéré et
+                <strong className="text-white">13.3.</strong> En cas de dysfonctionnement avéré et
                 imputable à Book'nPay ayant causé un préjudice financier direct (par exemple, double
                 prélèvement), Book'nPay s'engage à procéder au remboursement du trop-perçu dans un délai
                 raisonnable, sur signalement de l'Utilisateur concerné.
@@ -416,23 +370,23 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">15. Utilisation Frauduleuse et Sécurité des Comptes</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">14. Utilisation Frauduleuse et Sécurité des Comptes</h2>
             <div className="space-y-3">
               <p>
-                <strong className="text-white">15.1.</strong> Toute tentative de fraude est strictement
+                <strong className="text-white">14.1.</strong> Toute tentative de fraude est strictement
                 interdite, incluant notamment : la création de comptes multiples par une même personne,
                 l'auto-parrainage, la falsification d'informations d'identité ou de contact, et toute
                 manipulation visant à obtenir indûment des avantages du programme de fidélité ou de
                 parrainage.
               </p>
               <p>
-                <strong className="text-white">15.2.</strong> Book'nPay se réserve le droit de vérifier,
+                <strong className="text-white">14.2.</strong> Book'nPay se réserve le droit de vérifier,
                 suspendre ou supprimer tout compte présentant des signes de fraude, sans préavis et sans
                 indemnité, et de retirer rétroactivement tout avantage (Jokers, réductions, statuts)
                 obtenu de manière frauduleuse.
               </p>
               <p>
-                <strong className="text-white">15.3.</strong> L'Utilisateur est responsable de la
+                <strong className="text-white">14.3.</strong> L'Utilisateur est responsable de la
                 confidentialité de ses identifiants de connexion. Toute action effectuée depuis un compte
                 est présumée avoir été effectuée par son titulaire, sauf preuve contraire d'un accès non
                 autorisé signalé sans délai à Book'nPay.
@@ -441,22 +395,22 @@ export default function CGUPage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-base font-semibold text-white">16. Propriété Intellectuelle</h2>
+            <h2 className="mb-2 text-base font-semibold text-white">15. Propriété Intellectuelle</h2>
             <div className="space-y-3">
               <p>
-                <strong className="text-white">16.1.</strong> La marque "Book'nPay", son logo, son
+                <strong className="text-white">15.1.</strong> La marque "Book'nPay", son logo, son
                 identité visuelle, ainsi que l'ensemble des éléments composant la plateforme (textes,
                 code source, design, base de données, algorithmes de fidélité et de tarification) sont la
                 propriété exclusive de Book'nPay ou de ses concédants, et sont protégés par le droit de
                 la propriété intellectuelle.
               </p>
               <p>
-                <strong className="text-white">16.2.</strong> Toute reproduction, représentation,
+                <strong className="text-white">15.2.</strong> Toute reproduction, représentation,
                 modification, ou exploitation, totale ou partielle, de ces éléments sans autorisation
                 écrite préalable de Book'nPay est strictement interdite et susceptible de poursuites.
               </p>
               <p>
-                <strong className="text-white">16.3.</strong> Les contenus publiés par les Professionnels
+                <strong className="text-white">15.3.</strong> Les contenus publiés par les Professionnels
                 (descriptions, photos, tarifs) restent leur propriété, mais ces derniers concèdent à
                 Book'nPay une licence d'utilisation non exclusive aux seules fins d'affichage et de
                 promotion sur la plateforme, pour la durée de leur inscription.

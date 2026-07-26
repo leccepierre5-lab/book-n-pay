@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
         await stripe.refunds.create({
           payment_intent: member.stripe_payment_intent_id,
           // Ne rembourse que les frais de réservation — les frais de gestion
-          // Book'nPay restent acquis (CGV Art. 3, déjà annoncé dans l'email
+          // Book'nPay restent acquis (CGV Art. 2, déjà annoncé dans l'email
           // ci-dessous ; sans `amount` explicite Stripe rembourse tout le
           // PaymentIntent par défaut, gestion incluse).
           amount: depositRefundAmountCents(member.deposit),
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
         ? refundDone
           ? `✅ Remboursement de vos frais de réservation (${member.deposit ?? 0}€) initié — crédit sous 5 à 10 jours ouvrés selon votre banque.`
           : `⚠️ Remboursement de vos frais de réservation (${member.deposit ?? 0}€) initié mais une vérification manuelle peut être nécessaire — contactez-nous si vous ne le recevez pas.`
-        : `❌ Annulation à moins de 48h du RDV — les frais de réservation sont conservés par le professionnel (CGV Art. 3).`;
+        : `❌ Annulation à moins de 48h du RDV — les frais de réservation sont conservés par le professionnel (CGV Art. 2).`;
 
       await sendEmail({
         to: clientEmail,
@@ -177,7 +177,7 @@ Votre réservation a bien été annulée.
 
 ${refundLine}
 
-⚠️ Rappel : les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 3).
+⚠️ Rappel : les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).
 
 Si vous avez des questions : contact@book-n-pay.com
 
