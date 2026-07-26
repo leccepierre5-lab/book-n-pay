@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
-import { getParisTomorrowStr, formatTime } from '@/lib/booking-utils';
+import { getParisTomorrowStr, formatTime, resolveMemberRecipientEmail } from '@/lib/booking-utils';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { processBatch } from '@/lib/cron-batch';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
 
     for (const member of paidMembers) {
       if (!member.name) continue;
-      const email = member.phone === booking.client_phone ? booking.client_email : null;
+      const email = resolveMemberRecipientEmail(member, booking);
       if (!email) {
         console.warn(`[Rappels] Pas d'email pour ${member.name} — rappel ignoré`);
         continue;

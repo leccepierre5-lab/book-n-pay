@@ -277,6 +277,33 @@ export function isSlotPast(date: string, time: string): boolean {
   return time.slice(0, 5) <= nowParis;
 }
 
+// Adresse à laquelle notifier UN membre précis d'un booking (rappel J-1/J-2,
+// clôture de prestation...) — jamais celle de l'organisateur par défaut.
+// `booking_members.email` est renseigné pour CHAQUE membre dès son propre
+// paiement (stripe/webhook/route.ts), organisateur ou invité de groupe —
+// c'est donc la source prioritaire. Le fallback sur `client_email` (via
+// correspondance de téléphone) ne sert que les lignes historiques créées
+// avant que ce champ existe, ou un cas où `member.email` n'a pas pu être
+// capturé (paiement hors Stripe Checkout).
+//
+// ⚠️ Bug réel trouvé en audit (26/07) : 3 sites (send-rdv-reminders,
+// send-rdv-reminders-j2, cloturer-prestation) ignoraient `member.email` et
+// ne testaient QUE la correspondance de téléphone — un invité de groupe
+// (téléphone différent de l'organisateur) ne recevait donc jamais son
+// rappel J-1/J-2 ni son email de clôture, alors que sa propre adresse était
+// déjà en base. Centralisé ici pour que la classe de bug ne puisse pas
+// réapparaître sur un futur point d'envoi.
+export function resolveMemberRecipientEmail(
+  member: { email: string | null; phone: string | null },
+  booking: { client_phone: string | null; client_email: string | null }
+): string | null {
+  if (member.email) return member.email;
+  if (member.phone && booking.client_phone && member.phone === booking.client_phone) {
+    return booking.client_email;
+  }
+  return null;
+}
+
 // ── Frais de gestion progressifs ─────────────────────────────────────────────
 // Barème : ≤ 50€ → 1,99€ | 50,01-80€ → 2,10€ | 80,01-100€ → 2,30€ | > 100€ → 2,50€
 // ⚠️ Garder synchronisé avec app_config (frais_gestion_palier_*) côté serveur —

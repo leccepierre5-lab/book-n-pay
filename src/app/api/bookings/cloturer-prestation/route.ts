@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, escapeHtml } from '@/lib/email/send';
-import { formatTime } from '@/lib/booking-utils';
+import { formatTime, resolveMemberRecipientEmail } from '@/lib/booking-utils';
 import { logAndRespond } from '@/lib/api-error';
 
 const MODE_LABEL: Record<string, string> = {
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       }).catch((e) => console.warn('[Clôture] Échec appel fidélité:', e));
     }
 
-    const clientEmail = member.phone === booking.client_phone ? booking.client_email : null;
+    const clientEmail = resolveMemberRecipientEmail(member, booking);
     let emailSent = false;
 
     if (clientEmail) {
