@@ -76,13 +76,20 @@ export async function getBusinessSettings(bizId: string) {
 
 export interface ProStats {
   totalBookings: number;
-  totalRevenue: number;
+  // Audit 26/07 : ce chiffre ne comptait QUE les frais de réservation perçus
+  // en ligne par Book'nPay (deposit) — jamais le solde de la prestation
+  // encaissé sur place par le pro (app/tpe/espèces, cloturer-prestation).
+  // Affiché seul sous "CA ce mois", ça sous-évaluait fortement le chiffre
+  // d'affaires réel du pro. Séparé en deux chiffres distincts ci-dessous —
+  // ne jamais les re-fusionner en un seul total sans le dire explicitement.
+  onlineRevenue: number;   // perçu en ligne via Book'nPay (frais de réservation)
+  onSiteRevenue: number;   // encaissé sur place par le pro (solde de la prestation)
   noShowRate: number;
   upcomingCount: number;
   // "Ce que Book'nPay vous apporte" (19/07) — volontairement factuels, pas de
   // chiffre spéculatif (ex. "temps gagné" écarté faute de vraie mesure).
   depositSecuredCount: number;   // nb de RDV avec acompte réellement encaissé, CUMUL depuis l'inscription
-  depositSecuredAmount: number;  // idem en €. Portée volontairement différente de totalRevenue (mois
+  depositSecuredAmount: number;  // idem en €. Portée volontairement différente de onlineRevenue (mois
                                   // courant) — un cumul depuis l'inscription, pas le même chiffre sous
                                   // un autre nom (relecture 19/07 : le doublon nuisait à la crédibilité
                                   // du bloc "valeur" au moment où elle compte le plus).
@@ -105,24 +112,38 @@ export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProS
 
   const { data: bookings } = await supabase
     .from('bookings')
-    .select('date, status, created_at, booking_members(status, deposit)')
+    .select('date, status, created_at, booking_members(status, deposit, payment_mode, referral_discount_pct), services(price)')
     .eq('biz_id', bizId)
     .gte('date', fromDate)
     .lte('date', toDate);
 
-  let totalRevenue = 0;
+  let onlineRevenue = 0;
+  let onSiteRevenue = 0;
   let totalMembers = 0;
   let noShows = 0;
   let offHoursBookingsCount = 0;
 
   for (const b of bookings || []) {
     if (b.status !== 'cancelled' && isCreatedOffHours(b.created_at, biz)) offHoursBookingsCount++;
+    const servicePrice = (b as any).services?.price ?? null;
     for (const m of b.booking_members || []) {
       if (m.status === 'paid' || m.status === 'arrived' || m.status === 'no_show') {
         totalMembers++;
-        if (m.deposit) totalRevenue += m.deposit;
+        if (m.deposit) onlineRevenue += m.deposit;
       }
       if (m.status === 'no_show') noShows++;
+      // Solde encaissé sur place — seulement quand la clôture a réellement eu
+      // lieu (payment_mode posé par cloturer-prestation/route.ts ; un
+      // 'arrived' via check-in QR sans clôture n'a pas encore de mode et ne
+      // compte donc pas ici, l'argent n'est pas confirmé encaissé). Même
+      // calcul que CaisseEncaissement.tsx (prix remisé - dépôt).
+      if (m.status === 'arrived' && m.payment_mode && servicePrice != null) {
+        const discountPct = m.referral_discount_pct || 0;
+        const prixTotal = discountPct > 0
+          ? Math.round(servicePrice * (1 - discountPct / 100) * 100) / 100
+          : servicePrice;
+        onSiteRevenue += Math.max(0, prixTotal - (m.deposit || 0));
+      }
     }
   }
 
@@ -137,7 +158,8 @@ export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProS
     .gte('date', today)
     .neq('status', 'cancelled');
 
-  const totalRevenueRounded = Math.round(totalRevenue * 100) / 100;
+  const onlineRevenueRounded = Math.round(onlineRevenue * 100) / 100;
+  const onSiteRevenueRounded = Math.round(onSiteRevenue * 100) / 100;
 
   // Cumul depuis l'inscription (pas de borne de date, volontaire) — requête
   // séparée et minimale (une seule colonne) pour ne pas répéter le coût d'un
@@ -156,7 +178,8 @@ export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProS
 
   return {
     totalBookings: bookings?.length || 0,
-    totalRevenue: totalRevenueRounded,
+    onlineRevenue: onlineRevenueRounded,
+    onSiteRevenue: onSiteRevenueRounded,
     noShowRate: totalMembers > 0 ? Math.round((noShows / totalMembers) * 100) : 0,
     upcomingCount: upcomingCount || 0,
     depositSecuredCount,

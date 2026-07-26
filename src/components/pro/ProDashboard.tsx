@@ -254,7 +254,13 @@ export default function ProDashboard({
         ) : (
           <div className="mb-6 grid grid-cols-2 gap-3">
             {[
-              { label: 'CA ce mois', value: `${stats.totalRevenue}€`, color: 'text-mint-400', icon: '💰' },
+              // Audit 26/07 : "CA ce mois" ne comptait que les frais de
+              // réservation perçus en ligne par Book'nPay — jamais le solde
+              // de la prestation encaissé sur place par le pro (app/tpe/
+              // espèces). Deux tuiles distinctes plutôt qu'un total unique
+              // qui aurait sous-évalué le vrai chiffre d'affaires du pro.
+              { label: 'Perçu en ligne', value: `${stats.onlineRevenue}€`, color: 'text-mint-400', icon: '💳' },
+              { label: 'Encaissé sur place', value: `${stats.onSiteRevenue}€`, color: 'text-mint-400', icon: '💰' },
               { label: 'Taux no-show', value: `${stats.noShowRate}%`, color: stats.noShowRate > 15 ? 'text-red-400' : 'text-white', icon: '📊' },
               { label: 'Réservations', value: stats.totalBookings, color: 'text-white', icon: '📅' },
               { label: 'À venir', value: stats.upcomingCount, color: 'text-blue-400', icon: '🗓️' },
