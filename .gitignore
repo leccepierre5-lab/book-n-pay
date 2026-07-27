@@ -35,6 +35,9 @@ verify-*.png
 # Claude Code local settings
 .claude/settings.local.json
 
+# Claude Code worktrees (sessions en arrière-plan) — jamais à committer
+.claude/worktrees/
+
 # OS
 .DS_Store
 Thumbs.db
