@@ -12,6 +12,8 @@
 // invité-paie-sa-part) et sur les prix autour de chaque seuil du barème.
 // Sans ce test, 180/180 ne prouvait rien sur cette logique — aucun test
 // existant n'exerçait le calcul du palier par le PRIX plutôt que le dépôt.
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { calcFraisGestion } from '@/lib/booking-utils';
 
@@ -246,5 +248,73 @@ describe('POST /api/stripe/checkout — service legacy avec dépôt < 1€ → m
     const data = await res.json();
     expect(data.error).toBe('Montant invalide');
     expect(mockSessionsCreate).not.toHaveBeenCalled();
+  });
+});
+
+// Question posée en revue (28/07) : `calcFraisGestion(servicePrice ?? amount)`
+// retombe sur `amount` (le dépôt) si `servicePrice` est null — exactement le
+// bug corrigé plus haut. Deux garanties DISTINCTES à distinguer :
+// 1. Que ce chemin est INATTEIGNABLE par un client réel — vit côté
+//    APPELANTS (StepPayment.tsx/PayGuestClient.tsx), pas dans cette route ;
+//    verrouillé par le test source-scan ci-dessous, pas celui-ci.
+// 2. Que SI ce chemin se déclenche (parcours démo testeur whitelisté
+//    uniquement, voir bookings/create/route.ts), le calcul reste
+//    déterministe plutôt que silencieusement incohérent. C'EST la seule
+//    garantie que ce test-ci verrouille.
+describe('POST /api/stripe/checkout — fallback servicePrice→amount SI déclenché (comportement, pas atteignabilité)', () => {
+  it('sans bookingMeta.bookingId (parcours démo) → fraisGestion calculé sur amount, pas sur un prix inconnu', async () => {
+    bookingFixture = null;
+    serviceFixture = null;
+
+    const { POST } = await import('@/app/api/stripe/checkout/route');
+    const res = await POST(buildRequest({
+      amount: 15, // ici, faute de service à relire, `amount` tient lieu de "prix" pour le barème
+      successUrl: 'http://localhost:3000/confirmation',
+      cancelUrl: 'http://localhost:3000/annule',
+      // Pas de bookingMeta du tout — reproduit le cas démo (bookingId: '' est
+      // également falsy et produit le même comportement).
+    }) as any);
+
+    expect(res.status).toBe(200);
+    const sessionParams = mockSessionsCreate.mock.calls[0][0];
+    const feeLine = sessionParams.line_items[1];
+
+    expect(feeLine.price_data.unit_amount / 100).toBe(calcFraisGestion(15));
+  });
+});
+
+// Garantie #1 (celle qui compte, cf. commentaire ci-dessus) : que le fallback
+// servicePrice→amount reste INATTEIGNABLE par un client réel. Cette garantie
+// vit dans le code des 4 sites d'appel à /api/stripe/checkout (pas dans la
+// route), donc un test de la route seule ne peut pas la prouver — audit
+// source à la place : bookingId n'est vide QUE sous le ternaire `isDemo`
+// explicite (SoloPayment + ModeAPayment, StepPayment.tsx:266/817), jamais de
+// façon inconditionnelle, et jamais sur ModeBPayment/PayGuestClient (aucun
+// des deux ne connaît de parcours démo — ModeB est d'ailleurs masqué
+// entièrement sur une fiche non réelle, hideModeB={isNonRealBusiness(...)}).
+// Échoue si un futur call site envoie bookingId vide hors de ce ternaire.
+describe('StepPayment.tsx / PayGuestClient.tsx — garde de non-régression : bookingId jamais vide hors du parcours démo testeur explicite', () => {
+  const stepPaymentSource = readFileSync(
+    fileURLToPath(new URL('../../src/components/booking/StepPayment.tsx', import.meta.url)),
+    'utf-8'
+  );
+  const payGuestSource = readFileSync(
+    fileURLToPath(new URL('../../src/components/group/PayGuestClient.tsx', import.meta.url)),
+    'utf-8'
+  );
+
+  it("StepPayment.tsx — aucune occurrence de bookingId vide EN DEHORS du ternaire isDemo connu (Solo + Mode A, 2 exactement)", () => {
+    expect(stepPaymentSource).not.toMatch(/bookingId:\s*''\s*,/);
+    const demoTernaryOccurrences = stepPaymentSource.match(/bookingId:\s*isDemo\s*\?\s*''\s*:/g) || [];
+    expect(demoTernaryOccurrences.length).toBe(2);
+  });
+
+  it('StepPayment.tsx (Mode B organisateur) — bookingId toujours un vrai id, jamais conditionné à isDemo', () => {
+    expect(stepPaymentSource).toMatch(/bookingId:\s*primaryBookingId,/);
+  });
+
+  it("PayGuestClient.tsx — bookingId toujours un vrai booking.id, aucun parcours démo sur ce flux (invité qui paie sa part)", () => {
+    expect(payGuestSource).toMatch(/bookingId:\s*booking\.id,/);
+    expect(payGuestSource).not.toMatch(/isDemo/);
   });
 });

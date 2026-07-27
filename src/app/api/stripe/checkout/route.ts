@@ -264,6 +264,17 @@ export async function POST(req: NextRequest) {
     // l'écart prix/dépôt de passer inaperçu. `servicePrice` peut être `null`
     // si la prestation n'a pas pu être relue en base (edge case) : on retombe
     // alors sur `amount` plutôt que de faire échouer le paiement.
+    // ⚠️ Vérifié (28/07, question posée en revue) : ce fallback réintroduit
+    // le bug corrigé ci-dessus, mais UNIQUEMENT sur le parcours démo testeur
+    // whitelisté (bookings/create/route.ts — fiche sans propriétaire réel +
+    // email dans DEMO_TESTER_EMAILS, bookingId renvoyé vide donc jamais de
+    // service à relire ici) — jamais atteignable par un client réel. Même
+    // atteint : en mode live, le garde Connect obligatoire plus bas (pas de
+    // stripe_account_id sur une fiche sans propriétaire) renvoie 423 avant
+    // toute création de session Stripe ; en mode test, c'est de l'argent
+    // Stripe TEST dans le bac à sable du testeur. Verrouillé par un test
+    // dédié (checkout-frais-gestion-price.test.ts) plutôt que laissé
+    // silencieux.
     const baseFraisGestion = calcFraisGestion(servicePrice ?? amount);
     // Override admin (AdminDashboard → app_config.frais_gestion_palier_*) :
     // ajuste la VALEUR d'un palier déjà identifié par calcFraisGestion, ne
