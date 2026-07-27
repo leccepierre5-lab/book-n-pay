@@ -173,3 +173,78 @@ describe("POST /api/stripe/checkout — impact sur application_fee_amount (commi
     expect(highTierFee).toBeGreaterThan(lowTierFee);
   });
 });
+
+// LOT 2 #1 (audit tarification 27/07) — pro/services bloque désormais la
+// création/édition d'un service avec un dépôt sous 1€, mais un service créé
+// AVANT ce correctif peut encore porter un dépôt à 0€ (ou moins d'1€) en
+// base. Ce test prouve le message clair dédié (pas la générique "Montant
+// invalide") pour ce cas résiduel.
+describe('POST /api/stripe/checkout — service legacy avec dépôt < 1€ → message clair, pas la générique "Montant invalide"', () => {
+  it('service.deposit = 0 → 422 avec message explicite, aucune session Stripe créée', async () => {
+    bookingFixture = { service_id: 'srv1', biz_id: null, is_demo: false, status: 'active', payment_deadline: null };
+    serviceFixture = { deposit: 0, price: 40 };
+
+    const { POST } = await import('@/app/api/stripe/checkout/route');
+    const res = await POST(buildRequest({
+      amount: 0,
+      successUrl: 'http://localhost:3000/confirmation',
+      cancelUrl: 'http://localhost:3000/annule',
+      bookingMeta: { bookingId: 'bk1' },
+    }) as any);
+
+    expect(res.status).toBe(422);
+    const data = await res.json();
+    expect(data.error).not.toBe('Montant invalide');
+    expect(data.error).toMatch(/pas disponible à la réservation en ligne/);
+    expect(mockSessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it('service.deposit = 0.5 (sous 1€, mais > 0) → 422 même message clair', async () => {
+    bookingFixture = { service_id: 'srv1', biz_id: null, is_demo: false, status: 'active', payment_deadline: null };
+    serviceFixture = { deposit: 0.5, price: 40 };
+
+    const { POST } = await import('@/app/api/stripe/checkout/route');
+    const res = await POST(buildRequest({
+      amount: 0.5,
+      successUrl: 'http://localhost:3000/confirmation',
+      cancelUrl: 'http://localhost:3000/annule',
+      bookingMeta: { bookingId: 'bk1' },
+    }) as any);
+
+    expect(res.status).toBe(422);
+    expect(mockSessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it('service.deposit = 1 (plancher exact) → passe normalement (pas bloqué par le nouveau check)', async () => {
+    bookingFixture = { service_id: 'srv1', biz_id: null, is_demo: false, status: 'active', payment_deadline: null };
+    serviceFixture = { deposit: 1, price: 40 };
+
+    const { POST } = await import('@/app/api/stripe/checkout/route');
+    const res = await POST(buildRequest({
+      amount: 1,
+      successUrl: 'http://localhost:3000/confirmation',
+      cancelUrl: 'http://localhost:3000/annule',
+      bookingMeta: { bookingId: 'bk1' },
+    }) as any);
+
+    expect(res.status).toBe(200);
+    expect(mockSessionsCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('amount=0 sans bookingId/service (filet générique) → toujours 400 "Montant invalide"', async () => {
+    bookingFixture = null;
+    serviceFixture = null;
+
+    const { POST } = await import('@/app/api/stripe/checkout/route');
+    const res = await POST(buildRequest({
+      amount: 0,
+      successUrl: 'http://localhost:3000/confirmation',
+      cancelUrl: 'http://localhost:3000/annule',
+    }) as any);
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe('Montant invalide');
+    expect(mockSessionsCreate).not.toHaveBeenCalled();
+  });
+});

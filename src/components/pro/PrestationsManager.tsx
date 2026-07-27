@@ -45,7 +45,7 @@ const EMPTY_FORM: FormState = {
   allow_group: true,
   duration_minutes: '30',
   price: '',
-  deposit: '0',
+  deposit: '',
   max_persons: '',
 };
 
@@ -105,7 +105,7 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
       allow_group: form.allow_group,
       duration_minutes: Number(form.duration_minutes),
       price: Number(form.price),
-      deposit: Number(form.deposit || 0),
+      deposit: Number(form.deposit),
       max_persons: form.max_persons ? Number(form.max_persons) : null,
     };
 
@@ -312,16 +312,18 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] text-slate-500 uppercase tracking-widest mb-1.5">Frais de réservation (€)</label>
+                <label className="block text-[10px] text-slate-500 uppercase tracking-widest mb-1.5">Frais de réservation (€) *</label>
                 <input
                   type="number"
-                  min="0"
+                  min="1"
                   step="0.5"
-                  placeholder="0"
+                  placeholder="1"
                   value={form.deposit}
                   onChange={(e) => setForm((f) => ({ ...f, deposit: e.target.value }))}
+                  required
                   className={inputClass}
                 />
+                <p className="mt-1 text-[10px] text-slate-600">Minimum 1€ — en dessous, la réservation ne peut pas être sécurisée en ligne.</p>
               </div>
               <div>
                 <label className="block text-[10px] text-slate-500 uppercase tracking-widest mb-1.5">Max personnes</label>

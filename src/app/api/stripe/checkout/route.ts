@@ -70,10 +70,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'URL de redirection non autorisée' }, { status: 400 });
     }
 
-    if (!amount || amount < 1) {
-      return NextResponse.json({ error: 'Montant invalide' }, { status: 400 });
-    }
-
     const resolvedQty = Math.max(1, parseInt(String(quantity), 10) || 1);
     if (resolvedQty > 23 || parseInt(groupSize, 10) > 23) {
       return NextResponse.json(
@@ -164,6 +160,24 @@ export async function POST(req: NextRequest) {
         if (service) {
           serviceDeposit = service.deposit;
           servicePrice = service.price;
+
+          // ⚠️ CORRECTIF (LOT 2 #1, audit tarification 27/07) : pro/services
+          // bloque désormais la création/édition d'un service avec un dépôt
+          // sous 1€ (plancher Stripe de facto, voir le check générique
+          // `amount < 1` plus bas) — mais un service créé AVANT ce correctif
+          // peut encore porter un dépôt à 0€ en base. Sans ce check, le
+          // client allait jusqu'au bout du tunnel (fiche→prestation→créneau)
+          // avant de tomber sur l'erreur générique "Montant invalide", sans
+          // comprendre que c'est le SERVICE qui est mal configuré, pas sa
+          // saisie. Message dédié, plus clair, avant le check générique.
+          if (service.deposit < 1) {
+            console.error(`[Checkout] Service avec dépôt < 1€ (mal configuré) — service=${booking.service_id} deposit=${service.deposit}`);
+            return NextResponse.json(
+              { error: "Ce service n'est pas disponible à la réservation en ligne pour le moment. Merci de contacter directement l'établissement." },
+              { status: 422 }
+            );
+          }
+
           // Calcul du dépôt effectif après réduction (fait côté serveur)
           const expectedDeposit = referralDiscountPct > 0
             ? Math.round(service.deposit * (1 - referralDiscountPct / 100) * 100) / 100
@@ -193,6 +207,15 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Membre introuvable pour cette réservation' }, { status: 404 });
         }
       }
+    }
+
+    // Filet générique final — couvre les cas sans service identifiable
+    // (bookingId absent, service_id absent) où le check dédié ci-dessus n'a
+    // pas pu s'appliquer. Volontairement placé APRÈS le check dédié : un
+    // service mal configuré doit renvoyer le message clair ci-dessus, pas
+    // celui-ci.
+    if (!amount || amount < 1) {
+      return NextResponse.json({ error: 'Montant invalide' }, { status: 400 });
     }
 
     // ── Calcul du dépôt effectif ──────────────────────────────────────────────

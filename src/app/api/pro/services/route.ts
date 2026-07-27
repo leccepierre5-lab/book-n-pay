@@ -41,6 +41,19 @@ export const POST = withErrorHandling('[Services]', async (req: NextRequest) => 
     return NextResponse.json({ error: 'name, duration_minutes et price requis' }, { status: 400 });
   }
 
+  // ⚠️ CORRECTIF (LOT 2 #1, audit tarification 27/07) : un dépôt à 0€ (ou
+  // sous 1€) rendait le service structurellement inréservable en ligne —
+  // stripe/checkout/route.ts refuse tout paiement Stripe sous 1€, le client
+  // tombait sur une erreur en toute fin de tunnel, après avoir déjà choisi
+  // son créneau. `deposit` défaultait silencieusement à 0 (`?? 0`) si omis —
+  // bloqué à la source, plus de service créable dans cet état.
+  if (deposit == null || Number(deposit) < 1) {
+    return NextResponse.json(
+      { error: "Le dépôt (frais de réservation) doit être d'au moins 1€ — en dessous, la réservation ne peut pas être sécurisée en ligne." },
+      { status: 400 }
+    );
+  }
+
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from('services')
@@ -51,7 +64,7 @@ export const POST = withErrorHandling('[Services]', async (req: NextRequest) => 
       allow_group: allow_group !== false,
       duration_minutes: Number(duration_minutes),
       price: Number(price),
-      deposit: Number(deposit ?? 0),
+      deposit: Number(deposit),
       max_persons: max_persons ? Number(max_persons) : null,
     })
     .select()
@@ -86,7 +99,16 @@ export const PATCH = withErrorHandling('[Services]', async (req: NextRequest) =>
   if (allow_group !== undefined) updates.allow_group = allow_group !== false;
   if (duration_minutes !== undefined) updates.duration_minutes = Number(duration_minutes);
   if (price !== undefined) updates.price = Number(price);
-  if (deposit !== undefined) updates.deposit = Number(deposit);
+  if (deposit !== undefined) {
+    // Même correctif que POST — voir commentaire ci-dessus.
+    if (Number(deposit) < 1) {
+      return NextResponse.json(
+        { error: "Le dépôt (frais de réservation) doit être d'au moins 1€ — en dessous, la réservation ne peut pas être sécurisée en ligne." },
+        { status: 400 }
+      );
+    }
+    updates.deposit = Number(deposit);
+  }
   if (max_persons !== undefined) updates.max_persons = max_persons ? Number(max_persons) : null;
 
   const { data, error } = await supabase
