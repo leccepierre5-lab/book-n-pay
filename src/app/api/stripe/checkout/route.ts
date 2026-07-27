@@ -100,6 +100,11 @@ export async function POST(req: NextRequest) {
 
     // ── Validation du montant contre le prix réel en base (anti-tampering) ──
     let serviceDeposit: number | null = null;
+    // Prix de la prestation — nécessaire plus bas pour le barème des frais de
+    // gestion (CGU Art. 2 / page /tarifs : le palier dépend du PRIX, pas du
+    // dépôt). Hors du if(service) pour rester lisible au niveau du calcul du
+    // palier, sans dupliquer la requête.
+    let servicePrice: number | null = null;
     if (bookingMeta?.bookingId) {
       const { data: booking } = await supabase
         .from('bookings')
@@ -158,6 +163,7 @@ export async function POST(req: NextRequest) {
 
         if (service) {
           serviceDeposit = service.deposit;
+          servicePrice = service.price;
           // Calcul du dépôt effectif après réduction (fait côté serveur)
           const expectedDeposit = referralDiscountPct > 0
             ? Math.round(service.deposit * (1 - referralDiscountPct / 100) * 100) / 100
@@ -219,15 +225,38 @@ export async function POST(req: NextRequest) {
       if (!isNaN(n)) cfg[row.key] = n;
     });
 
-    let fraisGestion: number;
-    if (amount > 100) fraisGestion = cfg.frais_gestion_palier_4 ?? 2.5;
-    else if (amount > 80) fraisGestion = cfg.frais_gestion_palier_3 ?? 2.3;
-    else if (amount > 50) fraisGestion = cfg.frais_gestion_palier_2 ?? 2.1;
-    else fraisGestion = cfg.frais_gestion_palier_1 ?? calcFraisGestion(amount);
+    // ⚠️ CORRECTIF (audit tarification 27/07) : ce bloc appliquait le barème
+    // sur `amount` — qui est le DÉPÔT (voir la validation anti-tampering plus
+    // haut, `amount` == `service.deposit`), pas le PRIX. Or le barème CGU
+    // Art. 2 et la page /tarifs sont explicites : "le montant des frais
+    // varie selon le PRIX de la prestation réservée". Le dépôt étant
+    // généralement bien inférieur au prix, le palier facturé tombait
+    // systématiquement en-dessous de celui affiché au client par
+    // StepPayment.tsx (qui, lui, appelle déjà correctement
+    // `calcFraisGestion(service.price)`) — écart entre prix annoncé avant
+    // paiement et prix réellement débité, sur chaque réservation.
+    // Seuils lus UNE SEULE fois, via `calcFraisGestion` (booking-utils.ts,
+    // même helper que le front) — volontairement pas réimplémentés ici en
+    // `amount > 100 / > 80 / > 50` : c'est cette duplication qui a permis à
+    // l'écart prix/dépôt de passer inaperçu. `servicePrice` peut être `null`
+    // si la prestation n'a pas pu être relue en base (edge case) : on retombe
+    // alors sur `amount` plutôt que de faire échouer le paiement.
+    const baseFraisGestion = calcFraisGestion(servicePrice ?? amount);
+    // Override admin (AdminDashboard → app_config.frais_gestion_palier_*) :
+    // ajuste la VALEUR d'un palier déjà identifié par calcFraisGestion, ne
+    // redéfinit jamais ses seuils.
+    const configKeyByDefaultFee: Record<number, string> = {
+      2.5: 'frais_gestion_palier_4',
+      2.3: 'frais_gestion_palier_3',
+      2.1: 'frais_gestion_palier_2',
+      1.99: 'frais_gestion_palier_1',
+    };
+    const overrideKey = configKeyByDefaultFee[baseFraisGestion];
+    let fraisGestion: number = (overrideKey && cfg[overrideKey] != null) ? cfg[overrideKey] : baseFraisGestion;
 
     if (fraisGestionInput !== undefined && Math.abs(Number(fraisGestionInput) - fraisGestion) > 0.02) {
       console.warn(
-        `[Checkout] fraisGestion falsifié ignoré — reçu ${fraisGestionInput}€, palier réel appliqué ${fraisGestion}€ (amount=${amount})`
+        `[Checkout] fraisGestion falsifié ignoré — reçu ${fraisGestionInput}€, palier réel appliqué ${fraisGestion}€ (price=${servicePrice ?? 'inconnu'}, amount=${amount})`
       );
     }
 
