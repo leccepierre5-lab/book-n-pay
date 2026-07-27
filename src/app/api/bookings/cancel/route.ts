@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, phonesMatch, formatTime } from '@/lib/booking-utils';
-import { depositRefundAmountCents } from '@/lib/refunds';
+import { depositRefundAmountCents, retrieveManagementFeeAmount } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
@@ -83,10 +83,14 @@ export async function POST(req: NextRequest) {
     const hoursUntilRdv = (rdvDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
     const eligibleForRefund = hoursUntilRdv >= CANCEL_DEADLINE_HOURS;
 
+    // Créé ici (pas seulement dans le if refund) pour être réutilisable par
+    // la récupération best-effort des frais de gestion sur l'email plus bas,
+    // même si le client n'est pas éligible au remboursement.
+    const stripe = await getStripeClient(serviceSupabase);
+
     let refundDone = false;
     if (eligibleForRefund && member.stripe_payment_intent_id) {
       try {
-        const stripe = await getStripeClient(serviceSupabase);
         await stripe.refunds.create({
           payment_intent: member.stripe_payment_intent_id,
           // Ne rembourse que les frais de réservation — les frais de gestion
@@ -163,6 +167,19 @@ export async function POST(req: NextRequest) {
           : `⚠️ Remboursement de vos frais de réservation (${member.deposit ?? 0}€) initié mais une vérification manuelle peut être nécessaire — contactez-nous si vous ne le recevez pas.`
         : `❌ Annulation à moins de 48h du RDV — les frais de réservation sont conservés par le professionnel (CGV Art. 2).`;
 
+      // ⚠️ CORRECTIF (audit email 27/07, même classe que C15 `e7cfe60`) : le
+      // rappel générique ne donnait aucun montant — un client qui a payé en
+      // une seule fois (ex. 11,99€) ne devinait pas de lui-même la part
+      // conservée. Best-effort, n'a jamais bloqué l'envoi de l'email.
+      const managementFeeAmount = await retrieveManagementFeeAmount(
+        stripe,
+        member.stripe_checkout_session_id,
+        'CancelClient'
+      );
+      const managementFeeLine = managementFeeAmount != null
+        ? `❌ Conservé : ${managementFeeAmount.toFixed(2)}€ (frais de gestion Book'nPay, CGV Art. 2 — jamais remboursés)`
+        : `⚠️ Les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).`;
+
       await sendEmail({
         to: clientEmail,
         subject: `❌ Réservation annulée — ${booking.biz_name}`,
@@ -176,8 +193,7 @@ Votre réservation a bien été annulée.
 🕐 Heure : ${formatTime(booking.time)}
 
 ${refundLine}
-
-⚠️ Rappel : les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).
+${managementFeeLine}
 
 Si vous avez des questions : contact@book-n-pay.com
 

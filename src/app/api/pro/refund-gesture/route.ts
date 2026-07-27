@@ -6,7 +6,7 @@
 // initiées par le client avant le RDV).
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { depositRefundAmountCents } from '@/lib/refunds';
+import { depositRefundAmountCents, retrieveManagementFeeAmount } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
@@ -94,6 +94,19 @@ export async function POST(req: NextRequest) {
       });
       const amountFormatted = (member.deposit ?? 0).toFixed(2);
 
+      // ⚠️ CORRECTIF (audit email 27/07, même classe que C15 `e7cfe60`) : le
+      // rappel générique ne donnait aucun montant — un client qui a payé en
+      // une seule fois (ex. 11,99€) ne devinait pas de lui-même la part
+      // conservée. Best-effort, n'a jamais bloqué l'envoi de l'email.
+      const managementFeeAmount = await retrieveManagementFeeAmount(
+        stripe,
+        member.stripe_checkout_session_id,
+        'RefundGesture'
+      );
+      const managementFeeLine = managementFeeAmount != null
+        ? `❌ Conservé : ${managementFeeAmount.toFixed(2)}€ (frais de gestion Book'nPay, CGV Art. 2 — jamais remboursés)`
+        : `⚠️ Les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).`;
+
       await sendEmail({
         to: clientEmail,
         subject: `✅ Remboursement — ${booking.biz_name}`,
@@ -105,10 +118,9 @@ Le professionnel vous a remboursé vos frais de réservation, à titre de geste 
 💆 Prestation : ${booking.service_name}
 📅 Date du rendez-vous concerné : ${dateFormatted}
 🕐 Heure : ${formatTime(booking.time)}
-💶 Montant remboursé : ${amountFormatted}€
-✅ Crédit sous 5 à 10 jours ouvrés selon votre banque.
-
-⚠️ Rappel : les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).
+✅ Remboursé : ${amountFormatted}€ (frais de réservation, intégral)
+${managementFeeLine}
+Crédit sous 5 à 10 jours ouvrés selon votre banque.
 
 Si vous avez des questions : contact@book-n-pay.com
 

@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
-import { depositRefundAmountCents } from '@/lib/refunds';
+import { depositRefundAmountCents, retrieveManagementFeeAmount } from '@/lib/refunds';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
 import { formatTime, getParisDateOffsetStr } from '@/lib/booking-utils';
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       const { data: futureBookings } = await serviceSupabase
         .from('bookings')
         .select(
-          'id, client_email, service_name, date, time, booking_members(id, phone, name, status, email, deposit, stripe_payment_intent_id)'
+          'id, client_email, service_name, date, time, booking_members(id, phone, name, status, email, deposit, stripe_payment_intent_id, stripe_checkout_session_id)'
         )
         .eq('biz_id', bizId)
         .neq('status', 'cancelled')
@@ -109,10 +109,24 @@ export async function POST(req: NextRequest) {
 
               const emailTo = member.email || booking.client_email;
               if (emailTo) {
+                // Best-effort — un échec ici ne doit jamais bloquer le gel
+                // (déjà effectif au-dessus) ni le remboursement (déjà fait).
+                const managementFeeAmount = await retrieveManagementFeeAmount(
+                  stripe,
+                  member.stripe_checkout_session_id,
+                  'FreezeBusiness'
+                );
+                // Deux lignes chiffrées distinctes plutôt qu'un rappel vague
+                // (jusqu'ici absent : l'ancien texte ne mentionnait même pas
+                // que des frais restaient acquis) — même correctif que C15
+                // (pro/cancel-booking, `e7cfe60`).
+                const managementFeeLine = managementFeeAmount != null
+                  ? `❌ Conservé : ${managementFeeAmount.toFixed(2)}€ (frais de gestion Book'nPay, CGV Art. 2 — jamais remboursés)`
+                  : `⚠️ Les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).`;
                 await sendEmail({
                   to: emailTo,
                   subject: `💸 Remboursement — Réservation annulée chez ${business.name}`,
-                  text: `Bonjour ${member.name || 'vous'},\n\nL'établissement ${business.name} est temporairement indisponible, votre réservation a donc été annulée.\n\n💆 ${booking.service_name}\n📅 ${dateFormatted} à ${formatTime(booking.time)}\n\nVos frais de réservation (${member.deposit ?? 0}€) vous seront remboursés sous 5 à 10 jours ouvrés.\n\nNous sommes désolés pour la gêne occasionnée.\nL'équipe Book'nPay`,
+                  text: `Bonjour ${member.name || 'vous'},\n\nL'établissement ${business.name} est temporairement indisponible, votre réservation a donc été annulée.\n\n💆 ${booking.service_name}\n📅 ${dateFormatted} à ${formatTime(booking.time)}\n\n✅ Remboursé : ${member.deposit ?? 0}€ (frais de réservation) sous 5 à 10 jours ouvrés.\n${managementFeeLine}\n\nNous sommes désolés pour la gêne occasionnée.\nL'équipe Book'nPay`,
                 }).catch(() => {});
               }
             } catch (err: any) {
