@@ -3,8 +3,6 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { BNP_PLANS } from '@/lib/plans-config';
 
-const COMMISSION_CLASSIQUE = 0.15; // commission moyenne d'une plateforme de réservation classique
-
 function formatEuro(n: number) {
   return n.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
 }
@@ -53,34 +51,35 @@ function Slider({
   );
 }
 
+// Toutes les entrées sont saisies par le pro — aucune hypothèse de la
+// plateforme (taux de no-show par défaut, facteur d'amélioration, %
+// de commission figé) n'est codée en dur. Chaque chiffre affiché en sortie
+// est une combinaison directe de ces entrées, jamais une estimation
+// contrefactuelle inventée par Book'nPay.
 export default function SimulatorPage() {
   const [panierMoyen, setPanierMoyen] = useState(60);
   const [nbReservations, setNbReservations] = useState(80);
-  const [noShowRate, setNoShowRate] = useState(10);
-  const [noShowReduction, setNoShowReduction] = useState(30);
+  const [noShowsEvites, setNoShowsEvites] = useState(0);
+  const [commissionPct, setCommissionPct] = useState(15);
   const [planKey, setPlanKey] = useState<'starter' | 'business' | 'scale'>('starter');
 
   const plan = BNP_PLANS.find((p) => p.key === planKey)!;
 
   const {
+    coutCommissionClassique,
     economieMensuelle,
-    economieAnnuelle,
-    revenusRecuperesMensuel,
-    gainTotalAnnuel,
-    noShowRateBnp,
+    valeurNoShowsEvites,
+    totalMensuel,
+    totalAnnuel,
   } = useMemo(() => {
-    const commissionClassiqueMensuelle = nbReservations * panierMoyen * COMMISSION_CLASSIQUE;
-    const economieMensuelle = commissionClassiqueMensuelle - plan.priceHT;
-    const economieAnnuelle = economieMensuelle * 12;
+    const coutCommissionClassique = nbReservations * panierMoyen * (commissionPct / 100);
+    const economieMensuelle = coutCommissionClassique - plan.priceHT;
+    const valeurNoShowsEvites = noShowsEvites * panierMoyen;
+    const totalMensuel = economieMensuelle + valeurNoShowsEvites;
+    const totalAnnuel = totalMensuel * 12;
 
-    const noShowRateBnp = noShowRate * (1 - noShowReduction / 100);
-    const noShowsEvitesMensuel = nbReservations * ((noShowRate - noShowRateBnp) / 100);
-    const revenusRecuperesMensuel = noShowsEvitesMensuel * panierMoyen;
-
-    const gainTotalAnnuel = economieAnnuelle + revenusRecuperesMensuel * 12;
-
-    return { economieMensuelle, economieAnnuelle, revenusRecuperesMensuel, gainTotalAnnuel, noShowRateBnp };
-  }, [panierMoyen, nbReservations, noShowRate, noShowReduction, plan]);
+    return { coutCommissionClassique, economieMensuelle, valeurNoShowsEvites, totalMensuel, totalAnnuel };
+  }, [panierMoyen, nbReservations, noShowsEvites, commissionPct, plan]);
 
   return (
     <div className="min-h-dvh px-4 py-10">
@@ -94,8 +93,8 @@ export default function SimulatorPage() {
 
         <header className="mb-10 text-center">
           <p className="text-xs font-bold tracking-[0.2em] text-mint-500/70 uppercase mb-3">SIMULATEUR</p>
-          <h1 className="text-3xl font-bold text-white mb-3">Simulez votre ROI</h1>
-          <p className="text-slate-500 text-sm">Bougez les curseurs pour estimer vos gains avec Book&apos;nPay.</p>
+          <h1 className="text-3xl font-bold text-white mb-3">Simulez votre cas</h1>
+          <p className="text-slate-500 text-sm">Entrez vos propres chiffres — aucune estimation n&apos;est faite à votre place.</p>
         </header>
 
         {/* Inputs */}
@@ -118,27 +117,32 @@ export default function SimulatorPage() {
             unit=""
             onChange={setNbReservations}
           />
-          <Slider
-            label="Taux de no-show estimé"
-            value={noShowRate}
-            min={0}
-            max={40}
-            step={1}
-            unit="%"
-            onChange={setNoShowRate}
-          />
           <div>
             <Slider
-              label="Réduction des no-shows avec Book'nPay (hypothèse à ajuster)"
-              value={noShowReduction}
+              label="No-shows que vous estimez éviter grâce à Book'nPay / mois"
+              value={noShowsEvites}
               min={0}
-              max={60}
-              step={5}
-              unit="%"
-              onChange={setNoShowReduction}
+              max={30}
+              step={1}
+              unit=""
+              onChange={setNoShowsEvites}
             />
             <p className="mt-1.5 text-[11px] text-slate-600">
-              Estimation basée sur l&apos;effet dissuasif d&apos;un paiement anticipé — ajustez selon votre propre expérience, ce n&apos;est pas une donnée mesurée.
+              Votre propre estimation, d&apos;après votre expérience — Book&apos;nPay n&apos;invente aucun taux à votre place.
+            </p>
+          </div>
+          <div>
+            <Slider
+              label="Commission d'une plateforme classique, pour comparaison"
+              value={commissionPct}
+              min={5}
+              max={30}
+              step={1}
+              unit="%"
+              onChange={setCommissionPct}
+            />
+            <p className="mt-1.5 text-[11px] text-slate-600">
+              Ajustez selon la plateforme à laquelle vous comparez Book&apos;nPay (les commissions observées vont généralement de 10 à 25 %).
             </p>
           </div>
 
@@ -166,43 +170,39 @@ export default function SimulatorPage() {
         {/* Résultats */}
         <div className="grid gap-4 sm:grid-cols-2 mb-6">
           <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-5">
-            <p className="text-xs text-slate-500 mb-1">💰 Économie mensuelle</p>
-            <p className={`text-2xl font-black ${economieMensuelle >= 0 ? 'text-mint-400' : 'text-red-400'}`}>
-              {formatEuro(economieMensuelle)}
-            </p>
-            <p className="text-[11px] text-slate-600 mt-1">vs commission classique à {(COMMISSION_CLASSIQUE * 100).toFixed(0)}%</p>
+            <p className="text-xs text-slate-500 mb-1">Coût mensuel à {commissionPct}% de commission</p>
+            <p className="text-2xl font-black text-white">{formatEuro(coutCommissionClassique)}</p>
+            <p className="text-[11px] text-slate-600 mt-1">{nbReservations} résa × {panierMoyen}€ × {commissionPct}%</p>
           </div>
 
           <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-5">
-            <p className="text-xs text-slate-500 mb-1">🛡️ Revenus récupérés / mois (estimation)</p>
-            <p className="text-2xl font-black text-mint-400">{formatEuro(revenusRecuperesMensuel)}</p>
-            <p className="text-[11px] text-slate-600 mt-1">
-              no-show {noShowRate}% → {noShowRateBnp.toFixed(1)}% avec Book&apos;nPay
+            <p className="text-xs text-slate-500 mb-1">Économie sur l&apos;abonnement / mois</p>
+            <p className={`text-2xl font-black ${economieMensuelle >= 0 ? 'text-mint-400' : 'text-red-400'}`}>
+              {formatEuro(economieMensuelle)}
             </p>
+            <p className="text-[11px] text-slate-600 mt-1">{formatEuro(coutCommissionClassique)} − {plan.priceHT}€ (plan {plan.label})</p>
           </div>
         </div>
 
+        {noShowsEvites > 0 && (
+          <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-5 mb-6">
+            <p className="text-xs text-slate-500 mb-1">Valeur de vos no-shows évités / mois (votre estimation)</p>
+            <p className="text-2xl font-black text-mint-400">{formatEuro(valeurNoShowsEvites)}</p>
+            <p className="text-[11px] text-slate-600 mt-1">{noShowsEvites} no-show{noShowsEvites > 1 ? 's' : ''} × {panierMoyen}€</p>
+          </div>
+        )}
+
         {/* Le grand chiffre */}
         <div
-          className="rounded-2xl border border-mint-500/30 p-8 text-center mb-6"
+          className="rounded-2xl border border-mint-500/30 p-8 text-center mb-10"
           style={{
             background: 'radial-gradient(ellipse at 50% 0%, rgba(52,211,153,0.15) 0%, transparent 70%), #1e293b',
           }}
         >
-          <p className="text-xs font-bold tracking-widest text-mint-400/80 uppercase mb-2">📅 Économie annuelle</p>
-          <p className="text-5xl font-black text-white mb-1">{formatEuro(economieAnnuelle)}</p>
-          <p className="text-xs text-slate-500">rien qu&apos;en évitant la commission classique</p>
-        </div>
-
-        <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-6 mb-8 text-center">
-          <p className="text-xs text-slate-500 mb-1">📈 Gain total annuel (commission + no-shows évités)</p>
-          <p className="text-4xl font-black text-mint-400">{formatEuro(gainTotalAnnuel)}</p>
-        </div>
-
-        {/* Message clé */}
-        <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/25 px-5 py-4 mb-10 text-center">
-          <p className="text-sm font-semibold text-emerald-300">
-            🛡️ Book&apos;nPay protège votre chiffre d&apos;affaires en décourageant les no-shows
+          <p className="text-xs font-bold tracking-widest text-mint-400/80 uppercase mb-2">Total annuel, d&apos;après vos chiffres</p>
+          <p className={`text-5xl font-black mb-1 ${totalAnnuel >= 0 ? 'text-white' : 'text-red-400'}`}>{formatEuro(totalAnnuel)}</p>
+          <p className="text-xs text-slate-500">
+            économie vs commission classique{noShowsEvites > 0 ? ' + valeur de vos no-shows évités' : ''}
           </p>
         </div>
 
