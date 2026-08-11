@@ -95,12 +95,8 @@ JOIN (
     ('sport', 'arts martiaux', 'Abonnement mensuel (4 cours)', 70.00, 25.00, 60),
 
     -- ── sante ────────────────────────────────────────────────────────────
-    ('sante', 'dieteticien', 'Première consultation', 60.00, 25.00, 60),
-    ('sante', 'dieteticien', 'Consultation de suivi', 40.00, 15.00, 30),
-    ('sante', 'dieteticien', 'Bilan nutritionnel complet', 90.00, 30.00, 75),
-    ('sante', 'podologue', 'Consultation podologique', 45.00, 15.00, 30),
-    ('sante', 'podologue', 'Semelles orthopédiques (bilan)', 60.00, 20.00, 45),
-    ('sante', 'podologue', 'Soin des pieds', 35.00, 10.00, 30),
+    -- diététicien et podologue retirés (titres protégés, hors périmètre) —
+    -- 49 fiches démo dieteticien déjà supprimées en base.
     ('sante', 'reflexologue', 'Séance réflexologie plantaire', 55.00, 20.00, 45),
     ('sante', 'reflexologue', 'Réflexologie palmaire', 45.00, 15.00, 30),
     ('sante', 'reflexologue', 'Séance découverte', 35.00, 10.00, 30),
@@ -163,9 +159,7 @@ JOIN (
     ('coaching', 'sophrologue', 'Séance individuelle sophrologie', 55.00, 20.00, 45),
     ('coaching', 'sophrologue', 'Séance collective', 25.00, 10.00, 60),
     ('coaching', 'sophrologue', 'Forfait 3 séances', 150.00, 50.00, 45),
-    ('coaching', 'psychologue', 'Consultation psychologue', 65.00, 25.00, 45),
-    ('coaching', 'psychologue', 'Consultation de suivi', 60.00, 20.00, 45),
-    ('coaching', 'psychologue', 'Thérapie de couple', 90.00, 30.00, 60),
+    -- psychologue retiré (titre protégé, n° ADELI, hors périmètre)
     ('coaching', 'meditation pleine conscience', 'Séance individuelle', 50.00, 20.00, 45),
     ('coaching', 'meditation pleine conscience', 'Atelier collectif MBSR', 30.00, 10.00, 90),
     ('coaching', 'meditation pleine conscience', 'Cycle 8 semaines (séance)', 40.00, 15.00, 90),

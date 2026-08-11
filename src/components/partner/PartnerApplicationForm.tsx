@@ -8,7 +8,7 @@ const CATEGORIES = [
   { value: 'beaute', label: 'Beauté', sub: 'Coiffure, esthétique, barber, onglerie…' },
   { value: 'bien-etre', label: 'Bien-être', sub: 'Massage, yoga, ostéo, méditation…' },
   { value: 'sport', label: 'Sport & fitness', sub: 'Coaching, gym, natation, arts martiaux…' },
-  { value: 'sante', label: 'Santé & médecines douces', sub: 'Ostéopathe, naturopathe, diététicien, réflexologue…' },
+  { value: 'sante', label: 'Santé & médecines douces', sub: 'Ostéopathe, naturopathe, kinésiologue, réflexologue…' },
   { value: 'soins-corps', label: 'Soins du corps', sub: 'Spa, hammam, épilation, UV, balnéo…' },
   { value: 'coiffure-barber', label: 'Coiffure & Barber', sub: 'Coiffeur·se, barbier, afro, extensions…' },
   { value: 'tatouage-piercing', label: 'Tatouage & Piercing', sub: 'Tatoueur, perceur, maquillage permanent…' },
@@ -22,12 +22,12 @@ const CATEGORIES = [
 // Suggestions affichées comme exemple dans le champ "type d'établissement"
 // une fois la catégorie sélectionnée.
 const TYPE_PLACEHOLDERS: Partial<Record<(typeof CATEGORIES)[number]['value'], string>> = {
-  sante: 'ex : Ostéopathe, Naturopathe, Diététicien/Nutritionniste, Podologue, Réflexologue, Énergéticien/Reiki, Kinésiologue, Magnétiseur, Acupressure/Shiatsu, Ayurveda…',
+  sante: 'ex : Ostéopathe, Naturopathe, Réflexologue, Énergéticien/Reiki, Kinésiologue, Magnétiseur, Acupressure/Shiatsu/Médecine chinoise, Ayurveda, Aromathérapie…',
   'soins-corps': 'ex : Spa/Institut, Hammam/Sauna, Épilation, UV/Bronzage, Balnéo/Bains, Masseur bien-être, Drainage lymphatique…',
   'coiffure-barber': 'ex : Coiffeur·se, Barbier, Coiffeur afro, Extensions/Tresses…',
   'tatouage-piercing': 'ex : Tatoueur, Perceur, Maquillage permanent/Microblading…',
-  coaching: 'ex : Coach de vie, Hypnothérapeute, Sophrologue, Psychologue (non remboursé), Méditation/Pleine conscience…',
-  animaux: 'ex : Toiletteur, Dog-sitter/Pet-sitter, Éducateur canin, Vétérinaire (consultations privées)…',
+  coaching: 'ex : Coach de vie, Coach en développement personnel, Hypnothérapeute, Sophrologue, Psychopraticien, EFT, Psychogénéalogie, Méditation/Pleine conscience…',
+  animaux: 'ex : Toiletteur, Dog-sitter/Pet-sitter, Éducateur canin, Ostéopathe animalier, Vétérinaire (consultations privées)…',
   'beaute-domicile': 'ex : Coiffeur·se à domicile, Esthéticienne à domicile, Maquilleur·se à domicile, Manucure à domicile…',
   photographie: 'ex : Portrait, Mariage, Nouveau-né/Bébé, Famille, Entreprise/Corporate…',
 };
