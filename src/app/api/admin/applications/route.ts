@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
     // 7. Email Resend — UN seul email avec le lien d'invitation + détails du plan
     const plan = getPlanConfig(planKey);
     const firstName = app.gerant.trim().split(' ')[0] || app.gerant;
-    const quotaLabel = plan?.quota != null ? `${plan.quota} réservations / mois` : 'illimitées';
+    const engagementLabel = plan && plan.engagementMonths === 0 ? 'sans engagement' : `engagement ${plan?.engagementMonths} mois`;
     await sendEmail({
       to: app.email,
       subject: `✅ Bienvenue sur Book'nPay — ${app.etablissement}`,
@@ -259,7 +259,7 @@ export async function POST(req: NextRequest) {
           <p style="color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:0.1em; margin:0 0 4px;">Votre plan</p>
           <p style="color:#f1f5f9; font-size:18px; font-weight:700; margin:0 0 2px;">${plan.label}</p>
           <p style="color:#64748b; font-size:13px; margin:0;">
-            ${plan.priceHT}&nbsp;€ HT&nbsp;/&nbsp;mois · engagement ${plan.engagementMonths}&nbsp;mois · ${quotaLabel}
+            ${plan.priceHT}&nbsp;€ HT&nbsp;/&nbsp;mois · ${engagementLabel} · réservations illimitées
           </p>
         </div>
         ` : ''}

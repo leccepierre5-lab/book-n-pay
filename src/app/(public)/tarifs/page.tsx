@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { calcFraisGestion } from '@/lib/booking-utils';
-import { BNP_PLANS, OVERAGE_FEE_HT } from '@/lib/plans-config';
+import { BNP_PLANS } from '@/lib/plans-config';
 
 const FEE_BRACKETS = [
   { label: '≤ 50 €', fee: calcFraisGestion(30) },
@@ -21,7 +21,8 @@ const PLANS = [
     borderColor: 'border-blue-500/30',
     glowColor: 'rgba(59,130,246,0.12)',
     features: [
-      '120 réservations protégées / mois',
+      'Réservations illimitées',
+      'Sans engagement',
       'Vos frais encaissés directement',
       'Check-in QR + fiabilité clients',
       'Apple Pay & Google Pay',
@@ -43,7 +44,7 @@ const PLANS = [
     glowColor: 'rgba(52,211,153,0.12)',
     highlighted: true,
     features: [
-      '300 réservations protégées / mois',
+      'Réservations illimitées',
       'Toute l\'équipe sur un agenda',
       'CA réel vs prévisionnel en un coup d\'œil',
       'Vos clients vous recommandent (parrainage intégré)',
@@ -85,7 +86,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Quel est l'engagement ?",
-    a: "3 mois pour Starter, 6 pour Business, 12 pour Scale. Résiliation possible en fin de période d'engagement.",
+    a: "Aucun pour Starter. 6 mois pour Business, 12 pour Scale — résiliation possible en fin de période d'engagement.",
   },
   {
     q: "Que se passe-t-il en cas de no-show ?",
@@ -149,7 +150,9 @@ export default function TarifsPage() {
                     <span className="text-4xl font-black text-white">{planConfig.priceHT}€</span>
                     <span className="text-sm text-slate-500 ml-1">/ mois HT</span>
                   </div>
-                  <p className="text-xs text-slate-600 mb-1 italic">Engagement {planConfig.engagementMonths} mois</p>
+                  <p className="text-xs text-slate-600 mb-1 italic">
+                    {planConfig.engagementMonths === 0 ? 'Sans engagement' : `Engagement ${planConfig.engagementMonths} mois`}
+                  </p>
                   <p className={`text-xs font-medium mb-5 ${plan.accentColor}`}>{plan.promise}</p>
                   <ul className="flex-1 space-y-2.5">
                     {plan.features.map((f) => (
@@ -193,7 +196,7 @@ export default function TarifsPage() {
           <p className="mb-8 text-center text-sm text-slate-500">
             Le modèle tourne en arrière-plan sans vous mettre en danger.
           </p>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="max-w-md mx-auto">
             {/* Carte Protection Stripe Connect */}
             <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-6">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/12 border border-emerald-500/20 flex items-center justify-center mb-4">
@@ -224,37 +227,6 @@ export default function TarifsPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            </div>
-
-            {/* Carte Hors-Forfait */}
-            <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-6">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/12 border border-amber-500/20 flex items-center justify-center mb-4">
-                <svg className="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
-                </svg>
-              </div>
-              <h3 className="mb-2 font-semibold text-white text-sm">Régulation par le Hors-Forfait</h3>
-              <p className="text-xs leading-relaxed text-slate-500 mb-3">
-                Chaque plan inclut un quota mensuel de réservations. Au-delà, un droit à l'erreur s'applique avant tout surcoût.
-              </p>
-              <div className="space-y-2 mb-3">
-                {BNP_PLANS.filter((p) => p.quota !== null).map((p) => (
-                  <div key={p.key} className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 capitalize">{p.label}</span>
-                    <span className="text-slate-400">{p.quota} réservations incluses</span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Scale</span>
-                  <span className="text-emerald-400 font-medium">Illimité</span>
-                </div>
-              </div>
-              <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 px-3 py-3 space-y-1.5 text-xs text-slate-400">
-                <p>
-                  <span className="text-white font-medium">Au-delà du quota :</span>{' '}
-                  {OVERAGE_FEE_HT.toFixed(2).replace('.', ',')} € HT / réservation supplémentaire dès le 1er dépassement, prélevés immédiatement + proposition de montée de plan.
-                </p>
               </div>
             </div>
           </div>

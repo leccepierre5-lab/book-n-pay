@@ -108,7 +108,9 @@ function SetupForm({
           </div>
           <div className="text-right">
             <p className="text-2xl font-black text-white">{planConfig.priceHT} €</p>
-            <p className="text-xs text-slate-500">/ mois HT · engagement {planConfig.engagementMonths} mois</p>
+            <p className="text-xs text-slate-500">
+              / mois HT · {planConfig.engagementMonths === 0 ? 'sans engagement' : `engagement ${planConfig.engagementMonths} mois`}
+            </p>
           </div>
         </div>
         <p className="mt-3 text-xs text-slate-500">

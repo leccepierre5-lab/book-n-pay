@@ -8,7 +8,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
-import { maybeCreateOverageCharge, invoiceUnpaidOverageCharges } from '@/lib/stripe/overageCharge';
 import { notifyProNewBooking } from '@/lib/pro-notifications';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 import { formatTime } from '@/lib/booking-utils';
@@ -285,10 +284,7 @@ export async function POST(req: NextRequest) {
       // ⚠️ 'completed' est la seule valeur valide de l'enum booking_status
       // (active/cancelled/completed) — 'complete' (sans d) était utilisé ici
       // par erreur, ce qui faisait échouer l'update silencieusement à chaque
-      // fois (aucune inspection de { error }) et rendait wasAlreadyComplete
-      // structurellement toujours false, cassant la protection anti-double-
-      // facturation hors-forfait ci-dessous.
-      const wasAlreadyComplete = bookingRow?.status === 'completed';
+      // fois (aucune inspection de { error }).
       if (activeMembers.length > 0 && activeMembers.every(m => m.status === 'paid')) {
         const { error: completeError } = await supabase
           .from('bookings')
@@ -298,13 +294,6 @@ export async function POST(req: NextRequest) {
           console.error(`[Webhook] ❌ Échec update status=completed — booking ${bookingId}:`, completeError.message);
         } else {
           console.log(`[Webhook] ✅ Booking ${bookingId} → completed (tous les membres ont payé)`);
-        }
-
-        // ── Hors-forfait pro ────────────────────────────────────────────────
-        // Idempotence : on ne compte la réservation qu'une seule fois, à la
-        // toute première bascule vers 'completed' (le webhook peut être rejoué).
-        if (!wasAlreadyComplete && bookingRow?.biz_id) {
-          await maybeCreateOverageCharge(supabase, bookingRow.biz_id, bookingId);
         }
       }
 
@@ -556,31 +545,6 @@ L'équipe Book'nPay`,
           .update({ subscription_status: 'active' })
           .eq('biz_id', settings.biz_id);
         console.log(`[Webhook] ✅ Abonnement actif — biz ${settings.biz_id}`);
-      }
-
-      // ── Hors-forfait pro — regroupement des impayés ─────────────────────
-      // Renouvellement mensuel de l'abonnement : on facture séparément les
-      // charges hors-forfait encore en retry_scheduled/failed du mois écoulé.
-      if (settings) {
-        await invoiceUnpaidOverageCharges(supabase, settings.biz_id);
-
-        // ── Reset mensuel du compteur de réservations ──────────────────────
-        // Uniquement sur un vrai renouvellement de cycle (pas subscription_create
-        // ni subscription_update), et seulement APRÈS avoir facturé les
-        // dépassements en attente ci-dessus — sinon un dépassement du mois
-        // écoulé se retrouverait compté sur le nouveau mois qui démarre à 0.
-        if (invoice.billing_reason === 'subscription_cycle') {
-          const { error: resetError } = await supabase
-            .from('business_settings')
-            .update({ monthly_bookings_count: 0, bookings_count_reset_at: new Date().toISOString() })
-            .eq('biz_id', settings.biz_id);
-
-          if (resetError) {
-            console.error(`[Webhook] ❌ Échec reset monthly_bookings_count — biz ${settings.biz_id}:`, resetError);
-          } else {
-            console.log(`[Webhook] 🔄 Compteur mensuel remis à 0 — biz ${settings.biz_id}`);
-          }
-        }
       }
     }
   }
