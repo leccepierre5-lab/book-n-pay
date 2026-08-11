@@ -19,7 +19,7 @@ export const BNP_PLANS: PlanConfig[] = [
   {
     key: 'starter',
     label: 'Starter',
-    priceHT: 79,
+    priceHT: 49,
     engagementMonths: 3,
     quota: 120,
     nextPlan: 'business',
@@ -28,7 +28,7 @@ export const BNP_PLANS: PlanConfig[] = [
   {
     key: 'business',
     label: 'Business',
-    priceHT: 139,
+    priceHT: 89,
     engagementMonths: 6,
     quota: 300,
     nextPlan: 'scale',
@@ -37,7 +37,7 @@ export const BNP_PLANS: PlanConfig[] = [
   {
     key: 'scale',
     label: 'Scale',
-    priceHT: 299,
+    priceHT: 139,
     engagementMonths: 12,
     quota: null,   // illimité — aucun surcoût, aucune modale d'upgrade
     nextPlan: null,

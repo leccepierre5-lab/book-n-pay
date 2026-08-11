@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { CGU_VERSION } from '@/lib/legal';
+import { BNP_PLANS } from '@/lib/plans-config';
 
 const CATEGORIES = [
   { value: 'beaute', label: 'Beauté', sub: 'Coiffure, esthétique, barber, onglerie…' },
@@ -33,9 +34,9 @@ const TYPE_PLACEHOLDERS: Partial<Record<(typeof CATEGORIES)[number]['value'], st
 };
 
 const BOOKINGS_ESTIMATES = [
-  { value: '0-80', label: 'Moins de 120 / mois', hint: 'Plan Starter — 79 € HT' },
-  { value: '81-300', label: '121 à 300 / mois', hint: 'Plan Business — 139 € HT' },
-  { value: '300+', label: 'Plus de 300 / mois', hint: 'Plan Scale — 299 € HT' },
+  { value: '0-80', label: 'Moins de 120 / mois', hint: `Plan Starter — ${BNP_PLANS[0].priceHT} € HT` },
+  { value: '81-300', label: '121 à 300 / mois', hint: `Plan Business — ${BNP_PLANS[1].priceHT} € HT` },
+  { value: '300+', label: 'Plus de 300 / mois', hint: `Plan Scale — ${BNP_PLANS[2].priceHT} € HT` },
 ] as const;
 
 export default function PartnerApplicationForm() {

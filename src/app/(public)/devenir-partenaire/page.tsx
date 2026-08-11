@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import PartnerApplicationForm from '@/components/partner/PartnerApplicationForm';
+import { BNP_PLANS } from '@/lib/plans-config';
 
 export const metadata: Metadata = {
   title: 'Devenir partenaire — 0% de commission',
@@ -34,7 +35,7 @@ export default function DevenirPartenairePage() {
           réserver. Vous gardez l&apos;esprit libre pour exercer.
         </p>
         <p className="text-sm text-slate-400">
-          À partir de 79&nbsp;€ HT par mois, engagement selon la formule.{' '}
+          À partir de {BNP_PLANS[0].priceHT}&nbsp;€ HT par mois, engagement selon la formule.{' '}
           <Link href="/tarifs" className="text-mint-400 underline underline-offset-2 hover:text-mint-300">
             Voir les formules →
           </Link>

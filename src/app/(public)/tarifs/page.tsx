@@ -16,8 +16,6 @@ const PLANS = [
     key: 'starter',
     badge: 'Pour Démarrer',
     title: 'STARTER',
-    price: '79',
-    engagement: '3 mois',
     promise: 'Pour lancer votre activité sur de bonnes bases.',
     accentColor: 'text-blue-400',
     borderColor: 'border-blue-500/30',
@@ -29,18 +27,16 @@ const PLANS = [
       'Apple Pay & Google Pay',
     ],
     back: {
-      title: 'Exemple de rentabilité',
-      para1: "Un indépendant avec un panier moyen de 35 €. 5 lapins/mois = 175 € perdus.",
-      para2: "Avec Book'nPay, ces 5 lapins sont bloqués par des frais de 17,50 €. Non-présence = 5 × 17,50 € = 87,50 € encaissés.",
-      bilan: "L'abonnement à 79 € est entièrement remboursé. Net cost = 0 €.",
+      title: 'Le mécanisme, en clair',
+      para1: "Le client verse les frais de réservation en réservant en ligne (1,99 à 2,50 € selon le prix de la prestation, à sa charge, jamais la vôtre).",
+      para2: "En cas de non-présentation, ces frais sont automatiquement encaissés via Stripe Connect — sans réclamation ni relance de votre part.",
+      bilan: "Le montant réel dépend de votre activité — simulez-le avec vos propres chiffres.",
     },
   },
   {
     key: 'business',
     badge: 'Le Plus Populaire',
     title: 'BUSINESS',
-    price: '139',
-    engagement: '6 mois',
     promise: 'Pour les pros qui tournent à plein régime.',
     accentColor: 'text-mint-400',
     borderColor: 'border-mint-500/40',
@@ -53,18 +49,16 @@ const PLANS = [
       'Vos clients vous recommandent (parrainage intégré)',
     ],
     back: {
-      title: 'Exemple de rentabilité',
-      para1: 'Studio de bien-être, 3 salariés, 250 RDV/mois, panier 60 €. 10 % no-shows = 1 500 €/mois perdus.',
-      para2: "Business à 139 € sécurise ces créneaux. 5 oublis couvrent largement l'abonnement.",
-      bilan: "+1 300 € de CA récupéré. ROI de 10× le prix de l'abonnement.",
+      title: 'Le mécanisme, en clair',
+      para1: "Toute l'équipe partage le même agenda et le même mécanisme de protection anti no-show, collaborateur par collaborateur.",
+      para2: "Check-in QR, rappels automatiques J-2/J-1 et parrainage intégré pour toute l'équipe.",
+      bilan: "Le montant réel dépend de votre activité — simulez-le avec vos propres chiffres.",
     },
   },
   {
     key: 'scale',
     badge: 'Gros Volume',
     title: 'SCALE',
-    price: '299',
-    engagement: '12 mois',
     promise: 'Pour ne plus jamais penser aux no-shows.',
     accentColor: 'text-purple-400',
     borderColor: 'border-purple-500/30',
@@ -76,10 +70,10 @@ const PLANS = [
       'Support client prioritaire',
     ],
     back: {
-      title: 'Exemple de rentabilité',
-      para1: "+600 réservations/mois, panier 100 €. Chaque faille coûte des milliers d'euros par semaine.",
-      para2: "299 € offre la tranquillité absolue : automatisation complète, zéro faille dans l'agenda.",
-      bilan: "Pour 3 prestations/mois, une infrastructure blindée. Zéro créneaux perdus.",
+      title: 'Le mécanisme, en clair',
+      para1: "Pensé pour les structures à volume : agenda multi-personnels avancé, aucune limite de réservations.",
+      para2: "Support client prioritaire pour ne jamais rester bloqué en pleine saison.",
+      bilan: "Le montant réel dépend de votre activité — simulez-le avec vos propres chiffres.",
     },
   },
 ];
@@ -125,7 +119,9 @@ export default function TarifsPage() {
         </header>
 
         <div className="mb-16 grid gap-5 sm:grid-cols-3">
-          {PLANS.map((plan) => (
+          {PLANS.map((plan) => {
+          const planConfig = BNP_PLANS.find((p) => p.key === plan.key)!;
+          return (
             <button
               key={plan.key}
               onClick={() => toggleFlip(plan.key)}
@@ -150,10 +146,10 @@ export default function TarifsPage() {
                   </span>
                   <h2 className={`text-xl font-black mb-1 ${plan.accentColor}`}>{plan.title}</h2>
                   <div className="mb-1">
-                    <span className="text-4xl font-black text-white">{plan.price}€</span>
+                    <span className="text-4xl font-black text-white">{planConfig.priceHT}€</span>
                     <span className="text-sm text-slate-500 ml-1">/ mois HT</span>
                   </div>
-                  <p className="text-xs text-slate-600 mb-1 italic">Engagement {plan.engagement}</p>
+                  <p className="text-xs text-slate-600 mb-1 italic">Engagement {planConfig.engagementMonths} mois</p>
                   <p className={`text-xs font-medium mb-5 ${plan.accentColor}`}>{plan.promise}</p>
                   <ul className="flex-1 space-y-2.5">
                     {plan.features.map((f) => (
@@ -188,7 +184,8 @@ export default function TarifsPage() {
                 </div>
               )}
             </button>
-          ))}
+          );
+          })}
         </div>
 
         <section className="border-t border-white/[0.07] pt-12">
