@@ -43,6 +43,15 @@ beforeEach(() => {
 });
 
 describe('Flag OFF — routes serveur du flux groupe', () => {
+  // Timeout relevé (défaut vitest 5000ms) : ce test fait le tout premier
+  // import dynamique de '@/app/api/bookings/create-group/route' de la
+  // suite — sa chaîne de dépendances transitives (Stripe/Supabase, même
+  // mockées) peut dépasser 5s sous contention quand les fichiers de test
+  // tournent en parallèle (suite complète), alors qu'il reste toujours
+  // sous 2s en isolé. Les imports suivants (autres tests de ce fichier,
+  // même chaîne de deps) sont mis en cache par le registre de modules et
+  // restent rapides — un seul test avait besoin de la marge. 3e occurrence
+  // de cette instabilité (11/08), corrigée ici plutôt que reconfirmée.
   it('POST /api/bookings/create-group → 404, aucune écriture tentée', async () => {
     const { POST } = await import('@/app/api/bookings/create-group/route');
     const res = await POST(jsonRequest('http://localhost/api/bookings/create-group', {
@@ -50,7 +59,7 @@ describe('Flag OFF — routes serveur du flux groupe', () => {
     }) as any);
     expect(res.status).toBe(404);
     expect(mockFrom).not.toHaveBeenCalled();
-  });
+  }, 15000);
 
   it("POST /api/bookings/group (addMemberAndGetCheckout) → 404, aucune écriture tentée", async () => {
     const { POST } = await import('@/app/api/bookings/group/route');
