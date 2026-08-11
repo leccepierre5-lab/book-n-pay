@@ -94,6 +94,19 @@ export interface ProStats {
                                   // un autre nom (relecture 19/07 : le doublon nuisait à la crédibilité
                                   // du bloc "valeur" au moment où elle compte le plus).
   offHoursBookingsCount: number; // RDV RÉSERVÉS (created_at) hors jour/heure d'ouverture ce mois
+  // Frais de gestion refacturés au pro suite à ses propres annulations de RDV
+  // (pro_charges, migration 0041 — C15 uniquement, voir pro/cancel-booking).
+  // Somme de TOUTES les charges 'pending' (pas de borne de date, la
+  // facturation effective n'est pas encore implémentée — elles restent
+  // 'pending' jusqu'à rapprochement avec la facture mensuelle, hors périmètre
+  // de ce lot). Sans ce chiffre, ce serait exactement le frais caché reproché
+  // à la concurrence — obligatoire, jamais retirable sans repasser par cette
+  // décision.
+  // ⚠️ Ce chiffre est un CUMUL, pas un montant mensuel — le composant
+  // (ProDashboard.tsx) doit l'afficher sous un libellé "à refacturer", jamais
+  // "ce mois" (relecture 11/08 : même classe d'erreur que le bug CA `0655d92`,
+  // un libellé "ce mois" sur un cumul devient faux dès le 2e mois).
+  proChargesPendingAmount: number;
 }
 
 export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProStats> {
@@ -176,6 +189,18 @@ export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProS
     (depositRows || []).reduce((sum, r) => sum + (r.deposit || 0), 0) * 100
   ) / 100;
 
+  // Cumul depuis toujours, pas borné au mois (voir commentaire ProStats) —
+  // requête minimale (une seule colonne), même pattern que depositRows.
+  const { data: proChargesRows } = await supabase
+    .from('pro_charges')
+    .select('amount_cents')
+    .eq('biz_id', bizId)
+    .eq('status', 'pending');
+
+  const proChargesPendingAmount = Math.round(
+    (proChargesRows || []).reduce((sum, r) => sum + (r.amount_cents || 0), 0)
+  ) / 100;
+
   return {
     totalBookings: bookings?.length || 0,
     onlineRevenue: onlineRevenueRounded,
@@ -185,5 +210,6 @@ export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProS
     depositSecuredCount,
     depositSecuredAmount,
     offHoursBookingsCount,
+    proChargesPendingAmount,
   };
 }

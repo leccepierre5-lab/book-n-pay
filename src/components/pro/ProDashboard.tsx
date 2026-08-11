@@ -302,6 +302,36 @@ export default function ProDashboard({
           </div>
         )}
 
+        {/* Frais de gestion refacturés suite à VOS annulations de RDV (C15,
+            pro/cancel-booking) — depuis le 11/08, le client est intégralement
+            remboursé quand vous annulez, les frais de gestion vous sont donc
+            refacturés en contrepartie. Toujours visible dès qu'il y a un
+            montant en attente, indépendamment du gate "je démarre" ci-dessus
+            (une charge en attente reste due même sur un mois par ailleurs
+            calme). Sans cette ligne, c'est exactement le frais caché reproché
+            à la concurrence — carte dédiée (pas fondue dans "Ce que Book'nPay
+            vous apporte" : ceci est un montant que le pro DOIT, pas une
+            valeur reçue).
+            Libellé "à refacturer", PAS "ce mois" (relecture 11/08, même
+            classe d'erreur que le bug CA `0655d92`) : proChargesPendingAmount
+            est un cumul de TOUTES les charges 'pending' depuis toujours (la
+            facturation réelle qui viderait ce cumul chaque mois n'existe pas
+            encore, hors périmètre de ce lot) — un libellé "ce mois" serait
+            faux dès le deuxième mois d'activité. À revoir quand la
+            facturation effective (rapprochement facture mensuelle) sera
+            construite. */}
+        {stats.proChargesPendingAmount > 0 && (
+          <div className="mb-6 rounded-2xl bg-navy-900 border border-amber-500/20 p-4">
+            <p className="text-xs text-slate-500 mb-2 flex items-center gap-1.5">
+              <span>🧾</span>Frais de gestion à refacturer
+            </p>
+            <p className="text-2xl font-bold text-amber-400">{stats.proChargesPendingAmount}€</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Suite à vos annulations de rendez-vous (client remboursé intégralement) — prélevés sur votre prochaine facture.
+            </p>
+          </div>
+        )}
+
         {/* QR Scanner button */}
         <button
           onClick={() => setScannerOpen(true)}

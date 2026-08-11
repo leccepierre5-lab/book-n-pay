@@ -2,18 +2,27 @@
 // par le pro (avec remboursement), audité 26/07 comme le seul mécanisme
 // manquant qui touche un cas certain à se produire.
 //
-// Ces tests prouvent :
+// Extension 11/08 : le client est désormais remboursé du TOTAL (frais de
+// réservation + frais de gestion, CGU Art. 3) et les frais de gestion sont
+// refacturés au pro (pro_charges, migration 0041). Ces tests prouvent :
 // 1. Auth/rate-limit/autorisation biz gardent bien la route.
 // 2. Idempotence : un membre déjà 'cancelled' ne redéclenche jamais Stripe.
 // 3. Un RDV déjà passé est rejeté (refund-gesture couvre ce cas, pas C15).
-// 4. Cas nominal : refund OK → statut 'cancelled' (pas de statut parallèle,
-//    voir commentaire de tête de route.ts), montant_rembourse posé, créneau
-//    libéré (cancelBookingIfNoActiveMembers → bookings.status='cancelled'),
-//    log ANNULATION_PRO au format constant, email client envoyé, pas
-//    d'alerte admin.
-// 5. Échec Stripe : le membre est quand même annulé et le créneau libéré
-//    (le pro est indisponible quoi qu'il arrive côté Stripe), le log porte
-//    refund_status=echec, une alerte admin part.
+// 4. Cas nominal (frais de gestion connus) : refund OK du TOTAL → statut
+//    'cancelled', montant_rembourse = TOTAL, créneau libéré, ligne
+//    pro_charges 'pending' créée, log ANNULATION_PRO étendu (frais_gestion_
+//    impute + charge_id), email client (remboursement intégral, une seule
+//    ligne), email pro (montant refacturé), pas d'alerte admin.
+// 5. Rejeu (contrainte unique booking_id+type) : aucun doublon créé, pas
+//    d'alerte admin — idempotence normale.
+// 6. Insertion pro_charges en échec pour une autre raison : n'empêche NI
+//    l'annulation NI le remboursement, alerte admin + trace booking_logs.
+// 7. Échec Stripe : le membre est quand même annulé et le créneau libéré,
+//    AUCUNE ligne pro_charges, log porte refund_status=echec, alerte admin
+//    (refund), pas de second email pro.
+// 8. Frais de gestion non identifiables (session introuvable) : pas de
+//    crash, remboursement du dépôt seul, alerte admin, aucune ligne
+//    pro_charges, pas d'email pro.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGetUser = vi.fn();
@@ -51,6 +60,8 @@ function makeChain(listData: any[], singleData: any = listData[0] ?? null, error
   return chain;
 }
 
+const mockGetUserById = vi.fn(async (_id?: string) => ({ data: { user: { email: 'owner@example.com' } } }));
+
 let chains: Record<string, any> = {};
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
@@ -62,7 +73,10 @@ vi.mock('@/lib/supabase/server', () => ({
       throw new Error('unexpected table on authed client: ' + t);
     },
   })),
-  createServiceRoleClient: vi.fn(() => ({ from: (t: string) => chains[t] })),
+  createServiceRoleClient: vi.fn(() => ({
+    from: (t: string) => chains[t],
+    auth: { admin: { getUserById: (id: string) => mockGetUserById(id) } },
+  })),
 }));
 
 function buildRequest(body: any) {
@@ -81,6 +95,9 @@ const PAID_MEMBER = {
   id: 'm1', booking_id: 'bk1', status: 'paid', deposit: 15, email: 'client@example.com', name: 'Client Test',
   stripe_payment_intent_id: 'pi_123',
 };
+// Variante avec session Checkout identifiable — nécessaire pour que
+// managementFeeAmount soit connu (voir stripe_checkout_session_id).
+const PAID_MEMBER_WITH_FEE = { ...PAID_MEMBER, stripe_checkout_session_id: 'cs_123' };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -149,88 +166,177 @@ describe('POST /api/pro/cancel-booking', () => {
     expect(mockRefundsCreate).not.toHaveBeenCalled();
   });
 
-  it('cas nominal : refund OK → cancelled (pas de statut parallèle), créneau libéré, log ANNULATION_PRO, email client, pas d\'alerte admin', async () => {
+  it('cas nominal (frais de gestion connus) : remboursement TOTAL, charge pro_charges créée, log étendu, emails client+pro, pas d\'alerte admin', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
     chains.bookings = makeChain([], FUTURE_BOOKING);
     // listData=[] : après annulation, plus aucun membre actif restant →
     // cancelBookingIfNoActiveMembers doit fermer le booking.
-    chains.booking_members = makeChain([], PAID_MEMBER);
+    chains.booking_members = makeChain([], PAID_MEMBER_WITH_FEE);
     chains.booking_logs = makeChain([]);
-    chains.businesses = makeChain([], null); // pas de slug → email retombe sur /recherche
+    chains.pro_charges = makeChain([], { id: 'charge-1' });
+    chains.businesses = makeChain([], { slug: null, owner_id: 'owner-1' });
+    mockSessionsRetrieve.mockResolvedValueOnce({ metadata: { fraisGestion: '1.99' } });
+    mockGetUserById.mockResolvedValueOnce({ data: { user: { email: 'proowner@example.com' } } });
 
     const { POST } = await import('@/app/api/pro/cancel-booking/route');
     const res = await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json).toEqual({ success: true, refundDone: true, refundAmount: 15 });
+    // Total = dépôt (15) + frais de gestion (1.99) = 16.99.
+    expect(json).toEqual({ success: true, refundDone: true, refundAmount: 16.99 });
 
     expect(mockRefundsCreate).toHaveBeenCalledWith({
       payment_intent: 'pi_123',
-      amount: 1500,
+      amount: 1699,
       reason: 'requested_by_customer',
       metadata: { email_sent: 'true', reason: 'pro_cancellation' },
     });
 
-    // Statut réutilisé, pas de valeur parallèle — voir en-tête de route.ts.
+    // Statut réutilisé, montant_rembourse = TOTAL.
     const memberUpdateCall = chains.booking_members.update.mock.calls[0][0];
-    expect(memberUpdateCall).toEqual({ status: 'cancelled', montant_rembourse: 15 });
+    expect(memberUpdateCall).toEqual({ status: 'cancelled', montant_rembourse: 16.99 });
 
-    // Créneau libéré : cancelBookingIfNoActiveMembers a fermé le booking.
+    // Créneau libéré.
     expect(chains.bookings.update).toHaveBeenCalledWith({ status: 'cancelled' });
 
-    // Log au format constant/parsable.
-    const logMessage = chains.booking_logs.insert.mock.calls[0][0].message;
-    expect(logMessage).toBe(
-      'ANNULATION_PRO | pro_id=pro1 | pro_email=pro@example.com | montant_rembourse=15.00 | refund_status=ok'
+    // Charge créée pour le pro, statut 'pending'.
+    expect(chains.pro_charges.insert).toHaveBeenCalledWith({
+      biz_id: 'biz-1',
+      booking_id: 'bk1',
+      type: 'management_fee_pro_cancellation',
+      amount_cents: 199,
+      currency: 'eur',
+      status: 'pending',
+    });
+
+    // Log étendu (frais_gestion_impute + charge_id).
+    const logCalls = chains.booking_logs.insert.mock.calls.map((c: any[]) => c[0].message);
+    const mainLog = logCalls.find((m: string) => m.startsWith('ANNULATION_PRO |'));
+    expect(mainLog).toBe(
+      'ANNULATION_PRO | pro_id=pro1 | pro_email=pro@example.com | montant_rembourse=16.99 | refund_status=ok | frais_gestion_impute=1.99 | charge_id=charge-1'
     );
 
-    expect(mockSendEmail).toHaveBeenCalledTimes(1);
-    expect(mockSendEmail.mock.calls[0][0].to).toBe('client@example.com');
+    // Email client (remboursement intégral) + email pro (montant refacturé).
+    expect(mockSendEmail).toHaveBeenCalledTimes(2);
+    const clientCall = mockSendEmail.mock.calls.find((c: any[]) => c[0].to === 'client@example.com');
+    expect(clientCall![0].text).toContain('Remboursé : 16.99€ (intégral — frais de réservation + frais de gestion)');
+    expect(clientCall![0].text).not.toContain('Conservé');
+
+    const proCall = mockSendEmail.mock.calls.find((c: any[]) => c[0].to === 'proowner@example.com');
+    expect(proCall![0].text).toContain(
+      "Votre client a été intégralement remboursé. Les frais de gestion de cette réservation (1,99 €) vous seront refacturés sur votre prochaine facture."
+    );
+
     expect(mockNotifyAdminOnFailure).not.toHaveBeenCalled();
   });
 
-  it('email : deux montants distincts (remboursé/conservé) + lien de reprise vers la fiche établissement', async () => {
+  it('rejeu (contrainte unique booking_id+type) : aucun doublon, pas d\'alerte admin', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
     chains.bookings = makeChain([], FUTURE_BOOKING);
-    chains.booking_members = makeChain([], { ...PAID_MEMBER, stripe_checkout_session_id: 'cs_123' });
+    chains.booking_members = makeChain([], PAID_MEMBER_WITH_FEE);
     chains.booking_logs = makeChain([]);
-    chains.businesses = makeChain([], { slug: 'salon-test' });
+    chains.pro_charges = makeChain([], null, { code: '23505', message: 'duplicate key value violates unique constraint "uq_pro_charges_booking_type"' });
+    chains.businesses = makeChain([], { slug: null, owner_id: null });
     mockSessionsRetrieve.mockResolvedValueOnce({ metadata: { fraisGestion: '1.99' } });
-
-    const { POST } = await import('@/app/api/pro/cancel-booking/route');
-    await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
-
-    expect(mockSessionsRetrieve).toHaveBeenCalledWith('cs_123');
-    const emailText = mockSendEmail.mock.calls[0][0].text as string;
-    expect(emailText).toContain('Remboursé : 15.00€');
-    expect(emailText).toContain('Conservé : 1.99€ (frais de gestion Book\'nPay, CGV Art. 2');
-    expect(emailText).toContain('https://book-n-pay-next.vercel.app/etablissement/salon-test');
-  });
-
-  it('email : lookup frais de gestion en échec → ne bloque pas l\'envoi, rappel générique conservé', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
-    chains.bookings = makeChain([], FUTURE_BOOKING);
-    chains.booking_members = makeChain([], { ...PAID_MEMBER, stripe_checkout_session_id: 'cs_123' });
-    chains.booking_logs = makeChain([]);
-    chains.businesses = makeChain([], null);
-    mockSessionsRetrieve.mockRejectedValueOnce(new Error('session introuvable'));
 
     const { POST } = await import('@/app/api/pro/cancel-booking/route');
     const res = await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
 
     expect(res.status).toBe(200);
-    const emailText = mockSendEmail.mock.calls[0][0].text as string;
-    expect(emailText).toContain('frais de gestion Book\'nPay ne sont jamais remboursés');
-    expect(emailText).toContain('https://book-n-pay-next.vercel.app/recherche');
+    expect(mockNotifyAdminOnFailure).not.toHaveBeenCalled();
+
+    const logMessage = chains.booking_logs.insert.mock.calls
+      .map((c: any[]) => c[0].message)
+      .find((m: string) => m.startsWith('ANNULATION_PRO |'));
+    // charge_id=none : pas de nouvelle ligne créée sur ce rejeu.
+    expect(logMessage).toContain('charge_id=none');
   });
 
-  it('échec Stripe : le membre est quand même annulé et le créneau libéré, log refund_status=echec, alerte admin envoyée', async () => {
+  it('insertion pro_charges en échec (autre raison) : annulation et remboursement quand même effectués, alerte admin + trace booking_logs', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
     chains.bookings = makeChain([], FUTURE_BOOKING);
-    chains.booking_members = makeChain([], PAID_MEMBER);
+    chains.booking_members = makeChain([], PAID_MEMBER_WITH_FEE);
     chains.booking_logs = makeChain([]);
-    chains.businesses = makeChain([], null);
+    chains.pro_charges = makeChain([], null, { code: '23503', message: 'foreign key violation' });
+    chains.businesses = makeChain([], { slug: null, owner_id: null });
+    mockSessionsRetrieve.mockResolvedValueOnce({ metadata: { fraisGestion: '1.99' } });
+
+    const { POST } = await import('@/app/api/pro/cancel-booking/route');
+    const res = await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.refundDone).toBe(true);
+    expect(json.refundAmount).toBe(16.99);
+
+    expect(mockNotifyAdminOnFailure).toHaveBeenCalledTimes(1);
+    expect(mockNotifyAdminOnFailure.mock.calls[0][0]).toBe('pro/cancel-booking:pro_charge');
+
+    const chargeFailLog = chains.booking_logs.insert.mock.calls
+      .map((c: any[]) => c[0].message)
+      .find((m: string) => m.startsWith('ANNULATION_PRO_CHARGE_ECHEC'));
+    expect(chargeFailLog).toContain('booking_id=bk1');
+    expect(chargeFailLog).toContain('montant=1.99');
+  });
+
+  it('email : remboursement intégral, une seule ligne (plus de "conservé")', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
+    chains.bookings = makeChain([], FUTURE_BOOKING);
+    chains.booking_members = makeChain([], PAID_MEMBER_WITH_FEE);
+    chains.booking_logs = makeChain([]);
+    chains.pro_charges = makeChain([], { id: 'charge-1' });
+    chains.businesses = makeChain([], { slug: 'salon-test', owner_id: null });
+    mockSessionsRetrieve.mockResolvedValueOnce({ metadata: { fraisGestion: '1.99' } });
+
+    const { POST } = await import('@/app/api/pro/cancel-booking/route');
+    await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
+
+    const emailText = mockSendEmail.mock.calls[0][0].text as string;
+    expect(emailText).toContain('Remboursé : 16.99€ (intégral — frais de réservation + frais de gestion)');
+    expect(emailText).toContain('https://book-n-pay-next.vercel.app/etablissement/salon-test');
+  });
+
+  it('frais de gestion non identifiables (session introuvable) : pas de crash, remboursement du dépôt seul, alerte admin, aucune charge, pas d\'email pro', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
+    chains.bookings = makeChain([], FUTURE_BOOKING);
+    chains.booking_members = makeChain([], PAID_MEMBER_WITH_FEE);
+    chains.booking_logs = makeChain([]);
+    chains.pro_charges = makeChain([]);
+    chains.businesses = makeChain([], { slug: null, owner_id: 'owner-1' });
+    mockSessionsRetrieve.mockRejectedValueOnce(new Error('session introuvable'));
+
+    const { POST } = await import('@/app/api/pro/cancel-booking/route');
+    const res = await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.refundDone).toBe(true);
+    // Dépôt seul : montant total inconnu, jamais inventé.
+    expect(json.refundAmount).toBe(15);
+
+    expect(chains.pro_charges.insert).not.toHaveBeenCalled();
+    expect(mockNotifyAdminOnFailure).toHaveBeenCalledTimes(1);
+    expect(mockNotifyAdminOnFailure.mock.calls[0][0]).toBe('pro/cancel-booking:pro_charge');
+
+    const unknownFeeLog = chains.booking_logs.insert.mock.calls
+      .map((c: any[]) => c[0].message)
+      .find((m: string) => m.startsWith('ANNULATION_PRO_FRAIS_GESTION_INCONNU'));
+    expect(unknownFeeLog).toContain('booking_id=bk1');
+
+    // Un seul email (client) — pas d'email pro sans montant à annoncer.
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEmail.mock.calls[0][0].to).toBe('client@example.com');
+  });
+
+  it('échec Stripe : le membre est quand même annulé et le créneau libéré, aucune charge pro_charges, log refund_status=echec, alerte admin (refund)', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
+    chains.bookings = makeChain([], FUTURE_BOOKING);
+    chains.booking_members = makeChain([], PAID_MEMBER_WITH_FEE);
+    chains.booking_logs = makeChain([]);
+    chains.pro_charges = makeChain([]);
+    chains.businesses = makeChain([], { slug: null, owner_id: 'owner-1' });
+    mockSessionsRetrieve.mockResolvedValueOnce({ metadata: { fraisGestion: '1.99' } });
     mockRefundsCreate.mockRejectedValueOnce(new Error('solde Connect insuffisant'));
 
     const { POST } = await import('@/app/api/pro/cancel-booking/route');
@@ -244,12 +350,22 @@ describe('POST /api/pro/cancel-booking', () => {
     expect(memberUpdateCall).toEqual({ status: 'cancelled', montant_rembourse: null });
     expect(chains.bookings.update).toHaveBeenCalledWith({ status: 'cancelled' });
 
-    const logMessage = chains.booking_logs.insert.mock.calls[0][0].message;
+    expect(chains.pro_charges.insert).not.toHaveBeenCalled();
+
+    const logMessage = chains.booking_logs.insert.mock.calls
+      .map((c: any[]) => c[0].message)
+      .find((m: string) => m.startsWith('ANNULATION_PRO |'));
     expect(logMessage).toBe(
-      'ANNULATION_PRO | pro_id=pro1 | pro_email=pro@example.com | montant_rembourse=0.00 | refund_status=echec'
+      'ANNULATION_PRO | pro_id=pro1 | pro_email=pro@example.com | montant_rembourse=0.00 | refund_status=echec | frais_gestion_impute=0.00 | charge_id=none'
     );
 
+    // Une seule alerte admin (refund) — pas de seconde alerte "pro_charge"
+    // puisque le montant n'a jamais été facturé (rien à réclamer).
     expect(mockNotifyAdminOnFailure).toHaveBeenCalledTimes(1);
     expect(mockNotifyAdminOnFailure.mock.calls[0][0]).toBe('pro/cancel-booking:refund');
+
+    // Pas d'email pro (refundDone=false).
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEmail.mock.calls[0][0].to).toBe('client@example.com');
   });
 });

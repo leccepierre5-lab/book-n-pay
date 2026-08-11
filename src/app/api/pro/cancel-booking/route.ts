@@ -30,7 +30,12 @@ import { getStripeClient } from '@/lib/stripe/client';
 // annulations pro (litige, stats, futur indicateur de fiabilité). Ne pas
 // changer le format sans mettre à jour tout code qui le lira un jour.
 // Forme : "ANNULATION_PRO | pro_id=<uuid> | pro_email=<email> |
-// montant_rembourse=<X.XX> | refund_status=<ok|echec>"
+// montant_rembourse=<X.XX> | refund_status=<ok|echec> |
+// frais_gestion_impute=<X.XX> | charge_id=<uuid|none>"
+// Les deux derniers champs ont été ajoutés avec la refacturation des frais
+// de gestion au pro (pro_charges, migration 0041) — montant_rembourse inclut
+// désormais les frais de gestion (remboursement intégral, CGU Art. 3),
+// frais_gestion_impute est la part de ce remboursement refacturée au pro.
 const LOG_PREFIX = 'ANNULATION_PRO';
 
 export async function POST(req: NextRequest) {
@@ -100,22 +105,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Montant provisoire = CGU Art. 3 actuelle (remboursement intégral des
-    // frais de réservation ; les frais de gestion ne sont jamais remboursés,
-    // Art. 2). Fonction dédiée (lib/refunds.ts), pas le helper générique
-    // partagé par les autres routes d'annulation — ajustable ici seul si le
-    // RDV CCI du 30/07 change la règle spécifiquement pour les annulations
-    // pro. Dans ce cas, mettre à jour aussi le texte CGU, pas seulement
-    // cette fonction.
-    const refundAmountCents = proCancellationRefundAmountCents(member.deposit);
     const stripe = await getStripeClient(serviceSupabase);
 
-    // Montant des frais de gestion réellement facturés à l'origine (jamais
-    // remboursés, CGV Art. 2) — pour l'afficher explicitement dans l'email
-    // ci-dessous plutôt qu'un rappel vague. Stocké en metadata sur la
-    // SESSION Checkout (stripe/checkout/route.ts), pas sur le PaymentIntent
+    // Montant des frais de gestion réellement facturés à l'origine (CGV
+    // Art. 2). Nécessaire AVANT de calculer refundAmountCents ci-dessous : sur
+    // une annulation pro, ces frais sont remboursés au client puis refacturés
+    // au pro (pro_charges) — contrairement aux autres routes d'annulation où
+    // ce montant ne sert qu'à l'afficher dans l'email. Stocké en metadata sur
+    // la SESSION Checkout (stripe/checkout/route.ts), pas sur le PaymentIntent
     // — d'où stripe_checkout_session_id, pas stripe_payment_intent_id.
-    // Best-effort : un échec ici ne doit jamais bloquer l'annulation.
+    // Best-effort : un échec ici ne doit jamais bloquer l'annulation — si le
+    // montant reste inconnu, refundAmountCents retombe sur le dépôt seul
+    // (voir proCancellationRefundAmountCents) et une alerte admin part plus
+    // bas pour vérification manuelle.
     let managementFeeAmount: number | null = null;
     if (member.stripe_checkout_session_id) {
       try {
@@ -126,6 +128,13 @@ export async function POST(req: NextRequest) {
         console.warn('[ProCancelBooking] Impossible de récupérer les frais de gestion pour l\'email:', e.message);
       }
     }
+
+    // Remboursement INTÉGRAL (frais de réservation + frais de gestion) —
+    // CGU Art. 3 : le client n'a commis aucune faute et n'a reçu aucune
+    // prestation. Si managementFeeAmount est inconnu (session introuvable),
+    // le calcul retombe sur le dépôt seul — impossible de rembourser/facturer
+    // un montant qu'on ne connaît pas (voir alerte admin dédiée plus bas).
+    const refundAmountCents = proCancellationRefundAmountCents(member.deposit, managementFeeAmount);
 
     let refundDone = false;
     if (member.stripe_payment_intent_id) {
@@ -169,10 +178,85 @@ export async function POST(req: NextRequest) {
     // collision réelle) — voir lib/booking-lifecycle.ts.
     await cancelBookingIfNoActiveMembers(serviceSupabase, bookingId);
 
+    // Refacturation des frais de gestion au pro (pro_charges, migration
+    // 0041) — UNIQUEMENT si le refund Stripe a réussi (sinon on facturerait
+    // un remboursement qui n'a jamais eu lieu) ET si le montant est connu
+    // (impossible de facturer un montant qu'on n'a pas pu déterminer).
+    // L'échec de CETTE insertion ne doit JAMAIS bloquer l'annulation ni le
+    // remboursement, déjà actés au-dessus — best-effort avec alerte admin,
+    // même logique que le reste de la route.
+    let chargeId: string | null = null;
+    if (refundDone && managementFeeAmount != null) {
+      try {
+        const { data: chargeRow, error: chargeErr } = await serviceSupabase
+          .from('pro_charges')
+          .insert({
+            biz_id: booking.biz_id,
+            booking_id: bookingId,
+            type: 'management_fee_pro_cancellation',
+            amount_cents: Math.round(managementFeeAmount * 100),
+            currency: 'eur',
+            status: 'pending',
+          })
+          .select('id')
+          .single();
+
+        if (chargeErr) {
+          // Code Postgres 23505 = violation de la contrainte d'unicité
+          // (booking_id, type) : rejeu de la même annulation, idempotence
+          // normale — pas une erreur, pas d'alerte.
+          if (chargeErr.code !== '23505') {
+            throw chargeErr;
+          }
+        } else {
+          chargeId = chargeRow?.id ?? null;
+        }
+      } catch (chargeErr: any) {
+        console.error('[ProCancelBooking] Insertion pro_charges échouée:', chargeErr.message);
+        await serviceSupabase.from('booking_logs').insert({
+          booking_id: bookingId,
+          message: `ANNULATION_PRO_CHARGE_ECHEC | booking_id=${bookingId} | montant=${managementFeeAmount.toFixed(2)} | erreur=${chargeErr.message}`,
+        });
+        await notifyAdminOnFailure('pro/cancel-booking:pro_charge', {
+          processed: 0,
+          failed: 1,
+          failedItems: [bookingId],
+          failedDescriptions: [
+            `booking ${bookingId} — frais de gestion ${managementFeeAmount.toFixed(2)}€ non facturés au pro (échec insertion pro_charges) — ${chargeErr.message}`,
+          ],
+        });
+      }
+    } else if (refundDone && managementFeeAmount == null) {
+      // Client remboursé du dépôt seul (montant total inconnu), le pro n'est
+      // pas facturé faute de montant fiable — nécessite une vérification
+      // manuelle (voir tests attendus : "booking sans frais de gestion
+      // identifiable").
+      console.warn('[ProCancelBooking] Frais de gestion non identifiables — pro non facturé, alerte admin');
+      await serviceSupabase.from('booking_logs').insert({
+        booking_id: bookingId,
+        message: `ANNULATION_PRO_FRAIS_GESTION_INCONNU | booking_id=${bookingId} | pro_id=${authData.user.id}`,
+      });
+      await notifyAdminOnFailure('pro/cancel-booking:pro_charge', {
+        processed: 0,
+        failed: 1,
+        failedItems: [bookingId],
+        failedDescriptions: [
+          `booking ${bookingId} — frais de gestion non identifiables (session Stripe introuvable ou metadata absente), pro NON facturé — vérification manuelle nécessaire`,
+        ],
+      });
+    }
+
+    const fraisGestionImpute = refundDone && managementFeeAmount != null ? managementFeeAmount.toFixed(2) : '0.00';
     await serviceSupabase.from('booking_logs').insert({
       booking_id: bookingId,
-      message: `${LOG_PREFIX} | pro_id=${authData.user.id} | pro_email=${authData.user.email ?? 'inconnu'} | montant_rembourse=${(refundDone ? refundAmountCents / 100 : 0).toFixed(2)} | refund_status=${refundDone ? 'ok' : 'echec'}`,
+      message: `${LOG_PREFIX} | pro_id=${authData.user.id} | pro_email=${authData.user.email ?? 'inconnu'} | montant_rembourse=${(refundDone ? refundAmountCents / 100 : 0).toFixed(2)} | refund_status=${refundDone ? 'ok' : 'echec'} | frais_gestion_impute=${fraisGestionImpute} | charge_id=${chargeId ?? 'none'}`,
     });
+
+    const { data: biz } = await serviceSupabase
+      .from('businesses')
+      .select('slug, owner_id')
+      .eq('id', booking.biz_id)
+      .maybeSingle();
 
     // Email client — texte propre à cette route ("le pro a annulé"), pas
     // dérivé d'un statut générique : le client ne doit jamais recevoir le
@@ -183,18 +267,15 @@ export async function POST(req: NextRequest) {
       const dateFormatted = new Date(booking.date + 'T12:00:00').toLocaleDateString('fr-FR', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       });
-      // Deux lignes chiffrées distinctes plutôt qu'un rappel vague — un
-      // client qui a payé en une seule fois (ex. 11,99€) ne devine pas de
-      // lui-même la répartition remboursé/conservé.
+      // Remboursement intégral (frais de réservation + frais de gestion,
+      // CGU Art. 3) — un seul montant net, plus de ligne "conservé" : rien
+      // n'est retenu au client sur ce chemin, contrairement aux autres
+      // annulations (client, no-show, gel).
       const refundLine = refundDone
-        ? `✅ Remboursé : ${(refundAmountCents / 100).toFixed(2)}€ (frais de réservation, intégral)`
-        : `⚠️ Remboursement de ${member.deposit ?? 0}€ (frais de réservation) initié mais une vérification manuelle peut être nécessaire — contactez-nous si vous ne le recevez pas.`;
-      const managementFeeLine = managementFeeAmount != null
-        ? `❌ Conservé : ${managementFeeAmount.toFixed(2)}€ (frais de gestion Book'nPay, CGV Art. 2 — jamais remboursés)`
-        : `⚠️ Les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).`;
+        ? `✅ Remboursé : ${(refundAmountCents / 100).toFixed(2)}€ (intégral — frais de réservation + frais de gestion)`
+        : `⚠️ Remboursement de ${(refundAmountCents / 100).toFixed(2)}€ initié mais une vérification manuelle peut être nécessaire — contactez-nous si vous ne le recevez pas.`;
 
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app';
-      const { data: biz } = await serviceSupabase.from('businesses').select('slug').eq('id', booking.biz_id).maybeSingle();
       const rebookUrl = biz?.slug ? `${siteUrl}/etablissement/${biz.slug}` : `${siteUrl}/recherche`;
 
       await sendEmail({
@@ -210,7 +291,6 @@ Nous sommes désolés de vous l'annoncer : le professionnel a dû annuler votre 
 🕐 Heure : ${formatTime(booking.time)}
 
 ${refundLine}
-${managementFeeLine}
 
 Vous pouvez reprendre une réservation dès maintenant si vous le souhaitez : ${rebookUrl}
 
@@ -218,6 +298,39 @@ Si vous avez des questions : contact@book-n-pay.com
 
 L'équipe Book'nPay`,
       }).catch(() => {});
+    }
+
+    // Email pro — annonce le montant refacturé (uniquement si une charge a
+    // effectivement été déterminée : mêmes conditions que la création de la
+    // pro_charge ci-dessus). Envoyé au OWNER du business, pas forcément à
+    // authData.user : un admin peut avoir déclenché cette annulation pour le
+    // compte du pro (voir autorisation plus haut), c'est le pro qui doit être
+    // informé qu'il sera facturé, pas l'admin. Best-effort, ne bloque jamais.
+    if (refundDone && managementFeeAmount != null && biz?.owner_id) {
+      try {
+        const { data: ownerAuth } = await serviceSupabase.auth.admin.getUserById(biz.owner_id);
+        const ownerEmail = ownerAuth.user?.email;
+        if (ownerEmail) {
+          const feeFormatted = managementFeeAmount.toFixed(2).replace('.', ',');
+          await sendEmail({
+            to: ownerEmail,
+            subject: `Annulation confirmée — ${feeFormatted} € à refacturer`,
+            text: `Bonjour,
+
+Vous avez annulé le rendez-vous suivant :
+
+💆 Prestation : ${booking.service_name}
+📅 Date : ${new Date(booking.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+🕐 Heure : ${formatTime(booking.time)}
+
+Votre client a été intégralement remboursé. Les frais de gestion de cette réservation (${feeFormatted} €) vous seront refacturés sur votre prochaine facture.
+
+L'équipe Book'nPay`,
+          }).catch(() => {});
+        }
+      } catch (e: any) {
+        console.warn('[ProCancelBooking] Impossible de notifier le pro par email:', e.message);
+      }
     }
 
     return NextResponse.json({

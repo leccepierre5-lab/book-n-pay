@@ -6,24 +6,33 @@ import type Stripe from 'stripe';
 // stripe/checkout/route.ts). Un stripe.refunds.create() sans `amount`
 // explicite rembourse donc la TOTALITÉ du PaymentIntent par défaut, frais de
 // gestion inclus. Règle produit : les frais de gestion ne sont JAMAIS
-// remboursés, quel que soit le motif d'annulation (client, pro, expiration de
-// groupe, gel d'établissement...). Ce helper centralise le calcul du montant
-// à passer explicitement à Stripe pour ne rembourser que le dépôt.
+// remboursés au client sur ces chemins (client, expiration de groupe, gel
+// d'établissement...). Ce helper centralise le calcul du montant à passer
+// explicitement à Stripe pour ne rembourser que le dépôt.
+// ⚠️ Exception : l'annulation PAR LE PRO ne passe PAS par ce helper — voir
+// proCancellationRefundAmountCents ci-dessous, qui rembourse aussi les frais
+// de gestion (refacturés au pro en contrepartie, pro_charges migration 0041).
 export function depositRefundAmountCents(deposit: number | null | undefined): number {
   return Math.round((deposit || 0) * 100);
 }
 
 // Montant remboursé au client sur une annulation PAR LE PRO (C15,
-// pro/cancel-booking/route.ts) — actuellement identique à
-// depositRefundAmountCents (CGU Art. 3 : remboursement intégral des frais de
-// réservation, frais de gestion jamais remboursés). Volontairement isolée de
-// depositRefundAmountCents plutôt qu'un appel direct dans la route : si le
-// RDV CCI du 30/07 change la règle spécifiquement pour les annulations pro
-// (sans toucher client/no-show/expiration de groupe/gel d'établissement),
-// seul CE point change — modifier depositRefundAmountCents impacterait à
-// tort les 4 autres routes qui l'appellent.
-export function proCancellationRefundAmountCents(deposit: number | null | undefined): number {
-  return depositRefundAmountCents(deposit);
+// pro/cancel-booking/route.ts) — remboursement INTÉGRAL (frais de
+// réservation + frais de gestion), CGU Art. 3 modifiée en conséquence : le
+// client n'a commis aucune faute et n'a reçu aucune prestation, lui laisser
+// les frais de gestion à sa charge exposait à un risque de clause abusive.
+// Les frais de gestion ainsi remboursés sont refacturés au pro (pro_charges,
+// migration 0041) — voir route.ts. Volontairement isolée de
+// depositRefundAmountCents plutôt qu'un appel direct dans la route : cette
+// règle ne s'applique QU'aux annulations pro — modifier
+// depositRefundAmountCents impacterait à tort les 4 autres routes qui
+// l'appellent (client/no-show/expiration de groupe/gel d'établissement,
+// où les frais de gestion restent acquis).
+export function proCancellationRefundAmountCents(
+  deposit: number | null | undefined,
+  managementFee: number | null | undefined
+): number {
+  return depositRefundAmountCents(deposit) + Math.round((managementFee || 0) * 100);
 }
 
 // Récupère le montant des frais de gestion réellement facturés à l'origine

@@ -23,7 +23,7 @@ export default function CGUPage() {
         </Link>
 
         <h1 className="mb-2 text-2xl font-semibold text-white">CGU/CGV — Book'nPay</h1>
-        <p className="mb-8 text-xs text-white/40">Dernière mise à jour : juillet 2026</p>
+        <p className="mb-8 text-xs text-white/40">Dernière mise à jour : août 2026</p>
 
         <div className="space-y-7 text-sm leading-relaxed text-white/70">
           <section>
@@ -56,9 +56,10 @@ export default function CGUPage() {
                   Ils rémunèrent les services de la plateforme Book'nPay, incluant le traitement
                   bancaire sécurisé et la mise en relation. Ces frais sont{' '}
                   <strong className="text-white">
-                    non remboursables, quelle que soit la cause de l'annulation
-                  </strong>{' '}
-                  (annulation client, annulation professionnel, no-show).
+                    non remboursables au client en cas d'annulation client ou de no-show
+                  </strong>
+                  , et restent alors acquis à Book'nPay. En cas d'annulation à l'initiative du
+                  professionnel, ils sont intégralement remboursés au client (voir article 3).
                 </p>
                 <p className="mb-2 text-xs font-medium text-white/60">Barème des frais de gestion :</p>
                 <ul className="space-y-1.5 text-xs">
@@ -89,9 +90,12 @@ export default function CGUPage() {
             </h2>
             <div className="rounded-xl border border-white/10 bg-white/5 p-4">
               <p>
-                Le professionnel s'engage à procéder au remboursement intégral des frais de
-                réservation au client en cas d'annulation de sa part. Les frais de gestion{' '}
-                <strong className="text-white">ne font l'objet d'aucun remboursement</strong>.
+                En cas d'annulation d'un rendez-vous par le professionnel, le client est{' '}
+                <strong className="text-white">
+                  intégralement remboursé : frais de réservation et frais de gestion
+                </strong>
+                . Les frais de gestion ainsi remboursés au client sont refacturés au professionnel
+                sur sa facture suivante.
               </p>
             </div>
           </section>
