@@ -315,6 +315,13 @@ export function calcFraisGestion(servicePrice: number): number {
   return 1.99;
 }
 
+// ── Plafond du dépôt (frais de réservation) configurable par le pro ─────────
+// Stripe prélève ses frais sur le montant TOTAL débité (dépôt + frais de
+// gestion) — un dépôt élevé détruit la marge de Book'nPay plus qu'il n'y
+// paraît, seuil de perte identifié vers 122€. `services.deposit` est stocké
+// en euros (pas en centimes), ce plafond suit la même unité.
+export const MAX_DEPOSIT_EUROS = 50;
+
 // ── Dépôt dynamique selon l'historique de fiabilité ──────────────────────────
 // ⚠️ Non appelée aujourd'hui — même statut d'ancrage que calcTrustScore/
 // TrustScore ci-dessus (dont calcDeposit consomme le type) : testée

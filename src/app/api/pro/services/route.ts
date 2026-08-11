@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond, withErrorHandling } from '@/lib/api-error';
+import { MAX_DEPOSIT_EUROS } from '@/lib/booking-utils';
 
 async function getBizId(): Promise<string | null> {
   const supabase = await createClient();
@@ -54,6 +55,23 @@ export const POST = withErrorHandling('[Services]', async (req: NextRequest) => 
     );
   }
 
+  // Plafond dépôt (Stripe prélève sur le total débité, un dépôt élevé détruit
+  // la marge) — voir MAX_DEPOSIT_EUROS. Services déjà en base au-delà : non
+  // modifiés, seules les nouvelles créations/éditions sont contraintes.
+  if (Number(deposit) > MAX_DEPOSIT_EUROS) {
+    return NextResponse.json(
+      { error: `Le dépôt (frais de réservation) ne peut pas dépasser ${MAX_DEPOSIT_EUROS}€.` },
+      { status: 400 }
+    );
+  }
+
+  if (Number(deposit) > Number(price)) {
+    return NextResponse.json(
+      { error: 'Le dépôt (frais de réservation) ne peut pas dépasser le prix de la prestation.' },
+      { status: 400 }
+    );
+  }
+
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from('services')
@@ -84,21 +102,16 @@ export const PATCH = withErrorHandling('[Services]', async (req: NextRequest) =>
 
   const supabase = createServiceRoleClient();
 
-  // Vérifie que le service appartient bien à ce biz
+  // Vérifie que le service appartient bien à ce biz — price/deposit inclus
+  // pour valider le couple final même quand un seul des deux champs change.
   const { data: existing } = await supabase
     .from('services')
-    .select('id')
+    .select('id, price, deposit')
     .eq('id', id)
     .eq('biz_id', bizId)
     .maybeSingle();
   if (!existing) return NextResponse.json({ error: 'Service introuvable' }, { status: 404 });
 
-  const updates: Record<string, unknown> = {};
-  if (name !== undefined) updates.name = name.trim();
-  if (genre !== undefined) updates.genre = genre || null;
-  if (allow_group !== undefined) updates.allow_group = allow_group !== false;
-  if (duration_minutes !== undefined) updates.duration_minutes = Number(duration_minutes);
-  if (price !== undefined) updates.price = Number(price);
   if (deposit !== undefined) {
     // Même correctif que POST — voir commentaire ci-dessus.
     if (Number(deposit) < 1) {
@@ -107,8 +120,34 @@ export const PATCH = withErrorHandling('[Services]', async (req: NextRequest) =>
         { status: 400 }
       );
     }
-    updates.deposit = Number(deposit);
+    // Plafond dépôt — services déjà en base au-delà : non modifiés, seules
+    // les éditions qui touchent explicitement le dépôt sont contraintes.
+    if (Number(deposit) > MAX_DEPOSIT_EUROS) {
+      return NextResponse.json(
+        { error: `Le dépôt (frais de réservation) ne peut pas dépasser ${MAX_DEPOSIT_EUROS}€.` },
+        { status: 400 }
+      );
+    }
   }
+
+  if (deposit !== undefined || price !== undefined) {
+    const finalPrice = price !== undefined ? Number(price) : existing.price;
+    const finalDeposit = deposit !== undefined ? Number(deposit) : existing.deposit;
+    if (finalDeposit > finalPrice) {
+      return NextResponse.json(
+        { error: 'Le dépôt (frais de réservation) ne peut pas dépasser le prix de la prestation.' },
+        { status: 400 }
+      );
+    }
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (name !== undefined) updates.name = name.trim();
+  if (genre !== undefined) updates.genre = genre || null;
+  if (allow_group !== undefined) updates.allow_group = allow_group !== false;
+  if (duration_minutes !== undefined) updates.duration_minutes = Number(duration_minutes);
+  if (price !== undefined) updates.price = Number(price);
+  if (deposit !== undefined) updates.deposit = Number(deposit);
   if (max_persons !== undefined) updates.max_persons = max_persons ? Number(max_persons) : null;
 
   const { data, error } = await supabase

@@ -6,13 +6,16 @@
 // silencieusement à 0 (`Number(deposit ?? 0)`) si omis. Ces tests prouvent le
 // garde-fou côté serveur, seul point qu'un pro ne peut pas contourner (le
 // `required`/`min="1"` du formulaire n'est qu'une aide UX, pas une garantie).
+//
+// 11/08 : ajout du plafond MAX_DEPOSIT_EUROS (50€, Stripe prélève sur le
+// total débité) et du garde dépôt <= prix, mêmes principes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let insertPayload: any = null;
 let insertCalled = false;
 let updatePayload: any = null;
 let updateCalled = false;
-let existingServiceFixture: any = { id: 'svc1' };
+let existingServiceFixture: any = { id: 'svc1', price: 40, deposit: 15 };
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
@@ -62,7 +65,7 @@ beforeEach(() => {
   insertCalled = false;
   updatePayload = null;
   updateCalled = false;
-  existingServiceFixture = { id: 'svc1' };
+  existingServiceFixture = { id: 'svc1', price: 40, deposit: 15 };
 });
 
 const baseService = { name: 'Coupe', duration_minutes: 30, price: 40 };
@@ -107,6 +110,40 @@ describe('POST /api/pro/services — garde-fou dépôt minimum 1€', () => {
   });
 });
 
+describe('POST /api/pro/services — plafond dépôt 50€ et dépôt <= prix', () => {
+  it('deposit = 50 (plafond exact, prix suffisant) → accepté', async () => {
+    const { POST } = await import('@/app/api/pro/services/route');
+    const res = await POST(buildRequest({ ...baseService, price: 100, deposit: 50 }) as any);
+    expect(res.status).toBe(201);
+    expect(insertPayload.deposit).toBe(50);
+  });
+
+  it('deposit = 50.01 → 400, rien inséré', async () => {
+    const { POST } = await import('@/app/api/pro/services/route');
+    const res = await POST(buildRequest({ ...baseService, price: 100, deposit: 50.01 }) as any);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/50/);
+    expect(insertCalled).toBe(false);
+  });
+
+  it('deposit = 0.99 → 400 (garde minimum), rien inséré', async () => {
+    const { POST } = await import('@/app/api/pro/services/route');
+    const res = await POST(buildRequest({ ...baseService, deposit: 0.99 }) as any);
+    expect(res.status).toBe(400);
+    expect(insertCalled).toBe(false);
+  });
+
+  it('deposit > prix (deposit 45, price 40) → 400, rien inséré', async () => {
+    const { POST } = await import('@/app/api/pro/services/route');
+    const res = await POST(buildRequest({ ...baseService, price: 40, deposit: 45 }) as any);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/prix/);
+    expect(insertCalled).toBe(false);
+  });
+});
+
 describe('PATCH /api/pro/services — garde-fou dépôt minimum 1€', () => {
   it('deposit envoyé à 0 sur un service existant → 400, aucune mise à jour', async () => {
     const { PATCH } = await import('@/app/api/pro/services/route');
@@ -135,5 +172,41 @@ describe('PATCH /api/pro/services — garde-fou dépôt minimum 1€', () => {
     const res = await PATCH(buildRequest({ id: 'svc1', deposit: 2 }) as any);
     expect(res.status).toBe(200);
     expect(updatePayload.deposit).toBe(2);
+  });
+});
+
+describe('PATCH /api/pro/services — plafond dépôt 50€ et dépôt <= prix', () => {
+  it('deposit = 50 (plafond exact, prix existant à 40 mais price aussi mis à jour à 100) → accepté', async () => {
+    const { PATCH } = await import('@/app/api/pro/services/route');
+    const res = await PATCH(buildRequest({ id: 'svc1', price: 100, deposit: 50 }) as any);
+    expect(res.status).toBe(200);
+    expect(updatePayload.deposit).toBe(50);
+  });
+
+  it('deposit = 50.01 → 400, aucune mise à jour', async () => {
+    const { PATCH } = await import('@/app/api/pro/services/route');
+    const res = await PATCH(buildRequest({ id: 'svc1', price: 100, deposit: 50.01 }) as any);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/50/);
+    expect(updateCalled).toBe(false);
+  });
+
+  it('deposit envoyé seul, sans price, au-delà du prix existant (fixture price=40) → 400', async () => {
+    const { PATCH } = await import('@/app/api/pro/services/route');
+    const res = await PATCH(buildRequest({ id: 'svc1', deposit: 45 }) as any);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/prix/);
+    expect(updateCalled).toBe(false);
+  });
+
+  it('price abaissé sous le dépôt existant (fixture deposit=15) sans toucher deposit → 400', async () => {
+    const { PATCH } = await import('@/app/api/pro/services/route');
+    const res = await PATCH(buildRequest({ id: 'svc1', price: 10 }) as any);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/prix/);
+    expect(updateCalled).toBe(false);
   });
 });

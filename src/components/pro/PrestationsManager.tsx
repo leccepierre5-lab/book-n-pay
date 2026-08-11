@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { Service } from '@/lib/database.types';
+import { MAX_DEPOSIT_EUROS } from '@/lib/booking-utils';
 
 type GenreValue = '' | 'homme' | 'femme' | 'enfants' | 'garcon' | 'fille';
 
@@ -316,6 +317,7 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
                 <input
                   type="number"
                   min="1"
+                  max={MAX_DEPOSIT_EUROS}
                   step="0.5"
                   placeholder="1"
                   value={form.deposit}
@@ -323,7 +325,7 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
                   required
                   className={inputClass}
                 />
-                <p className="mt-1 text-[10px] text-slate-600">Minimum 1€ — en dessous, la réservation ne peut pas être sécurisée en ligne.</p>
+                <p className="mt-1 text-[10px] text-slate-600">Entre 1€ et {MAX_DEPOSIT_EUROS}€, jamais au-dessus du prix de la prestation.</p>
               </div>
               <div>
                 <label className="block text-[10px] text-slate-500 uppercase tracking-widest mb-1.5">Max personnes</label>
