@@ -151,9 +151,9 @@ export default function CGUPage() {
               </li>
               <li>
                 <strong className="text-white/80">Frais exclus :</strong> Le "Joker" permet
-                exclusivement le remboursement des frais de réservation. Les frais de gestion sont
-                définitivement acquis à Book'nPay et ne font l'objet d'aucun remboursement, quel que
-                soit le statut de l'Utilisateur.
+                exclusivement le remboursement des frais de réservation. Les frais de gestion restent
+                acquis à Book'nPay lors d'une annulation par l'Utilisateur, quel que soit son statut.
+                Le cas de l'annulation par le Professionnel est régi par l'article 3.
               </li>
             </ul>
             <p>
@@ -178,9 +178,10 @@ export default function CGUPage() {
                 l'Utilisateur.
               </p>
               <p>
-                <strong className="text-white">5.2. Frais non remboursables :</strong> Conformément à
-                nos conditions, les frais de gestion ne sont en aucun cas remboursables, quelle que
-                soit la date d'annulation.
+                <strong className="text-white">5.2. Frais de gestion :</strong> les frais de gestion
+                ne sont pas remboursés lorsque l'annulation émane du Client, quelle qu'en soit la
+                date, le service de mise en relation ayant été rendu. Le cas de l'annulation par le
+                Professionnel est régi par l'article 3.
               </p>
               <p>
                 <strong className="text-white">5.3. Annulation tardive :</strong> Passé le délai de
