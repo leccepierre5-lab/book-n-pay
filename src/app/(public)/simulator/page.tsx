@@ -77,13 +77,14 @@ export default function SimulatorPage() {
 
   const plan = BNP_PLANS.find((p) => p.key === planKey)!;
 
-  const { absencesParMois, perteParMois, coutCommissionActuelle } = useMemo(() => {
+  const { absencesParMois, perteParMois, coutCommissionActuelle, ecartMensuel } = useMemo(() => {
     const absencesParMois = nbReservations * (noShowRatePct / 100);
     const perteParMois = absencesParMois * panierMoyen;
     const coutCommissionActuelle = nbReservations * panierMoyen * (commissionPct / 100);
+    const ecartMensuel = coutCommissionActuelle - plan.priceHT;
 
-    return { absencesParMois, perteParMois, coutCommissionActuelle };
-  }, [panierMoyen, nbReservations, noShowRatePct, commissionPct]);
+    return { absencesParMois, perteParMois, coutCommissionActuelle, ecartMensuel };
+  }, [panierMoyen, nbReservations, noShowRatePct, commissionPct, plan]);
 
   return (
     <div className="min-h-dvh px-4 py-10">
@@ -191,6 +192,19 @@ export default function SimulatorPage() {
               <span className="text-2xl font-black text-mint-400">{formatEuro(plan.priceHT)}</span>
               <span className="text-xs text-slate-500">Book&apos;nPay, plan {plan.label}, abonnement fixe</span>
             </div>
+            <div className="mt-3 pt-3 border-t border-white/[0.08] flex items-baseline gap-2">
+              <span className={`text-lg font-black ${ecartMensuel >= 0 ? 'text-mint-400' : 'text-red-400'}`}>
+                {ecartMensuel >= 0 ? '' : '-'}{formatEuro(Math.abs(ecartMensuel))}
+              </span>
+              <span className="text-xs text-slate-500">
+                {ecartMensuel >= 0 ? "d'écart par mois" : "d'écart par mois (Book'nPay plus cher sur ce plan)"}
+              </span>
+            </div>
+            {commissionPct === 0 && (
+              <p className="mt-2 text-[11px] text-slate-600">
+                Comparatif sur la commission uniquement — si votre outil actuel facture un abonnement fixe (ex. Resalib, 39,99 €/mois), il n&apos;est pas inclus ici.
+              </p>
+            )}
           </div>
         </div>
 
