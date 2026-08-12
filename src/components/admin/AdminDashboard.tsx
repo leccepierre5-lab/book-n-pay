@@ -2,8 +2,9 @@
 // src/components/admin/AdminDashboard.tsx
 import { useState } from 'react';
 import type { AppConfig, PartnerApplication } from '@/lib/database.types';
-import { BNP_PLANS } from '@/lib/plans-config';
+import { BNP_PLANS, getPlanConfig } from '@/lib/plans-config';
 import type { PlanKey } from '@/lib/plans-config';
+import { getSuggestedPlanFromPractitionersCount, getPractitionersCountLabel } from '@/lib/partner-plan-suggestion';
 import { createClient } from '@/lib/supabase/client';
 
 interface BusinessRow {
@@ -13,12 +14,6 @@ interface BusinessRow {
   frozen: boolean;
   frozen_reason: string | null;
 }
-
-const PLAN_FROM_ESTIMATE: Record<string, PlanKey> = {
-  '0-80': 'starter',
-  '81-300': 'business',
-  '300+': 'scale',
-};
 
 export default function AdminDashboard({
   configs,
@@ -40,6 +35,10 @@ export default function AdminDashboard({
   // Approval flow state
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>('starter');
+  // undefined = pas de recommandation (practitioners_count absent/invalide,
+  // ex. ancienne candidature) — distinct de selectedPlan qui, lui, a
+  // toujours une valeur (l'admin doit pouvoir soumettre).
+  const [suggestedPlan, setSuggestedPlan] = useState<PlanKey | undefined>(undefined);
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState('');
 
@@ -52,8 +51,14 @@ export default function AdminDashboard({
   };
 
   const startApproval = (app: PartnerApplication) => {
-    const suggested = PLAN_FROM_ESTIMATE[app.monthly_bookings_estimate] ?? 'starter';
-    setSelectedPlan(suggested);
+    // Suggestion portée par l'effectif SEUL — jamais par le volume de
+    // réservations (sans rapport avec le plan depuis la refonte tarifaire).
+    // Pas de suggestion (undefined) si practitioners_count est absent —
+    // 'starter' reste la valeur initiale de la sélection (l'admin doit
+    // toujours pouvoir soumettre), mais sans être présentée comme suggérée.
+    const suggested = getSuggestedPlanFromPractitionersCount(app.practitioners_count);
+    setSelectedPlan(suggested ?? 'starter');
+    setSuggestedPlan(suggested);
     setApprovalError('');
     setApprovingId(app.id);
   };
@@ -181,6 +186,7 @@ export default function AdminDashboard({
                       {app.category_label && ` — ${app.category_label}`}
                       {app.type && ` (${app.type})`}
                       {' '}· {app.monthly_bookings_estimate} rés/mois
+                      {' '}· {getPractitionersCountLabel(app.practitioners_count)}
                     </p>
                   </div>
                   <span
@@ -223,9 +229,18 @@ export default function AdminDashboard({
                     </p>
 
                     <div className="space-y-2">
-                      <p className="text-xs text-slate-400">
-                        Plan suggéré : <span className="text-white font-medium">{PLAN_FROM_ESTIMATE[app.monthly_bookings_estimate] ?? 'starter'}</span>
-                        {' '}(basé sur {app.monthly_bookings_estimate} rés/mois)
+                      {suggestedPlan ? (
+                        <p className="text-xs text-slate-400">
+                          Plan suggéré : <span className="text-white font-medium">{getPlanConfig(suggestedPlan)?.label ?? suggestedPlan}</span>
+                          {' '}(basé sur {getPractitionersCountLabel(app.practitioners_count)})
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Aucune suggestion — effectif non renseigné à la candidature (ancienne candidature). Choisissez le plan manuellement.
+                        </p>
+                      )}
+                      <p className="text-xs text-slate-600">
+                        Volume estimé : {app.monthly_bookings_estimate} rés/mois (indicatif, sans rapport avec le plan)
                       </p>
                       <div className="space-y-1.5">
                         {BNP_PLANS.map((plan) => (

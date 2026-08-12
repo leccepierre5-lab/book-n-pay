@@ -262,6 +262,8 @@ export interface PartnerApplication {
   type: string | null;
   monthly_bookings_estimate: '0-80' | '81-300' | '300+';
   approved_at: string | null;
+  // Migration 0042 — nullable (candidatures antérieures à ce champ)
+  practitioners_count: '1' | '2-3' | '4+' | null;
 }
 
 export interface AppConfig {

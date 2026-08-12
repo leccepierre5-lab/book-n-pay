@@ -3,7 +3,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { CGU_VERSION } from '@/lib/legal';
-import { BNP_PLANS } from '@/lib/plans-config';
+import { getPlanConfig } from '@/lib/plans-config';
+import { PRACTITIONERS_COUNT_OPTIONS, BOOKINGS_ESTIMATE_OPTIONS } from '@/lib/partner-plan-suggestion';
 
 const CATEGORIES = [
   { value: 'beaute', label: 'Beauté', sub: 'Coiffure, esthétique, barber, onglerie…' },
@@ -33,12 +34,6 @@ const TYPE_PLACEHOLDERS: Partial<Record<(typeof CATEGORIES)[number]['value'], st
   photographie: 'ex : Portrait, Mariage, Nouveau-né/Bébé, Famille, Entreprise/Corporate…',
 };
 
-const BOOKINGS_ESTIMATES = [
-  { value: '0-80', label: 'Moins de 120 / mois', hint: `Plan Starter — ${BNP_PLANS[0].priceHT} € HT` },
-  { value: '81-300', label: '121 à 300 / mois', hint: `Plan Business — ${BNP_PLANS[1].priceHT} € HT` },
-  { value: '300+', label: 'Plus de 300 / mois', hint: `Plan Scale — ${BNP_PLANS[2].priceHT} € HT` },
-] as const;
-
 export default function PartnerApplicationForm() {
   const [form, setForm] = useState({
     etablissement: '',
@@ -53,6 +48,7 @@ export default function PartnerApplicationForm() {
   const [categoryLabel, setCategoryLabel] = useState('');
   const [bizType, setBizType] = useState('');
   const [bookingsEstimate, setBookingsEstimate] = useState<'0-80' | '81-300' | '300+' | ''>('');
+  const [practitionersCount, setPractitionersCount] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +62,7 @@ export default function PartnerApplicationForm() {
       return;
     }
     if (!bookingsEstimate) { setError('Sélectionnez votre volume estimé de réservations.'); return; }
+    if (!practitionersCount) { setError('Sélectionnez le nombre de praticiens de votre établissement.'); return; }
     if (!acceptedCgu) { setError('Vous devez accepter les CGU/CGV pour envoyer votre candidature.'); return; }
     setLoading(true);
     setError(null);
@@ -82,6 +79,7 @@ export default function PartnerApplicationForm() {
       category_label: category === 'autre' ? (categoryLabel.trim() || null) : null,
       type: bizType.trim() || null,
       monthly_bookings_estimate: bookingsEstimate,
+      practitioners_count: practitionersCount,
       cgu_accepted_at: new Date().toISOString(),
       cgu_version: CGU_VERSION,
     });
@@ -200,16 +198,48 @@ export default function PartnerApplicationForm() {
         )}
       </section>
 
-      {/* Volume estimé — obligatoire */}
+      {/* Nombre de praticiens — obligatoire, détermine le plan suggéré */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+          Nombre de praticiens <span className="text-red-400">*</span>
+        </h2>
+        <div className="space-y-2">
+          {PRACTITIONERS_COUNT_OPTIONS.map(({ value, label, plan }) => (
+            <label
+              key={value}
+              className={`flex items-center justify-between rounded-xl border px-4 py-3 cursor-pointer transition-all ${
+                practitionersCount === value
+                  ? 'border-mint-500/50 bg-mint-500/10'
+                  : 'border-white/[0.08] bg-white/[0.02] hover:border-white/15'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="practitioners_count"
+                  value={value}
+                  checked={practitionersCount === value}
+                  onChange={() => setPractitionersCount(value)}
+                  className="accent-mint-500"
+                />
+                <span className="text-sm text-white">{label}</span>
+              </div>
+              <span className="text-[11px] text-slate-500">Plan {getPlanConfig(plan)?.label}</span>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      {/* Volume estimé — obligatoire, indicatif (sans rapport avec le plan) */}
       <section className="space-y-3">
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
           Volume de réservations estimé <span className="text-red-400">*</span>
         </h2>
         <div className="space-y-2">
-          {BOOKINGS_ESTIMATES.map(({ value, label, hint }) => (
+          {BOOKINGS_ESTIMATE_OPTIONS.map(({ value, label }) => (
             <label
               key={value}
-              className={`flex items-center justify-between rounded-xl border px-4 py-3 cursor-pointer transition-all ${
+              className={`flex items-center rounded-xl border px-4 py-3 cursor-pointer transition-all ${
                 bookingsEstimate === value
                   ? 'border-mint-500/50 bg-mint-500/10'
                   : 'border-white/[0.08] bg-white/[0.02] hover:border-white/15'
@@ -226,7 +256,6 @@ export default function PartnerApplicationForm() {
                 />
                 <span className="text-sm text-white">{label}</span>
               </div>
-              <span className="text-[11px] text-slate-500">{hint}</span>
             </label>
           ))}
         </div>
