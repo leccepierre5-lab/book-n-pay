@@ -80,7 +80,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "En quoi est-ce différent des plateformes à commission ?",
-    a: "Les annuaires classiques prélèvent 10 à 25 % sur chaque rendez-vous, à vie. Book'nPay applique un tarif fixe : plus votre volume augmente, plus votre marge reste intacte.",
+    a: "Les plateformes à commission prélèvent un pourcentage sur chaque réservation, à vie. Book'nPay applique un tarif fixe : plus votre volume augmente, plus votre marge reste intacte.",
   },
 ];
 
@@ -98,7 +98,7 @@ export default function TarifsPage() {
         <header className="mb-12 text-center">
           <p className="text-xs font-bold tracking-[0.2em] text-mint-500/70 uppercase mb-3">TARIFICATION</p>
           <h1 className="text-3xl font-bold text-white mb-3">Un abonnement fixe. Zéro commission.</h1>
-          <p className="text-slate-500 text-sm">Contrairement aux plateformes à commission (10 à 25 %), vos ventes restent 100 % les vôtres.</p>
+          <p className="text-slate-500 text-sm">Vous ne payez aucune commission sur vos rendez-vous. Quel que soit votre volume, votre abonnement ne bouge pas.</p>
         </header>
 
         <div className="mb-16 grid gap-5 sm:grid-cols-3">

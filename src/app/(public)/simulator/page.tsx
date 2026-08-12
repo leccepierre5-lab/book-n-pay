@@ -186,6 +186,11 @@ export default function SimulatorPage() {
             <p className="mt-1.5 text-[11px] text-slate-600">
               Pré-remplit l&apos;abonnement et la commission ci-dessous, à titre indicatif — les deux restent modifiables.
             </p>
+            {outilKey === 'commission' && (
+              <p className="mt-1 text-[11px] text-mint-400/80">
+                Indiquez le taux prélevé par votre plateforme dans le curseur commission ci-dessous.
+              </p>
+            )}
           </div>
 
           <div>
