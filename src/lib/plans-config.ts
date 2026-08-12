@@ -74,14 +74,30 @@ export function getPraticiensLimit(planKey: string): number | null {
 }
 
 // Retourne la date de fin d'engagement à partir de la date d'activation.
-// engagementMonths=0 (Starter) : setMonth(+0) renvoie une date identique à
-// startDate — vérifié par test (5 cas dont fin de mois, année bissextile,
-// veille DST) qu'aucun rollover ne se produit, voir tests/unit/plans-config.test.ts.
+//
+// ⚠️ Bug réel trouvé le 12/08/2026 (test rouge depuis sa création, bc648e9,
+// 11/08 — pas un flake d'environnement) : setMonth()/getMonth() (variante
+// locale) lisent/écrivent les champs de date dans le fuseau LOCAL du
+// runtime qui exécute le code, pas en UTC. Le 25/10 (veille du bascule
+// hiver FR), l'heure murale locale "02h00–02h59" existe DEUX FOIS en
+// Europe/Paris (une fois en CEST avant le bascule, une fois en CET après).
+// Sur une machine dont le fuseau local résout à Europe/Paris (poste dev,
+// CI), reconstruire cette heure murale ambiguë via setMonth(sameMonth)
+// la réinterprète du mauvais côté du bascule — décalage réel d'1h alors
+// que engagementMonths=0 devrait être un no-op exact. Sur Vercel (fuseau
+// UTC, sans DST — voir booking-utils.ts:parseParisDatetime), le bug ne se
+// voyait jamais, d'où le passage inaperçu. Corrigé en passant en
+// arithmétique UTC pure (setUTCMonth/getUTCMonth), qui n'a par définition
+// aucune heure ambiguë — comportement identique quel que soit le fuseau du
+// runtime qui exécute le test ou le code.
+// engagementMonths=0 (Starter) : end reste identique à startDate — vérifié
+// par test (5 cas dont fin de mois, année bissextile, veille DST), voir
+// tests/unit/plans-config.test.ts.
 export function getEngagementEndDate(startDate: Date, planKey: string): Date {
   const plan = getPlanConfig(planKey);
   const months = plan?.engagementMonths ?? 3;
   const end = new Date(startDate);
-  end.setMonth(end.getMonth() + months);
+  end.setUTCMonth(end.getUTCMonth() + months);
   return end;
 }
 
