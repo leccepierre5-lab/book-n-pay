@@ -11,6 +11,10 @@ function formatNombre(n: number) {
   return n.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
 }
 
+function formatEuroPrecis(n: number) {
+  return n.toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' €';
+}
+
 function Slider({
   label,
   value,
@@ -55,36 +59,61 @@ function Slider({
   );
 }
 
+type OutilKey = 'agenda' | 'fixe' | 'commission' | 'autre';
+
+// Présélections indicatives, jamais figées — le pro garde la main sur les
+// deux champs après sélection. Pour "Plateforme à commission", seul
+// l'abonnement est préempli (0€, ces plateformes n'en facturent pas) ; la
+// commission n'a volontairement aucune valeur par défaut inventée, le pro
+// la règle lui-même selon son propre outil.
+const OUTILS_ACTUELS: { key: OutilKey; label: string; hint?: string; abonnement?: number; commission?: number }[] = [
+  { key: 'agenda', label: 'Agenda papier / téléphone / SMS', abonnement: 0, commission: 0 },
+  { key: 'fixe', label: 'Logiciel à abonnement fixe', hint: 'ex. Resalib, Perfactive', abonnement: 39.99, commission: 0 },
+  { key: 'commission', label: 'Plateforme à commission', hint: 'ex. Planity, Treatwell', abonnement: 0 },
+  { key: 'autre', label: 'Autre / je saisis mes chiffres' },
+];
+
 // Toutes les entrées sont saisies par le pro — aucune hypothèse de la
 // plateforme n'est codée en dur. Le taux de no-show et la commission sont
 // des pourcentages (pas des valeurs absolues) pour que le nombre d'absences
 // se recalcule correctement quand le volume de réservations change.
 //
-// Défaut commission = 0 % : Resalib, notre seul concurrent réel sur la
-// cible, ne prend aucune commission (39,99 € fixes/mois). Un défaut > 0
-// afficherait une économie fausse à un praticien déjà chez eux.
+// Défaut : agenda papier/téléphone (0€ abonnement, 0% commission) — le cas
+// le plus fréquent sur la cible. Le sélecteur "votre solution actuelle"
+// pré-remplit abonnement + commission à titre indicatif seulement.
 //
 // Aucun taux d'évitement de no-show n'est demandé ni affiché : la sortie
 // montre la perte ACTUELLE du pro, jamais un gain hypothétique attribué à
 // Book'nPay. Aucune synthèse prédictive ("vous gagnerez X") — le praticien
-// déduit lui-même en comparant les deux blocs de sortie.
+// déduit lui-même en comparant les deux blocs de sortie, qui restent
+// séparés (jamais fusionnés en un "bilan net").
 export default function SimulatorPage() {
   const [panierMoyen, setPanierMoyen] = useState(60);
   const [nbReservations, setNbReservations] = useState(80);
   const [noShowRatePct, setNoShowRatePct] = useState(0);
+  const [outilKey, setOutilKey] = useState<OutilKey>('agenda');
+  const [abonnementActuel, setAbonnementActuel] = useState(0);
   const [commissionPct, setCommissionPct] = useState(0);
   const [planKey, setPlanKey] = useState<'starter' | 'business' | 'scale'>('starter');
 
   const plan = BNP_PLANS.find((p) => p.key === planKey)!;
 
-  const { absencesParMois, perteParMois, coutCommissionActuelle, ecartMensuel } = useMemo(() => {
+  const selectOutil = (key: OutilKey) => {
+    const outil = OUTILS_ACTUELS.find((o) => o.key === key)!;
+    setOutilKey(key);
+    if (outil.abonnement !== undefined) setAbonnementActuel(outil.abonnement);
+    if (outil.commission !== undefined) setCommissionPct(outil.commission);
+  };
+
+  const { absencesParMois, perteParMois, coutCommissionActuelle, coutOutilActuel, ecartMensuel } = useMemo(() => {
     const absencesParMois = nbReservations * (noShowRatePct / 100);
     const perteParMois = absencesParMois * panierMoyen;
     const coutCommissionActuelle = nbReservations * panierMoyen * (commissionPct / 100);
-    const ecartMensuel = coutCommissionActuelle - plan.priceHT;
+    const coutOutilActuel = abonnementActuel + coutCommissionActuelle;
+    const ecartMensuel = coutOutilActuel - plan.priceHT;
 
-    return { absencesParMois, perteParMois, coutCommissionActuelle, ecartMensuel };
-  }, [panierMoyen, nbReservations, noShowRatePct, commissionPct, plan]);
+    return { absencesParMois, perteParMois, coutCommissionActuelle, coutOutilActuel, ecartMensuel };
+  }, [panierMoyen, nbReservations, noShowRatePct, abonnementActuel, commissionPct, plan]);
 
   return (
     <div className="min-h-dvh px-4 py-10">
@@ -137,6 +166,50 @@ export default function SimulatorPage() {
             </p>
           </div>
           <div>
+            <label className="text-sm text-slate-300 mb-2 block">Votre solution actuelle</label>
+            <div className="grid grid-cols-2 gap-2">
+              {OUTILS_ACTUELS.map((o) => (
+                <button
+                  key={o.key}
+                  onClick={() => selectOutil(o.key)}
+                  className={`rounded-xl border px-3 py-2.5 text-left transition-all duration-200 ${
+                    outilKey === o.key
+                      ? 'bg-mint-500 border-mint-500 text-navy-950'
+                      : 'bg-navy-800 border-white/[0.08] text-slate-400 hover:border-white/20'
+                  }`}
+                >
+                  <p className="text-xs font-bold">{o.label}</p>
+                  {o.hint && <p className="text-[11px] opacity-80">{o.hint}</p>}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-600">
+              Pré-remplit l&apos;abonnement et la commission ci-dessous, à titre indicatif — les deux restent modifiables.
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm text-slate-300">Abonnement de votre outil actuel</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={0}
+                  max={500}
+                  step={0.01}
+                  value={abonnementActuel}
+                  onChange={(e) => setAbonnementActuel(Math.max(0, Number(e.target.value)))}
+                  className="w-20 rounded-lg bg-navy-800 border border-white/10 px-2 py-1 text-sm font-bold text-mint-400 text-right focus:outline-none focus:border-mint-500/50"
+                />
+                <span className="text-sm font-bold text-mint-400">€/mois</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-600">
+              0 € si vous n&apos;avez pas d&apos;abonnement logiciel aujourd&apos;hui.
+            </p>
+          </div>
+
+          <div>
             <Slider
               label="Commission de l'outil actuel"
               value={commissionPct}
@@ -147,7 +220,7 @@ export default function SimulatorPage() {
               onChange={setCommissionPct}
             />
             <p className="mt-1.5 text-[11px] text-slate-600">
-              0 % par défaut (ex. Resalib, à abonnement fixe sans commission). Ajustez si votre outil actuel prend une commission par réservation.
+              0 % si votre outil actuel ne prend pas de commission par réservation.
             </p>
           </div>
 
@@ -185,8 +258,10 @@ export default function SimulatorPage() {
           <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-5">
             <p className="text-xs text-slate-500 mb-1">Comparatif de coût mensuel</p>
             <div className="flex items-baseline gap-3 flex-wrap">
-              <span className="text-2xl font-black text-white">{formatEuro(coutCommissionActuelle)}</span>
-              <span className="text-xs text-slate-500">outil actuel ({commissionPct}% × {nbReservations} résa × {panierMoyen}€)</span>
+              <span className="text-2xl font-black text-white">{formatEuro(coutOutilActuel)}</span>
+              <span className="text-xs text-slate-500">
+                outil actuel ({formatEuroPrecis(abonnementActuel)} abonnement + {commissionPct}% × {nbReservations} résa × {panierMoyen}€ = {formatEuro(coutCommissionActuelle)} commission)
+              </span>
             </div>
             <div className="flex items-baseline gap-3 flex-wrap mt-2">
               <span className="text-2xl font-black text-mint-400">{formatEuro(plan.priceHT)}</span>
@@ -200,11 +275,6 @@ export default function SimulatorPage() {
                 {ecartMensuel >= 0 ? "d'écart par mois" : "d'écart par mois (Book'nPay plus cher sur ce plan)"}
               </span>
             </div>
-            {commissionPct === 0 && (
-              <p className="mt-2 text-[11px] text-slate-600">
-                Comparatif sur la commission uniquement — si votre outil actuel facture un abonnement fixe (ex. Resalib, 39,99 €/mois), il n&apos;est pas inclus ici.
-              </p>
-            )}
           </div>
         </div>
 
