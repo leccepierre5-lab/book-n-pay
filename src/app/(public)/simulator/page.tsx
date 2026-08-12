@@ -280,6 +280,20 @@ export default function SimulatorPage() {
                 {ecartMensuel >= 0 ? "d'écart par mois" : "d'écart par mois (Book'nPay plus cher sur ce plan)"}
               </span>
             </div>
+            {/* Affiché seulement pour les 3 solutions dont on connaît le périmètre réel —
+                pour "Autre", on ignore ce que fait déjà l'outil du pro, donc on ne peut pas
+                honnêtement dire ce que Book'nPay "ajoute". Aucun montant sur les fonctionnalités
+                elles-mêmes, seul l'écart déjà calculé est chiffré. */}
+            {outilKey !== 'autre' && (
+              <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+                {ecartMensuel < 0 ? (
+                  <>Pour {formatEuro(-ecartMensuel)} de plus par mois, vous ajoutez : </>
+                ) : (
+                  <>Vous ajoutez : </>
+                )}
+                prépaiement du créneau, indemnisation automatique en cas d&apos;absence, check-in QR.
+              </p>
+            )}
           </div>
         </div>
 
