@@ -62,3 +62,53 @@ export async function retrieveManagementFeeAmount(
     return null;
   }
 }
+
+// Récupère auprès du pro le dépôt déjà transféré automatiquement à la
+// réservation (transfer_data.destination, stripe/checkout/route.ts) — sur un
+// remboursement PARTIEL (dépôt seul, frais de gestion conservés), le flag
+// `reverse_transfer` de stripe.refunds.create ne suffit PAS : Stripe annule le
+// transfert proportionnellement au ratio (montant remboursé / montant total de
+// la charge), pas au montant du dépôt lui-même — la charge incluant aussi les
+// frais de gestion, ce ratio est toujours < 100%, donc `reverse_transfer` seul
+// sous-récupère (ex. dépôt 10€/frais 2€/charge 12€ → 83% du dépôt récupéré,
+// pas 100%). Vérifié dans la doc Stripe (Connect > Destination charges >
+// Émettre des remboursements). D'où un appel SÉPARÉ à l'API Transfer
+// Reversals, qui accepte un montant exact indépendant de cette proportionnalité
+// (docs.stripe.com/api/transfer_reversals/create). Seule EXCEPTION : C15
+// (pro/cancel-booking) rembourse 100% de la charge (dépôt + frais de gestion)
+// — dans ce cas `reverse_transfer: true` sur le refund suffit et ce helper
+// n'est pas utilisé (voir proCancellationRefundAmountCents ci-dessus).
+//
+// Best-effort STRICT : le remboursement client (déjà acquis avant d'appeler
+// ce helper, voir chaque site d'appel) ne doit JAMAIS être remis en cause par
+// un échec ici — un échec de récupération est une alerte admin, jamais un
+// blocage. `refund_application_fee` n'est volontairement jamais posé : il
+// enverrait les frais de gestion déjà perçus par la plateforme VERS le pro
+// (l'inverse de pro_charges, qui les lui refacture) — les deux combinés
+// créeraient une incohérence comptable directe.
+export async function reverseConnectedAccountTransfer(
+  stripe: Stripe,
+  paymentIntentId: string | null | undefined,
+  amountCents: number,
+  logPrefix: string
+): Promise<{ done: boolean; error?: string }> {
+  if (!paymentIntentId || amountCents <= 0) return { done: false };
+  try {
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['latest_charge'] });
+    const charge = pi.latest_charge;
+    // string si non-expandé nulle part, mais on n'a expandé QUE latest_charge
+    // ici — charge.transfer reste donc un simple ID de Transfer, pas un objet.
+    const transferId = charge && typeof charge !== 'string' ? (charge.transfer as string | null) : null;
+    if (!transferId) {
+      // Pas de transfert à l'origine (ex. fixture sans compte Connect en mode
+      // test, stripe_account_id absent au moment du checkout) — rien à
+      // récupérer, ce n'est pas un échec.
+      return { done: false };
+    }
+    await stripe.transfers.createReversal(transferId, { amount: amountCents });
+    return { done: true };
+  } catch (e: any) {
+    console.warn(`[${logPrefix}] Récupération du dépôt auprès du pro échouée:`, e.message);
+    return { done: false, error: e.message };
+  }
+}

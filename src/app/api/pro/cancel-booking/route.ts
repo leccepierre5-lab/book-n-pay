@@ -143,9 +143,23 @@ export async function POST(req: NextRequest) {
           payment_intent: member.stripe_payment_intent_id,
           amount: refundAmountCents,
           reason: 'requested_by_customer',
-          // Cette route envoie son propre email d'annulation (ci-dessous) :
-          // évite un second email depuis le webhook charge.refunded pour le
-          // même remboursement (même flag que cancel/refund-gesture).
+          // reverse_transfer: true — ce remboursement couvre 100% de la charge
+          // (dépôt + frais de gestion, proCancellationRefundAmountCents
+          // ci-dessus) : Stripe annule alors 100% du transfert automatique
+          // (transfer_data.destination, stripe/checkout/route.ts) fait au pro
+          // à la réservation. Sans ce flag, le pro garderait le dépôt déjà
+          // transféré et la PLATEFORME absorberait seule ce remboursement —
+          // vérifié dans la doc Stripe (Connect > Destination charges >
+          // Émettre des remboursements). Seule cette route peut utiliser le
+          // flag natif tel quel : c'est la seule des 4 à rembourser 100% de la
+          // charge — les 3 autres (dépôt seul) passent par
+          // reverseConnectedAccountTransfer (lib/refunds.ts) à la place, le
+          // flag sous-récupérant sur un remboursement partiel. Aucune
+          // interaction avec pro_charges plus bas : ce flag ne touche que le
+          // dépôt transféré, jamais les frais de gestion (qui ne sont jamais
+          // transférés au pro, application_fee_amount reste sur la
+          // plateforme) — donc pas de double récupération.
+          reverse_transfer: true,
           metadata: { email_sent: 'true', reason: 'pro_cancellation' },
         });
         refundDone = true;

@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, phonesMatch, formatTime } from '@/lib/booking-utils';
-import { depositRefundAmountCents, retrieveManagementFeeAmount } from '@/lib/refunds';
+import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
@@ -124,6 +124,36 @@ export async function POST(req: NextRequest) {
           failed: 1,
           failedItems: [memberId],
           failedDescriptions: [`membre ${memberId} (booking ${bookingId}, ${member.deposit ?? 0}€) — ${stripeErr.message}`],
+        });
+      }
+    }
+
+    // Récupération du dépôt déjà transféré au pro (transfer_data.destination,
+    // stripe/checkout/route.ts) — UNIQUEMENT si le client a bien été remboursé
+    // (refundDone) : pas de raison de réclamer au pro tant que l'argent n'est
+    // pas reparti côté client. Ordre volontaire : refund client D'ABORD
+    // (ci-dessus), réversal ENSUITE — voir lib/refunds.ts pour le détail de
+    // pourquoi `reverse_transfer` sur le refund lui-même ne suffit pas ici
+    // (remboursement partiel, dépôt seul). Best-effort strict : un échec ne
+    // doit jamais bloquer la libération du créneau ci-dessous — c'est une
+    // alerte admin, pas un blocage.
+    let transferReversed = false;
+    if (refundDone) {
+      const reversal = await reverseConnectedAccountTransfer(
+        stripe,
+        member.stripe_payment_intent_id,
+        depositRefundAmountCents(member.deposit),
+        'CancelClient'
+      );
+      transferReversed = reversal.done;
+      if (reversal.error) {
+        await notifyAdminOnFailure('bookings/cancel:reverse_transfer', {
+          processed: 0,
+          failed: 1,
+          failedItems: [memberId],
+          failedDescriptions: [
+            `membre ${memberId} (booking ${bookingId}) — récupération du dépôt (${member.deposit ?? 0}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
+          ],
         });
       }
     }

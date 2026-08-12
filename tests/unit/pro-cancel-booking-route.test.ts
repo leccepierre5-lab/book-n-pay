@@ -190,8 +190,16 @@ describe('POST /api/pro/cancel-booking', () => {
       payment_intent: 'pi_123',
       amount: 1699,
       reason: 'requested_by_customer',
+      // reverse_transfer:true — cette route rembourse 100% de la charge
+      // (dépôt + frais de gestion), donc le flag natif suffit à récupérer
+      // 100% du transfert fait au pro (bug critique reverse_transfer,
+      // corrigé). Aucun refund_application_fee : les frais de gestion ne
+      // sont jamais transférés au pro dans ce modèle (application_fee_amount
+      // reste sur la plateforme), donc rien à en "rendre".
+      reverse_transfer: true,
       metadata: { email_sent: 'true', reason: 'pro_cancellation' },
     });
+    expect(mockRefundsCreate.mock.calls[0][0]).not.toHaveProperty('refund_application_fee');
 
     // Statut réutilisé, montant_rembourse = TOTAL.
     const memberUpdateCall = chains.booking_members.update.mock.calls[0][0];
@@ -327,6 +335,32 @@ describe('POST /api/pro/cancel-booking', () => {
     // Un seul email (client) — pas d'email pro sans montant à annoncer.
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
     expect(mockSendEmail.mock.calls[0][0].to).toBe('client@example.com');
+  });
+
+  it('bug critique reverse_transfer : pas de double récupération avec pro_charges (montants disjoints)', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
+    chains.bookings = makeChain([], FUTURE_BOOKING);
+    chains.booking_members = makeChain([], PAID_MEMBER_WITH_FEE);
+    chains.booking_logs = makeChain([]);
+    chains.pro_charges = makeChain([], { id: 'charge-1' });
+    chains.businesses = makeChain([], { slug: null, owner_id: 'owner-1' });
+    mockSessionsRetrieve.mockResolvedValueOnce({ metadata: { fraisGestion: '1.99' } });
+
+    const { POST } = await import('@/app/api/pro/cancel-booking/route');
+    await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
+
+    // reverse_transfer récupère le DÉPÔT auprès du pro (transfert Stripe,
+    // transfer_data.destination) — pro_charges facture séparément les FRAIS
+    // DE GESTION (jamais transférés au pro dans ce modèle). Un seul appel
+    // refunds.create (le flag suffit, pas d'appel séparé à
+    // reverseConnectedAccountTransfer/transfers.createReversal pour cette
+    // route) et une seule ligne pro_charges, avec le montant frais de
+    // gestion SEUL (1.99€=199 cents) — jamais le dépôt (15€) ni le total.
+    expect(mockRefundsCreate).toHaveBeenCalledTimes(1);
+    expect(chains.pro_charges.insert).toHaveBeenCalledTimes(1);
+    expect(chains.pro_charges.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ amount_cents: 199 })
+    );
   });
 
   it('échec Stripe : le membre est quand même annulé et le créneau libéré, aucune charge pro_charges, log refund_status=echec, alerte admin (refund)', async () => {

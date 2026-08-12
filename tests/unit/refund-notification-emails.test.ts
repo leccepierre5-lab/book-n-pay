@@ -13,8 +13,19 @@ vi.mock('@/lib/email/send', () => ({
   sendEmail: vi.fn(async (opts: any) => { sentEmails.push(opts); return { sent: true }; }),
 }));
 
+// paymentIntents.retrieve/transfers.createReversal : nécessaires depuis le
+// correctif reverse_transfer (bookings/cancel, freeze-business, refund-gesture
+// tentent tous une récupération du dépôt auprès du pro après un refund
+// réussi, voir lib/refunds.ts:reverseConnectedAccountTransfer). Mockés en
+// succès ici pour ne pas déclencher de fausse alerte admin dans des tests qui
+// ne portent pas sur ce mécanisme (couvert séparément par
+// reverse-transfer-refunds.test.ts).
 vi.mock('@/lib/stripe/client', () => ({
-  getStripeClient: vi.fn(async () => ({ refunds: { create: vi.fn(async () => ({ id: 're_1' })) } })),
+  getStripeClient: vi.fn(async () => ({
+    refunds: { create: vi.fn(async () => ({ id: 're_1' })) },
+    paymentIntents: { retrieve: vi.fn(async () => ({ latest_charge: { transfer: 'tr_1' } })) },
+    transfers: { createReversal: vi.fn(async () => ({ id: 'trr_1' })) },
+  })),
 }));
 
 vi.mock('@/lib/booking-lifecycle', () => ({

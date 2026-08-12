@@ -6,12 +6,13 @@
 // initiées par le client avant le RDV).
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { depositRefundAmountCents, retrieveManagementFeeAmount } from '@/lib/refunds';
+import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
 import { formatTime } from '@/lib/booking-utils';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,19 +63,66 @@ export async function POST(req: NextRequest) {
     }
 
     const stripe = await getStripeClient(serviceSupabase);
-    await stripe.refunds.create({
-      payment_intent: member.stripe_payment_intent_id,
-      // Ne rembourse que les frais de réservation — les frais de gestion
-      // Book'nPay restent acquis, même sur un geste commercial du pro.
-      amount: depositRefundAmountCents(member.deposit),
-      reason: 'requested_by_customer',
-      // Cette route envoie déjà son propre email (ci-dessous) : ce flag
-      // dit au webhook charge.refunded de ne pas en renvoyer un second
-      // pour le même remboursement. Un remboursement déclenché ailleurs
-      // (dashboard Stripe, admin freeze) n'a pas ce flag et le webhook
-      // reste le filet normal.
-      metadata: { email_sent: 'true' },
-    });
+    const depositCents = depositRefundAmountCents(member.deposit);
+    // ⚠️ CORRECTIF (bug critique reverse_transfer) : cette route n'avait
+    // jusqu'ici AUCUN try/catch autour du refund — un échec Stripe faisait
+    // planter toute la requête (500 brut via le catch générique en bas de
+    // fichier), sans jamais alerter personne côté admin. Contrairement à
+    // bookings/cancel ou freeze-business, il n'y a pas d'événement externe
+    // déjà survenu à couvrir coûte que coûte ici (c'est un geste VOLONTAIRE
+    // du pro) — on garde donc le comportement "on s'arrête si le refund
+    // échoue", on ajoute juste la visibilité admin qui manquait.
+    try {
+      await stripe.refunds.create({
+        payment_intent: member.stripe_payment_intent_id,
+        // Ne rembourse que les frais de réservation — les frais de gestion
+        // Book'nPay restent acquis, même sur un geste commercial du pro.
+        amount: depositCents,
+        reason: 'requested_by_customer',
+        // Cette route envoie déjà son propre email (ci-dessous) : ce flag
+        // dit au webhook charge.refunded de ne pas en renvoyer un second
+        // pour le même remboursement. Un remboursement déclenché ailleurs
+        // (dashboard Stripe, admin freeze) n'a pas ce flag et le webhook
+        // reste le filet normal.
+        metadata: { email_sent: 'true' },
+      });
+    } catch (stripeErr: any) {
+      console.error('[RefundGesture] Erreur Stripe:', stripeErr.message);
+      await notifyAdminOnFailure('pro/refund-gesture:refund', {
+        processed: 0,
+        failed: 1,
+        failedItems: [memberId],
+        failedDescriptions: [`membre ${memberId} (booking ${bookingId}, ${member.deposit ?? 0}€) — ${stripeErr.message}`],
+      });
+      return NextResponse.json(
+        { error: 'Le remboursement Stripe a échoué — notre équipe a été alertée, réessaie ou contacte-nous si ça persiste.' },
+        { status: 502 }
+      );
+    }
+
+    // Récupération du dépôt déjà transféré au pro (transfer_data.destination)
+    // — remboursement PARTIEL ici (dépôt seul, frais de gestion conservés),
+    // reverse_transfer sur le refund seul sous-récupérerait (voir
+    // lib/refunds.ts) : réversal séparée à montant exact. Best-effort strict,
+    // ne bloque jamais la suite (créneau déjà géré ci-dessous) — un échec est
+    // une alerte admin, jamais un blocage (le refund client, lui, a déjà
+    // réussi au-dessus).
+    const reversal = await reverseConnectedAccountTransfer(
+      stripe,
+      member.stripe_payment_intent_id,
+      depositCents,
+      'RefundGesture'
+    );
+    if (reversal.error) {
+      await notifyAdminOnFailure('pro/refund-gesture:reverse_transfer', {
+        processed: 0,
+        failed: 1,
+        failedItems: [memberId],
+        failedDescriptions: [
+          `membre ${memberId} (booking ${bookingId}) — récupération du dépôt (${member.deposit ?? 0}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
+        ],
+      });
+    }
 
     await serviceSupabase.from('booking_members').update({ status: 'cancelled' }).eq('id', memberId);
     // Voir lib/booking-lifecycle.ts — sans ça le créneau restait bloqué

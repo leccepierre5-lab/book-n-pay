@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
-import { depositRefundAmountCents, retrieveManagementFeeAmount } from '@/lib/refunds';
+import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer } from '@/lib/refunds';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
 import { formatTime, getParisDateOffsetStr } from '@/lib/booking-utils';
@@ -94,13 +94,38 @@ export async function POST(req: NextRequest) {
           // ses frais de réservation sans remboursement ni notification.
           if (member.stripe_payment_intent_id) {
             try {
+              const depositCents = depositRefundAmountCents(member.deposit);
               await stripe.refunds.create({
                 payment_intent: member.stripe_payment_intent_id,
                 // Ne rembourse que les frais de réservation — les frais de
                 // gestion Book'nPay restent acquis même sur un gel d'établissement.
-                amount: depositRefundAmountCents(member.deposit),
+                amount: depositCents,
                 metadata: { reason: 'business_frozen', biz_id: bizId },
               });
+
+              // Récupération du dépôt déjà transféré au pro
+              // (transfer_data.destination) — remboursement PARTIEL ici (dépôt
+              // seul), reverse_transfer sur le refund seul sous-récupérerait
+              // (voir lib/refunds.ts) : réversal séparée à montant exact.
+              // Best-effort strict — un échec ici est une alerte admin
+              // groupée (refundFailures plus bas), jamais un blocage du gel
+              // ni de la libération du créneau (déjà faits/à faire quoi qu'il
+              // arrive).
+              const reversal = await reverseConnectedAccountTransfer(
+                stripe,
+                member.stripe_payment_intent_id,
+                depositCents,
+                'FreezeBusiness'
+              );
+              if (reversal.error) {
+                refundFailures.push({
+                  bookingId: booking.id,
+                  memberId: member.id,
+                  deposit: member.deposit ?? 0,
+                  message: `récupération du dépôt auprès du pro échouée (client déjà remboursé) — ${reversal.error}`,
+                });
+              }
+
               await serviceSupabase
                 .from('booking_members')
                 .update({ status: 'cancelled', montant_rembourse: member.deposit ?? 0 })

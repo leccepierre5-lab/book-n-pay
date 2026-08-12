@@ -129,6 +129,11 @@ describe('admin/freeze-business — refunds Stripe en échec, alerte groupée', 
             return { id: 're_ok' };
           }),
         },
+        // Le membre pi_ok passe par reverseConnectedAccountTransfer après son
+        // refund réussi (bug critique reverse_transfer) — mocké en succès ici,
+        // ce test porte sur l'échec du REFUND lui-même, pas de la réversal.
+        paymentIntents: { retrieve: vi.fn(async () => ({ latest_charge: { transfer: 'tr_ok' } })) },
+        transfers: { createReversal: vi.fn(async () => ({ id: 'trr_ok' })) },
       })),
     }));
     vi.doMock('@/lib/supabase/server', () => ({
