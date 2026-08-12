@@ -46,13 +46,23 @@ const notifyAdminOnFailure = vi.fn(async (_label: string, _result: any) => {});
 vi.mock('@/lib/notify-admin', () => ({ notifyAdminOnFailure }));
 
 const mockRefundsCreate = vi.fn(async () => ({ id: 're_1' }));
-const mockPiRetrieve = vi.fn(async (id: string) => ({ latest_charge: { transfer: `tr_${id}` } }));
+// Type explicite (transfer: string | null) : un pi.latest_charge.transfer
+// null est un cas réel testé plus bas (fixture sans compte Connect) — sans
+// cette annotation, TS infère `string` depuis le seul usage par défaut
+// (template `tr_${id}`) et rejette `mockResolvedValueOnce({ transfer: null })`.
+const mockPiRetrieve = vi.fn(async (id: string): Promise<{ latest_charge: { transfer: string | null } }> => ({
+  latest_charge: { transfer: `tr_${id}` },
+}));
 const mockCreateReversal = vi.fn(async () => ({ id: 'trr_1' }));
 vi.mock('@/lib/stripe/client', () => ({
+  // Référence directe (pas de wrapper (...args) => mock(...args)) : les mocks
+  // ci-dessus n'ont pas tous la même arité déclarée (0, 1 param...), un
+  // wrapper `(...args: any[]) =>` spreadé dedans échoue le typecheck
+  // (TS2556, la signature du mock n'est pas un tuple compatible).
   getStripeClient: vi.fn(async () => ({
-    refunds: { create: (...args: any[]) => mockRefundsCreate(...args) },
-    paymentIntents: { retrieve: (...args: any[]) => mockPiRetrieve(...args) },
-    transfers: { createReversal: (...args: any[]) => mockCreateReversal(...args) },
+    refunds: { create: mockRefundsCreate },
+    paymentIntents: { retrieve: mockPiRetrieve },
+    transfers: { createReversal: mockCreateReversal },
   })),
 }));
 

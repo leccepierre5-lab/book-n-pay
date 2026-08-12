@@ -28,7 +28,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockGetUser = vi.fn();
 let authProfile: any = null;
 
-const mockRefundsCreate = vi.fn(async () => ({ id: 're_test' }));
+// (...args: any[]) — sans args typés, TS infère un mock 0-arité et
+// `.mock.calls[0][0]` (utilisé plus bas) échoue le typecheck (tuple `[]`
+// n'a pas d'index 0), alors que la route réelle appelle bien refunds.create
+// avec un objet.
+const mockRefundsCreate = vi.fn(async (..._args: any[]) => ({ id: 're_test' }));
 const mockSessionsRetrieve = vi.fn(async () => ({ metadata: {} }));
 vi.mock('@/lib/stripe/client', () => ({
   getStripeClient: vi.fn(async () => ({
