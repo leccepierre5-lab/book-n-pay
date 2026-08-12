@@ -10,6 +10,7 @@ import {
   getSuggestedPlanFromPractitionersCount,
   getPractitionersCountLabel,
   BOOKINGS_ESTIMATE_OPTIONS,
+  getBookingsEstimateLabel,
 } from '@/lib/partner-plan-suggestion';
 
 describe('PRACTITIONERS_COUNT_OPTIONS — dérivé de BNP_PLANS.maxStaff', () => {
@@ -56,11 +57,22 @@ describe('getPractitionersCountLabel', () => {
 });
 
 describe('BOOKINGS_ESTIMATE_OPTIONS — factorisé, sans référence à un plan', () => {
-  it('3 options, aucune ne porte de champ plan/hint (volume sans rapport avec le plan)', () => {
+  it('3 options, libellés alignés sur les valeurs stockées (chk_pa_bookings_estimate, migration 0016)', () => {
     expect(BOOKINGS_ESTIMATE_OPTIONS).toEqual([
-      { value: '0-80', label: 'Moins de 120 / mois' },
-      { value: '81-300', label: '121 à 300 / mois' },
+      { value: '0-80', label: "Jusqu'à 80 / mois" },
+      { value: '81-300', label: '81 à 300 / mois' },
       { value: '300+', label: 'Plus de 300 / mois' },
     ]);
+  });
+});
+
+describe('getBookingsEstimateLabel — facultatif depuis la migration 0044', () => {
+  it('valeur connue → libellé humain', () => {
+    expect(getBookingsEstimateLabel('81-300')).toBe('81 à 300 / mois');
+  });
+
+  it('null/undefined → libellé de repli explicite, jamais une valeur par défaut silencieuse', () => {
+    expect(getBookingsEstimateLabel(null)).toBe('non renseigné');
+    expect(getBookingsEstimateLabel(undefined)).toBe('non renseigné');
   });
 });

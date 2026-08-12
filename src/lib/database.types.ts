@@ -260,7 +260,8 @@ export interface PartnerApplication {
     | 'tatouage-piercing' | 'coaching' | 'animaux' | 'beaute-domicile' | 'photographie' | 'autre';
   category_label: string | null;
   type: string | null;
-  monthly_bookings_estimate: '0-80' | '81-300' | '300+';
+  // Migration 0044 — nullable (facultatif à la candidature depuis le 12/08/2026)
+  monthly_bookings_estimate: '0-80' | '81-300' | '300+' | null;
   approved_at: string | null;
   // Migration 0042 — nullable (candidatures antérieures à ce champ)
   practitioners_count: '1' | '2-3' | '4+' | null;

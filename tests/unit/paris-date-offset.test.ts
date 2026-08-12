@@ -9,7 +9,7 @@
 // passe par Intl.DateTimeFormat({timeZone:'Europe/Paris'}) et est donc
 // indépendant du fuseau du runtime qui l'exécute.
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { getParisDateOffsetStr, getParisTomorrowStr, toParisDateStr } from '@/lib/booking-utils';
+import { getParisDateOffsetStr, getParisTomorrowStr, toParisDateStr, isBookingDateUpcoming } from '@/lib/booking-utils';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -86,5 +86,38 @@ describe('toParisDateStr — instant arbitraire (pas "maintenant")', () => {
     // du vrai jour de prélèvement Paris, '2026-10-01'.
     const stripeTs = Math.floor(new Date('2026-09-30T22:15:00.000Z').getTime() / 1000);
     expect(toParisDateStr(new Date(stripeTs * 1000))).toBe('2026-10-01');
+  });
+});
+
+// isBookingDateUpcoming — onglet "À venir"/"Passés" de MyBookingsList.tsx.
+// Bug trouvé le 12/08/2026 : le composant comparait `booking.date` à
+// `new Date().toISOString().slice(0,10)` (date UTC) — même famille de bug
+// que ci-dessus, forme différente (comparaison "aujourd'hui" vs une date
+// stockée, pas juste calcul de "aujourd'hui").
+describe('isBookingDateUpcoming — fenêtre de décalage nocturne Paris/UTC', () => {
+  it("00h30 Paris (été) : une réservation d'hier (Paris) n'est plus \"à venir\" malgré l'UTC encore sur la veille", () => {
+    // 2026-08-15 00:30 Paris (CEST) = 2026-08-14 22:30 UTC. Une résa datée
+    // '2026-08-14' est déjà passée en calendrier Paris, alors que
+    // `new Date().toISOString().slice(0,10)` renverrait encore '2026-08-14'
+    // (bug : b.date >= today(UTC) serait vrai à tort).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-14T22:30:00.000Z'));
+    expect(isBookingDateUpcoming('2026-08-14')).toBe(false);
+    expect(isBookingDateUpcoming('2026-08-15')).toBe(true);
+  });
+
+  it('02h00 Paris (été, UTC vient de rattraper) : les deux calendriers concordent', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-15T00:00:00.000Z')); // 02h00 Paris
+    expect(isBookingDateUpcoming('2026-08-15')).toBe(true);
+    expect(isBookingDateUpcoming('2026-08-14')).toBe(false);
+  });
+
+  it('milieu de journée : comportement inchangé, une résa du jour reste "à venir"', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-15T12:00:00.000Z')); // 14h Paris
+    expect(isBookingDateUpcoming('2026-08-15')).toBe(true);
+    expect(isBookingDateUpcoming('2026-08-14')).toBe(false);
+    expect(isBookingDateUpcoming('2026-08-16')).toBe(true);
   });
 });

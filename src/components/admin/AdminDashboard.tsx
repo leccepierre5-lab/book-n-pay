@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { AppConfig, PartnerApplication } from '@/lib/database.types';
 import { BNP_PLANS, getPlanConfig } from '@/lib/plans-config';
 import type { PlanKey } from '@/lib/plans-config';
-import { getSuggestedPlanFromPractitionersCount, getPractitionersCountLabel } from '@/lib/partner-plan-suggestion';
+import { getSuggestedPlanFromPractitionersCount, getPractitionersCountLabel, getBookingsEstimateLabel } from '@/lib/partner-plan-suggestion';
 import { createClient } from '@/lib/supabase/client';
 
 interface BusinessRow {
@@ -185,7 +185,7 @@ export default function AdminDashboard({
                       {app.category}
                       {app.category_label && ` — ${app.category_label}`}
                       {app.type && ` (${app.type})`}
-                      {' '}· {app.monthly_bookings_estimate} rés/mois
+                      {' '}· {getBookingsEstimateLabel(app.monthly_bookings_estimate)}
                       {' '}· {getPractitionersCountLabel(app.practitioners_count)}
                     </p>
                   </div>
@@ -240,7 +240,7 @@ export default function AdminDashboard({
                         </p>
                       )}
                       <p className="text-xs text-slate-600">
-                        Volume estimé : {app.monthly_bookings_estimate} rés/mois (indicatif, sans rapport avec le plan)
+                        Volume estimé : {getBookingsEstimateLabel(app.monthly_bookings_estimate)} (indicatif, sans rapport avec le plan)
                       </p>
                       <div className="space-y-1.5">
                         {BNP_PLANS.map((plan) => (

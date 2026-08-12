@@ -60,9 +60,19 @@ export function getPractitionersCountLabel(value: string | null | undefined): st
 // Volume de réservations estimé — factorisé ici (dupliqué auparavant entre
 // PartnerApplicationForm.tsx et un mapping local à AdminDashboard.tsx qui
 // servait, à tort, à suggérer un plan). N'a plus aucun rapport avec le plan.
+// Libellés alignés le 12/08/2026 sur les valeurs réellement stockées en base
+// (CHECK chk_pa_bookings_estimate, migration 0016) — un décalage précédent
+// ("Moins de 120"/"121 à 300" pour '0-80'/'81-300') faisait écrire au pro
+// une réponse qui ne correspondait pas au libellé qu'il lisait.
 export const BOOKINGS_ESTIMATE_OPTIONS = [
-  { value: '0-80', label: 'Moins de 120 / mois' },
-  { value: '81-300', label: '121 à 300 / mois' },
+  { value: '0-80', label: 'Jusqu\'à 80 / mois' },
+  { value: '81-300', label: '81 à 300 / mois' },
   { value: '300+', label: 'Plus de 300 / mois' },
 ] as const;
 export type BookingsEstimate = (typeof BOOKINGS_ESTIMATE_OPTIONS)[number]['value'];
+
+// Facultatif depuis la migration 0044 — NULL = non renseigné, jamais une
+// valeur par défaut silencieuse (voir la migration pour le raisonnement).
+export function getBookingsEstimateLabel(value: string | null | undefined): string {
+  return BOOKINGS_ESTIMATE_OPTIONS.find((o) => o.value === value)?.label ?? 'non renseigné';
+}

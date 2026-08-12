@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { AppUser, Booking, BookingMember, EnrichedReferralEvent } from '@/lib/database.types';
 import type { GroupMap } from '@/app/(public)/mes-reservations/page';
-import { phonesMatch, formatTime } from '@/lib/booking-utils';
+import { phonesMatch, formatTime, isBookingDateUpcoming } from '@/lib/booking-utils';
 import WeekCalendar from './WeekCalendar';
 import GroupTimer from './GroupTimer';
 
@@ -394,9 +394,8 @@ export default function MyBookingsList({
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
   const [cancelError, setCancelError] = useState<string | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
   const filteredBookings = localBookings.filter((b) =>
-    period === 'upcoming' ? b.date >= today : b.date < today
+    period === 'upcoming' ? isBookingDateUpcoming(b.date) : !isBookingDateUpcoming(b.date)
   );
 
   const myPhone = profile?.phone ?? null;

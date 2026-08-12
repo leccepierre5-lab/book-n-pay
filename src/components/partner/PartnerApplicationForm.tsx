@@ -61,7 +61,6 @@ export default function PartnerApplicationForm() {
       setError('Décrivez votre secteur d\'activité.');
       return;
     }
-    if (!bookingsEstimate) { setError('Sélectionnez votre volume estimé de réservations.'); return; }
     if (!practitionersCount) { setError('Sélectionnez le nombre de praticiens de votre établissement.'); return; }
     if (!acceptedCgu) { setError('Vous devez accepter les CGU/CGV pour envoyer votre candidature.'); return; }
     setLoading(true);
@@ -78,7 +77,7 @@ export default function PartnerApplicationForm() {
       category,
       category_label: category === 'autre' ? (categoryLabel.trim() || null) : null,
       type: bizType.trim() || null,
-      monthly_bookings_estimate: bookingsEstimate,
+      monthly_bookings_estimate: bookingsEstimate || null,
       practitioners_count: practitionersCount,
       cgu_accepted_at: new Date().toISOString(),
       cgu_version: CGU_VERSION,
@@ -230,11 +229,14 @@ export default function PartnerApplicationForm() {
         </div>
       </section>
 
-      {/* Volume estimé — obligatoire, indicatif (sans rapport avec le plan) */}
+      {/* Volume estimé — facultatif, indicatif (sans rapport avec le plan) */}
       <section className="space-y-3">
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-          Volume de réservations estimé <span className="text-red-400">*</span>
+          Volume de réservations estimé
         </h2>
+        <p className="text-[11px] text-slate-600">
+          Facultatif — nous aide à préparer votre accompagnement.
+        </p>
         <div className="space-y-2">
           {BOOKINGS_ESTIMATE_OPTIONS.map(({ value, label }) => (
             <label

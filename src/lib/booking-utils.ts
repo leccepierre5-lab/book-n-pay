@@ -276,6 +276,18 @@ export function isSlotPast(date: string, time: string): boolean {
   return time.slice(0, 5) <= nowParis;
 }
 
+// Onglet "À venir"/"Passés" du client (MyBookingsList.tsx) — compare une
+// date calendaire (booking.date, toujours Paris) au jour Paris courant.
+// Bug trouvé le 12/08/2026 : le composant calculait auparavant "aujourd'hui"
+// via `new Date().toISOString().slice(0,10)` (date UTC) — entre minuit et
+// ~2h du matin heure de Paris en été (CEST), l'UTC est encore sur la veille,
+// donc une réservation d'hier (Paris) restait classée "à venir" jusqu'à
+// 2h du matin. Même bug que celui corrigé le 24/07 sur getParisDateOffsetStr
+// (voir tests/unit/paris-date-offset.test.ts), forme différente.
+export function isBookingDateUpcoming(date: string): boolean {
+  return date >= toParisDateStr(new Date());
+}
+
 // Adresse à laquelle notifier UN membre précis d'un booking (rappel J-1/J-2,
 // clôture de prestation...) — jamais celle de l'organisateur par défaut.
 // `booking_members.email` est renseigné pour CHAQUE membre dès son propre
