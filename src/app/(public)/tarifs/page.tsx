@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import Link from 'next/link';
 import { calcFraisGestion } from '@/lib/booking-utils';
 import { BNP_PLANS } from '@/lib/plans-config';
@@ -16,68 +15,54 @@ const PLANS = [
     key: 'starter',
     badge: 'Pour Démarrer',
     title: 'STARTER',
-    promise: 'Pour lancer votre activité sur de bonnes bases.',
+    promise: 'Pour démarrer ou sécuriser une activité solo.',
     accentColor: 'text-blue-400',
     borderColor: 'border-blue-500/30',
     glowColor: 'rgba(59,130,246,0.12)',
     features: [
       'Réservations illimitées',
-      'Sans engagement',
-      'Vos frais encaissés directement',
-      'Check-in QR + fiabilité clients',
-      'Apple Pay & Google Pay',
+      'Protection anti-no-show & acomptes',
+      'Encaissement direct via Stripe Connect',
+      'Check-in QR',
     ],
-    back: {
-      title: 'Le mécanisme, en clair',
-      para1: "Le client verse les frais de réservation en réservant en ligne (1,99 à 2,50 € selon le prix de la prestation, à sa charge, jamais la vôtre).",
-      para2: "En cas de non-présentation, ces frais sont automatiquement encaissés via Stripe Connect — sans réclamation ni relance de votre part.",
-      bilan: "Le montant réel dépend de votre activité — simulez-le avec vos propres chiffres.",
-    },
+    cta: 'Démarrer sans engagement →',
   },
   {
     key: 'business',
     badge: 'Le Plus Populaire',
     title: 'BUSINESS',
-    promise: 'Pour les pros qui tournent à plein régime.',
+    promise: 'Pour les cabinets partagés et équipes en croissance.',
     accentColor: 'text-mint-400',
     borderColor: 'border-mint-500/40',
     glowColor: 'rgba(52,211,153,0.12)',
     highlighted: true,
     features: [
-      'Réservations illimitées',
-      'Toute l\'équipe sur un agenda',
-      'CA réel vs prévisionnel en un coup d\'œil',
-      'Vos clients vous recommandent (parrainage intégré)',
+      'Tout le plan Starter',
+      'Agenda multi-collaborateurs',
+      'Suivi clair des paiements (en ligne et sur place)',
+      'Programme de parrainage entre vos clients',
     ],
-    back: {
-      title: 'Le mécanisme, en clair',
-      para1: "Toute l'équipe partage le même agenda et le même mécanisme de protection anti no-show, collaborateur par collaborateur.",
-      para2: "Check-in QR, rappels automatiques J-2/J-1 et parrainage intégré pour toute l'équipe.",
-      bilan: "Le montant réel dépend de votre activité — simulez-le avec vos propres chiffres.",
-    },
+    cta: 'Choisir le plan Business →',
   },
   {
     key: 'scale',
     badge: 'Gros Volume',
     title: 'SCALE',
-    promise: 'Pour ne plus jamais penser aux no-shows.',
+    promise: 'Pour les cabinets pluridisciplinaires et centres de santé.',
     accentColor: 'text-purple-400',
     borderColor: 'border-purple-500/30',
     glowColor: 'rgba(168,85,247,0.12)',
     features: [
-      'Réservations ILLIMITÉES',
+      'Tout le plan Business',
       'Multi-personnels avancé',
-      'Frais dynamiques clients risqués',
-      'Support client prioritaire',
+      'Support prioritaire',
     ],
-    back: {
-      title: 'Le mécanisme, en clair',
-      para1: "Pensé pour les structures à volume : agenda multi-personnels avancé, aucune limite de réservations.",
-      para2: "Support client prioritaire pour ne jamais rester bloqué en pleine saison.",
-      bilan: "Le montant réel dépend de votre activité — simulez-le avec vos propres chiffres.",
-    },
+    cta: 'Sélectionner le plan Scale →',
   },
 ];
+
+const businessEngagement = BNP_PLANS.find((p) => p.key === 'business')!.engagementMonths;
+const scaleEngagement = BNP_PLANS.find((p) => p.key === 'scale')!.engagementMonths;
 
 const FAQ_ITEMS = [
   {
@@ -86,23 +71,19 @@ const FAQ_ITEMS = [
   },
   {
     q: "Quel est l'engagement ?",
-    a: "Aucun pour Starter. 6 mois pour Business, 12 pour Scale — résiliation possible en fin de période d'engagement.",
+    a: `Aucun engagement sur le plan Starter. ${businessEngagement} mois pour Business et ${scaleEngagement} mois pour Scale (résiliation possible à l'échéance selon vos conditions contractuelles).`,
   },
   {
     q: "Que se passe-t-il en cas de no-show ?",
-    a: "Les frais de gestion prépayés par le client sont automatiquement encaissés — vous êtes couvert sans réclamation ni relance à faire.",
+    a: "En cas d'absence non annulée dans les délais, la garantie financière (frais de réservation et/ou acompte) est automatiquement conservée et versée sur votre compte Stripe. Aucune relance à effectuer.",
   },
   {
-    q: "En quoi c'est différent des plateformes à commission ?",
-    a: "Elles prennent 10 à 25 % sur chaque vente, à vie. Book'nPay applique un abonnement fixe : plus vous vendez, plus votre marge reste intacte.",
+    q: "En quoi est-ce différent des plateformes à commission ?",
+    a: "Les annuaires classiques prélèvent 10 à 25 % sur chaque rendez-vous, à vie. Book'nPay applique un tarif fixe : plus votre volume augmente, plus votre marge reste intacte.",
   },
 ];
 
 export default function TarifsPage() {
-  const [flipped, setFlipped] = useState<Record<string, boolean>>({});
-
-  const toggleFlip = (key: string) => setFlipped((prev) => ({ ...prev, [key]: !prev[key] }));
-
   return (
     <div className="min-h-dvh px-4 py-10">
       <div className="mx-auto max-w-5xl">
@@ -115,18 +96,17 @@ export default function TarifsPage() {
 
         <header className="mb-12 text-center">
           <p className="text-xs font-bold tracking-[0.2em] text-mint-500/70 uppercase mb-3">TARIFICATION</p>
-          <h1 className="text-3xl font-bold text-white mb-3">Un abonnement. Zéro commission.</h1>
-          <p className="text-slate-500 text-sm">Contrairement aux plateformes à commission (10 à 25%), vos ventes restent les vôtres — juste un abonnement fixe.</p>
+          <h1 className="text-3xl font-bold text-white mb-3">Un abonnement fixe. Zéro commission.</h1>
+          <p className="text-slate-500 text-sm">Contrairement aux plateformes à commission (10 à 25 %), vos ventes restent 100 % les vôtres.</p>
         </header>
 
         <div className="mb-16 grid gap-5 sm:grid-cols-3">
           {PLANS.map((plan) => {
           const planConfig = BNP_PLANS.find((p) => p.key === plan.key)!;
           return (
-            <button
+            <div
               key={plan.key}
-              onClick={() => toggleFlip(plan.key)}
-              className={`relative rounded-2xl border ${plan.borderColor} p-6 text-left transition-all duration-300 overflow-hidden group hover:scale-[1.01]`}
+              className={`relative rounded-2xl border ${plan.borderColor} p-6 text-left overflow-hidden`}
               style={{
                 background: `radial-gradient(ellipse at 0% 0%, ${plan.glowColor} 0%, transparent 70%), #1e293b`,
                 boxShadow: plan.highlighted ? `0 0 32px ${plan.glowColor}` : undefined,
@@ -136,57 +116,46 @@ export default function TarifsPage() {
                 <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-mint-500/50 to-transparent" />
               )}
 
-              {!flipped[plan.key] ? (
-                <div className="flex h-full flex-col min-h-[380px]">
-                  <span className={`mb-4 inline-flex items-center self-start rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${
+              <div className="flex h-full flex-col min-h-[380px]">
+                <span className={`mb-4 inline-flex items-center self-start rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${
+                  plan.highlighted
+                    ? 'bg-mint-500/15 text-mint-400 border border-mint-500/25'
+                    : 'bg-white/8 text-slate-400 border border-white/10'
+                }`}>
+                  {plan.badge}
+                </span>
+                <h2 className={`text-xl font-black mb-1 ${plan.accentColor}`}>{plan.title}</h2>
+                <div className="mb-1">
+                  <span className="text-4xl font-black text-white">{planConfig.priceHT}€</span>
+                  <span className="text-sm text-slate-500 ml-1">/ mois HT</span>
+                </div>
+                <p className="text-xs text-slate-600 mb-1 italic">
+                  {planConfig.engagementMonths === 0 ? 'Sans engagement' : `Engagement ${planConfig.engagementMonths} mois`}
+                </p>
+                <p className={`text-xs font-medium mb-5 ${plan.accentColor}`}>{plan.promise}</p>
+                <ul className="flex-1 space-y-2.5">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-sm text-slate-300">
+                      <svg className={`w-4 h-4 shrink-0 mt-0.5 ${plan.accentColor}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/devenir-partenaire"
+                  className={`mt-5 inline-flex items-center justify-center rounded-xl py-2.5 px-4 text-xs font-semibold transition-all hover:scale-[1.01] ${
                     plan.highlighted
-                      ? 'bg-mint-500/15 text-mint-400 border border-mint-500/25'
-                      : 'bg-white/8 text-slate-400 border border-white/10'
-                  }`}>
-                    {plan.badge}
-                  </span>
-                  <h2 className={`text-xl font-black mb-1 ${plan.accentColor}`}>{plan.title}</h2>
-                  <div className="mb-1">
-                    <span className="text-4xl font-black text-white">{planConfig.priceHT}€</span>
-                    <span className="text-sm text-slate-500 ml-1">/ mois HT</span>
-                  </div>
-                  <p className="text-xs text-slate-600 mb-1 italic">
-                    {planConfig.engagementMonths === 0 ? 'Sans engagement' : `Engagement ${planConfig.engagementMonths} mois`}
-                  </p>
-                  <p className={`text-xs font-medium mb-5 ${plan.accentColor}`}>{plan.promise}</p>
-                  <ul className="flex-1 space-y-2.5">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-slate-300">
-                        <svg className={`w-4 h-4 shrink-0 mt-0.5 ${plan.accentColor}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className={`mt-4 text-xs ${plan.accentColor} opacity-60`}>
-                    Voir la rentabilité →
-                  </p>
-                </div>
-              ) : (
-                <div className="flex h-full flex-col min-h-[380px]">
-                  <div className={`w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mb-4`}>
-                    <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-sm font-bold text-emerald-400 mb-3">{plan.back.title}</h3>
-                  <p className="text-xs leading-relaxed text-slate-400 mb-3">{plan.back.para1}</p>
-                  <p className="text-xs leading-relaxed text-slate-400 mb-4">{plan.back.para2}</p>
-                  <div className="rounded-xl border border-emerald-600/25 bg-emerald-950/30 p-3 flex-1">
-                    <p className="text-xs text-emerald-400 leading-relaxed">
-                      <span className="font-bold">Bilan :</span> {plan.back.bilan}
-                    </p>
-                  </div>
-                  <p className="mt-4 text-xs text-slate-600">← Retour</p>
-                </div>
-              )}
-            </button>
+                      ? 'text-navy-950'
+                      : 'text-white border border-white/15 bg-white/5 hover:bg-white/10'
+                  }`}
+                  style={plan.highlighted ? { background: 'linear-gradient(135deg, #34d399, #6ee7b7)' } : undefined}
+                >
+                  {plan.cta}
+                </Link>
+              </div>
+            </div>
           );
           })}
         </div>
@@ -194,7 +163,7 @@ export default function TarifsPage() {
         <section className="border-t border-white/[0.07] pt-12">
           <h2 className="mb-2 text-center text-xl font-bold text-white">Le mécanisme de compensation</h2>
           <p className="mb-8 text-center text-sm text-slate-500">
-            Le modèle tourne en arrière-plan sans vous mettre en danger.
+            Le modèle tourne en arrière-plan sans impacter votre trésorerie.
           </p>
           <div className="max-w-md mx-auto">
             {/* Carte Protection Stripe Connect */}
@@ -206,7 +175,7 @@ export default function TarifsPage() {
               </div>
               <h3 className="mb-2 font-semibold text-white text-sm">Protection Stripe Connect</h3>
               <p className="text-xs leading-relaxed text-slate-500 mb-3">
-                Le client paie les frais de gestion + le prix de la prestation. Le montant des frais varie selon le prix de la prestation réservée.
+                Le client règle les frais de gestion au moment de réserver. Vous ne payez aucune commission sur vos prestations — les frais de gestion sont réglés par le client, jamais vous.
               </p>
               <div className="rounded-xl border border-white/[0.07] overflow-hidden">
                 <table className="w-full text-xs">
