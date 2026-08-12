@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import EquipeManager from '@/components/pro/EquipeManager';
+import { getPlanConfig } from '@/lib/plans-config';
 
 export default async function ProEquipePage() {
   const supabase = await createClient();
@@ -23,6 +24,17 @@ export default async function ProEquipePage() {
     .eq('biz_id', profile.biz_id)
     .order('created_at', { ascending: true });
 
+  const { data: settings } = await admin
+    .from('business_settings')
+    .select('plan_key')
+    .eq('biz_id', profile.biz_id)
+    .maybeSingle();
+  const planKey = settings?.plan_key ?? 'starter';
+  // ⚠️ Pas `?? 0` : maxStaff peut valoir `null` (Scale, illimité) — un `??`
+  // ici ramènerait Scale à 0, plus restrictif que Starter.
+  const planConfig = getPlanConfig(planKey);
+  const maxStaff = planConfig ? planConfig.maxStaff : 0;
+
   return (
     <div className="min-h-dvh">
       <div className="mx-auto max-w-2xl px-4 py-6">
@@ -36,6 +48,8 @@ export default async function ProEquipePage() {
             id: string; name: string; role: string | null; emoji: string | null;
             is_active: boolean; deactivated_at: string | null; created_at: string;
           }[]}
+          planLabel={getPlanConfig(planKey)?.label ?? planKey}
+          maxStaff={maxStaff}
         />
       </div>
     </div>

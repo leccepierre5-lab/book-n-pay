@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond, withErrorHandling } from '@/lib/api-error';
+import { getPlanConfig, getPraticiensLimit } from '@/lib/plans-config';
 
 async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: authData } = await supabase.auth.getUser();
@@ -46,6 +47,38 @@ export const PATCH = withErrorHandling('[Staff]', async (
   if (Object.keys(updates).length === 0) return NextResponse.json({ ok: true });
 
   const admin = createServiceRoleClient();
+
+  // Une réactivation remonte le nombre de collaborateurs actifs — même garde
+  // que la création, sinon désactiver/réactiver contournerait la limite.
+  if (body.reactivate === true) {
+    const { data: settings } = await admin
+      .from('business_settings')
+      .select('plan_key')
+      .eq('biz_id', bizId)
+      .maybeSingle();
+    const planKey = settings?.plan_key ?? 'starter';
+    // ⚠️ Pas `?? 0` : maxStaff peut valoir `null` (Scale, illimité) — un `??`
+    // ici ramènerait Scale à 0, plus restrictif que Starter.
+    const planConfig = getPlanConfig(planKey);
+    const maxStaff = planConfig ? planConfig.maxStaff : 0;
+    if (maxStaff !== null) {
+      const { count } = await admin
+        .from('staff')
+        .select('id', { count: 'exact', head: true })
+        .eq('biz_id', bizId)
+        .eq('is_active', true);
+      if ((count ?? 0) >= maxStaff) {
+        const limit = getPraticiensLimit(planKey);
+        return NextResponse.json(
+          {
+            error: `Limite de ${limit} praticien${(limit ?? 0) > 1 ? 's' : ''} atteinte pour votre plan ${getPlanConfig(planKey)?.label ?? planKey} (vous y compris). Passez à un plan supérieur pour réactiver ce collaborateur.`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+  }
+
   const { data, error } = await admin
     .from('staff')
     .update(updates)

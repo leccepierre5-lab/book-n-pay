@@ -13,6 +13,13 @@ export interface PlanConfig {
   label: string;
   priceHT: number;             // €HT/mois
   engagementMonths: number;    // durée d'engagement minimale — 0 = sans engagement (Starter)
+  // Nombre de COLLABORATEURS (lignes table `staff`) au-delà du pro lui-même,
+  // qui n'a jamais de ligne `staff` (il n'est que owner_id sur `businesses` +
+  // biz_id sur app_users — vérifié dans le flux de création de business,
+  // aucun insert `staff` n'y est fait). Le total de praticiens affiché au
+  // pro (voir /tarifs, EquipeManager) est donc TOUJOURS maxStaff+1.
+  // null = illimité.
+  maxStaff: number | null;
   // Clé Stripe Price à renseigner dans les variables d'env — voir STRIPE_PRICE_IDS
   stripePriceEnvKey: string;
 }
@@ -23,6 +30,7 @@ export const BNP_PLANS: PlanConfig[] = [
     label: 'Starter',
     priceHT: 49,
     engagementMonths: 0,
+    maxStaff: 0, // solo : le pro seul, aucun collaborateur
     stripePriceEnvKey: 'STRIPE_PRICE_STARTER',
   },
   {
@@ -30,6 +38,7 @@ export const BNP_PLANS: PlanConfig[] = [
     label: 'Business',
     priceHT: 89,
     engagementMonths: 6,
+    maxStaff: 2, // + le pro lui-même = 3 praticiens au total
     stripePriceEnvKey: 'STRIPE_PRICE_BUSINESS',
   },
   {
@@ -37,6 +46,7 @@ export const BNP_PLANS: PlanConfig[] = [
     label: 'Scale',
     priceHT: 139,
     engagementMonths: 12,
+    maxStaff: null, // illimité
     stripePriceEnvKey: 'STRIPE_PRICE_SCALE',
   },
 ];
@@ -49,6 +59,18 @@ export const ENGAGEMENT_NOTICE_DAYS = 30;
 
 export function getPlanConfig(key: string): PlanConfig | undefined {
   return BNP_PLANS.find((p) => p.key === key);
+}
+
+// Nombre total de praticiens (le pro + ses collaborateurs) autorisé par un
+// plan — null = illimité. C'est ce nombre-là qui doit être montré au pro
+// (jamais maxStaff seul, qui exclut le pro et l'induirait en erreur).
+// ⚠️ Ne PAS écrire `plan?.maxStaff ?? 0` : maxStaff peut légitimement valoir
+// `null` (Scale, illimité) et `??` traiterait ce null comme une valeur
+// absente, ramenant Scale à une limite de 0 — plus restrictif que Starter.
+export function getPraticiensLimit(planKey: string): number | null {
+  const plan = getPlanConfig(planKey);
+  const maxStaff = plan ? plan.maxStaff : 0;
+  return maxStaff === null ? null : maxStaff + 1;
 }
 
 // Retourne la date de fin d'engagement à partir de la date d'activation.

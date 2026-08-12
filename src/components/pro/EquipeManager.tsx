@@ -75,14 +75,25 @@ function formatAbsenceRange(a: Absence): string {
 export default function EquipeManager({
   bizId: _bizId,
   initialStaff,
+  planLabel,
+  maxStaff,
 }: {
   bizId: string;
   initialStaff: StaffMember[];
+  planLabel: string;
+  maxStaff: number | null; // collaborateurs autorisés en plus du pro — null = illimité
 }) {
   const [staffList, setStaffList] = useState<StaffMember[]>(initialStaff);
   const [panel, setPanel] = useState<Panel>('none');
   const [error, setError] = useState('');
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const activeCount = staffList.filter((s) => s.is_active).length;
+  // Le pro lui-même n'a pas de ligne `staff` — total praticiens = collaborateurs actifs + 1.
+  const totalPraticiens = activeCount + 1;
+  const totalLimit = maxStaff === null ? null : maxStaff + 1;
+  const atLimit = maxStaff !== null && activeCount >= maxStaff;
+  const overLimit = maxStaff !== null && activeCount > maxStaff;
 
   // Formulaire ajout
   const [addName, setAddName] = useState('');
@@ -325,6 +336,18 @@ export default function EquipeManager({
         Gérez vos praticiens. Les clients pourront choisir un praticien précis ou "sans préférence" lors de la réservation.
       </p>
 
+      <p className="text-xs text-slate-500">
+        {totalLimit === null
+          ? `${totalPraticiens} praticien${totalPraticiens > 1 ? 's' : ''} — plan ${planLabel}, illimité`
+          : `${totalPraticiens} / ${totalLimit} praticien${totalLimit > 1 ? 's' : ''} — plan ${planLabel}`}
+      </p>
+
+      {overLimit && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 text-xs text-amber-300">
+          Vous dépassez la limite de votre plan {planLabel} ({totalPraticiens} praticiens pour {totalLimit} autorisés). Vos praticiens existants restent actifs, mais vous ne pouvez pas en ajouter ou en réactiver de nouveaux tant que vous n'êtes pas passé à un plan adapté.
+        </div>
+      )}
+
       {/* Liste praticiens actifs */}
       <div className="space-y-2">
         {activeStaff.length === 0 && panel !== 'add' && (
@@ -376,12 +399,19 @@ export default function EquipeManager({
 
       {/* Bouton ajouter */}
       {panel === 'none' && (
-        <button
-          onClick={openAdd}
-          className="w-full rounded-xl border border-dashed border-white/[0.12] py-2.5 text-sm text-slate-400 hover:text-white hover:border-white/20 transition-colors"
-        >
-          + Ajouter un praticien
-        </button>
+        atLimit ? (
+          <div className="w-full rounded-xl border border-dashed border-white/[0.08] py-2.5 text-center text-sm text-slate-600">
+            Limite du plan {planLabel} atteinte —{' '}
+            <a href="/tarifs" className="text-mint-400 hover:text-mint-300 transition-colors">voir les plans supérieurs</a>
+          </div>
+        ) : (
+          <button
+            onClick={openAdd}
+            className="w-full rounded-xl border border-dashed border-white/[0.12] py-2.5 text-sm text-slate-400 hover:text-white hover:border-white/20 transition-colors"
+          >
+            + Ajouter un praticien
+          </button>
+        )
       )}
 
       {/* Panneau ajout */}
@@ -664,7 +694,8 @@ export default function EquipeManager({
               </div>
               <button
                 onClick={() => handleReactivate(s.id)}
-                disabled={togglingId === s.id}
+                disabled={togglingId === s.id || atLimit}
+                title={atLimit ? `Limite du plan ${planLabel} atteinte` : undefined}
                 className="px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-mint-400 hover:bg-mint-500/[0.08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {togglingId === s.id ? '...' : 'Réactiver'}

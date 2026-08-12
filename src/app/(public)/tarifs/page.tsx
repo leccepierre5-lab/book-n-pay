@@ -1,7 +1,9 @@
 'use client';
 import Link from 'next/link';
 import { calcFraisGestion } from '@/lib/booking-utils';
-import { BNP_PLANS } from '@/lib/plans-config';
+import { BNP_PLANS, getPraticiensLimit } from '@/lib/plans-config';
+
+const businessPraticiensLimit = getPraticiensLimit('business'); // 3 (2 collaborateurs + le pro)
 
 const FEE_BRACKETS = [
   { label: '≤ 50 €', fee: calcFraisGestion(30) },
@@ -20,6 +22,7 @@ const PLANS = [
     borderColor: 'border-blue-500/30',
     glowColor: 'rgba(59,130,246,0.12)',
     features: [
+      '1 praticien (solo)',
       'Réservations illimitées',
       'Protection anti-no-show & acomptes',
       'Encaissement direct via Stripe Connect',
@@ -39,7 +42,7 @@ const PLANS = [
     highlighted: true,
     features: [
       'Tout le plan Starter',
-      'Agenda multi-collaborateurs',
+      `Agenda multi-collaborateurs (jusqu'à ${businessPraticiensLimit} praticiens)`,
       'Suivi clair des paiements (en ligne et sur place)',
       'Programme de parrainage entre vos clients',
     ],
@@ -55,7 +58,7 @@ const PLANS = [
     glowColor: 'rgba(168,85,247,0.12)',
     features: [
       'Tout le plan Business',
-      'Multi-personnels avancé',
+      'Praticiens illimités',
       'Support prioritaire',
     ],
     cta: 'Sélectionner le plan Scale →',
