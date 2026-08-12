@@ -24,6 +24,7 @@ const PLANS = [
       'Protection anti-no-show & acomptes',
       'Encaissement direct via Stripe Connect',
       'Check-in QR',
+      'Apple Pay & Google Pay',
     ],
     cta: 'Démarrer sans engagement →',
   },
