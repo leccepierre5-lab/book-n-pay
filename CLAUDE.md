@@ -94,3 +94,25 @@ des 8 décisions actées en revue, mais l'exécution réelle est ce qui suit.
   inscription client de bout en bout. Même traitement à leur appliquer
   qu'au double-booking solo — un scénario réel en conditions de
   concurrence, pas une relecture de code qui affirme que ça devrait marcher.
+
+# Tests de reproduction — appel EXACT du code réel
+
+Trouvé le 12/08/2026 : un script de diagnostic contre `partner_applications`
+chaînait `.insert().select().single()`, alors que le vrai code
+(`PartnerApplicationForm.tsx`) fait `.insert()` seul. `.select()` déclenche
+`Prefer: return=representation` côté PostgREST, donc un `INSERT ...
+RETURNING` qui exige une policy SELECT — absente pour `anon` sur cette
+table. Résultat : le script échouait systématiquement (42501 RLS) alors que
+le vrai formulaire fonctionnait. Ça a déclenché une fausse alerte P0
+("le formulaire public est cassé en prod"), une migration exécutée en
+urgence en base de prod (0043, inoffensive mais sans doute inutile), et
+plusieurs heures de diagnostic (GRANTS, pg_policies, clés API, logs
+Postgres) avant que le biais soit identifié.
+
+**Règle** : tout script de reproduction/diagnostic contre une vraie base
+(surtout en prod) doit utiliser EXACTEMENT le même appel que le code réel —
+mêmes paramètres, même chaînage de méthodes. Ne jamais ajouter un champ de
+retour, une option, un `.select()` "pour voir le résultat" — même
+temporairement. Si un contrôle supplémentaire est nécessaire, le faire dans
+un appel séparé (ex. une lecture via service role après coup), jamais en
+modifiant le premier appel testé.
