@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getBusinessSettings } from '@/lib/queries/pro';
 import NotificationsConfig from '@/components/pro/NotificationsConfig';
+import DeleteProAccount from '@/components/pro/DeleteProAccount';
 
 export default async function ProReglagesPage() {
   const supabase = await createClient();
@@ -43,6 +44,11 @@ export default async function ProReglagesPage() {
             ⬇️ Exporter mes clients (CSV)
           </a>
         </div>
+
+        {/* Suppression réservée au rôle 'pro' — symétrique à la restriction
+            côté route (api/pro/delete-account), voir son en-tête pour le
+            raisonnement (l'admin a déjà freeze-business comme outil). */}
+        {profile.role === 'pro' && <DeleteProAccount />}
       </div>
     </div>
   );
