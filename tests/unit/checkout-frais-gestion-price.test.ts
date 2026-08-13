@@ -91,6 +91,10 @@ function requestBodyForMode(mode: 'solo' | 'modeA' | 'modeB', participants: numb
     amount: DEPOSIT,
     successUrl: 'http://localhost:3000/confirmation',
     cancelUrl: 'http://localhost:3000/annule',
+    // Requis depuis le garde-fou rétractation (a01a366, 13/08) dès que
+    // bookingMeta.bookingId est fourni — sinon 400 avant même d'atteindre le
+    // calcul de frais de gestion que ces tests visent réellement.
+    retractionConsent: true,
   };
   if (mode === 'solo') {
     // SoloPayment — quantity implicite (1), pas de groupRef.
@@ -192,6 +196,8 @@ describe('POST /api/stripe/checkout — service legacy avec dépôt < 1€ → m
       successUrl: 'http://localhost:3000/confirmation',
       cancelUrl: 'http://localhost:3000/annule',
       bookingMeta: { bookingId: 'bk1' },
+      // Requis depuis le garde-fou rétractation (a01a366, 13/08).
+      retractionConsent: true,
     }) as any);
 
     expect(res.status).toBe(422);
@@ -211,6 +217,8 @@ describe('POST /api/stripe/checkout — service legacy avec dépôt < 1€ → m
       successUrl: 'http://localhost:3000/confirmation',
       cancelUrl: 'http://localhost:3000/annule',
       bookingMeta: { bookingId: 'bk1' },
+      // Requis depuis le garde-fou rétractation (a01a366, 13/08).
+      retractionConsent: true,
     }) as any);
 
     expect(res.status).toBe(422);
@@ -227,6 +235,8 @@ describe('POST /api/stripe/checkout — service legacy avec dépôt < 1€ → m
       successUrl: 'http://localhost:3000/confirmation',
       cancelUrl: 'http://localhost:3000/annule',
       bookingMeta: { bookingId: 'bk1' },
+      // Requis depuis le garde-fou rétractation (a01a366, 13/08).
+      retractionConsent: true,
     }) as any);
 
     expect(res.status).toBe(200);

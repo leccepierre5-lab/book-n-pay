@@ -61,6 +61,10 @@ const baseBody = {
   successUrl: 'http://localhost:3000/confirmation',
   cancelUrl: 'http://localhost:3000/annule',
   bookingMeta: { bookingId: 'bk1' },
+  // Requis depuis le garde-fou rétractation (a01a366, 13/08) dès que
+  // bookingMeta.bookingId est fourni — sinon 400 avant même d'atteindre le
+  // garde-fou payment_deadline/status que ces tests visent réellement.
+  retractionConsent: true,
 };
 
 beforeEach(() => {
