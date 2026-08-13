@@ -116,3 +116,24 @@ retour, une option, un `.select()` "pour voir le résultat" — même
 temporairement. Si un contrôle supplémentaire est nécessaire, le faire dans
 un appel séparé (ex. une lecture via service role après coup), jamais en
 modifiant le premier appel testé.
+
+# Suite complète avant commit sur une route partagée
+
+Trouvé le 13/08/2026 : l'ajout du garde-fou `retractionConsent` sur
+`/api/stripe/checkout` (commit `a01a366`, matin) a rendu 25 tests aveugles
+dans `checkout-payment-deadline.test.ts` et
+`checkout-frais-gestion-price.test.ts` — ces tests envoyaient un body sans
+le nouveau champ requis, donc rejetés en 400 avant même d'atteindre ce
+qu'ils étaient censés vérifier (garde-fou deadline, calcul des frais de
+gestion). Pas un bug de prod (le vrai front envoie bien le champ), mais un
+vrai trou de couverture resté silencieux toute la journée faute d'avoir
+relancé la suite complète après ce commit — découvert seulement le soir,
+en clôturant un chantier sans rapport.
+
+**Règle** : toute modification d'une route API partagée par plusieurs
+parcours (`stripe/checkout`, `bookings/create*`, tout ce qui a plusieurs
+appelants front distincts) impose de lancer `npm test` (suite complète, pas
+un fichier ciblé) avant de committer — pas seulement les tests du fichier
+qu'on vient de modifier. Un garde-fou ajouté à un seul endroit peut casser
+silencieusement des tests écrits pour vérifier autre chose sur la même
+route, s'ils ne fournissent pas le nouveau champ requis.
