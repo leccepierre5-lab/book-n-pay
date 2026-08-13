@@ -6,6 +6,7 @@ import type { Service, Staff } from '@/lib/database.types';
 import { calcFraisGestion, normalizePhone, isSlotPast } from '@/lib/booking-utils';
 import { createClient } from '@/lib/supabase/client';
 import { isNonRealBusiness } from '@/lib/business-helpers';
+import { RETRACTION_CONSENT_TEXT } from '@/lib/legal';
 
 // Contact Picker API — Chrome Android 80+, absent sur Safari iOS et desktop.
 type ContactRecord = { name?: string[]; tel?: string[] };
@@ -175,6 +176,25 @@ function ModeSelection({
   );
 }
 
+// Case rétractation — distincte de la case CGV, texte provisoire (voir
+// RETRACTION_CONSENT_TEXT, lib/legal.ts) partagée par les 3 variantes pour
+// n'avoir qu'un seul endroit à modifier après validation CCI.
+function RetractionConsentCheckbox({
+  checked, onChange,
+}: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-3 mb-4 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0"
+      />
+      <p className="text-xs text-slate-400">{RETRACTION_CONSENT_TEXT}</p>
+    </label>
+  );
+}
+
 // ── Mode A: pay for all ───────────────────────────────────────────────────────
 
 function ModeAPayment({
@@ -188,6 +208,7 @@ function ModeAPayment({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [retractionAccepted, setRetractionAccepted] = useState(false);
   const [guestNames, setGuestNames] = useState<string[]>(Array(participants).fill(''));
   const [showNames, setShowNames] = useState(false);
   const { supported: contactsSupported, pick: pickContacts } = useContactPicker();
@@ -199,7 +220,7 @@ function ModeAPayment({
   const slotsLabel = slots.length > 1 ? slots.join(' → ') : slots[0];
 
   const handlePay = async () => {
-    if (!accepted) return;
+    if (!accepted || !retractionAccepted) return;
     if (slots.some((s) => isSlotPast(date, s))) {
       setError('Un ou plusieurs créneaux sont déjà passés. Merci de retourner en arrière et de choisir un autre horaire.');
       return;
@@ -262,6 +283,7 @@ function ModeAPayment({
           amount: effectiveDepositPerPerson,
           quantity: participants,
           clientUserId: authData.user?.id || '',
+          retractionConsent: retractionAccepted,
           bookingMeta: {
             bookingId: isDemo ? '' : primaryBookingId,
             memberId: isDemo ? '' : primaryMemberId,
@@ -415,6 +437,8 @@ function ModeAPayment({
         </p>
       </label>
 
+      <RetractionConsentCheckbox checked={retractionAccepted} onChange={setRetractionAccepted} />
+
       {error && (
         <div role="alert" className="mb-4 rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
@@ -423,9 +447,9 @@ function ModeAPayment({
 
       <button
         onClick={handlePay}
-        disabled={loading || !accepted}
+        disabled={loading || !accepted || !retractionAccepted}
         className="w-full rounded-2xl py-4 font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-        style={!loading && accepted ? {
+        style={!loading && accepted && retractionAccepted ? {
           background: 'linear-gradient(135deg, #34d399, #6ee7b7)',
           boxShadow: '0 4px 24px rgba(52,211,153,0.4)',
           color: '#0a1224',
@@ -470,6 +494,7 @@ function ModeBPayment({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [retractionAccepted, setRetractionAccepted] = useState(false);
   const [guests, setGuests] = useState<GuestInfo[]>(
     Array.from({ length: participants - 1 }, () => ({ name: '', phone: '' }))
   );
@@ -488,7 +513,7 @@ function ModeBPayment({
   };
 
   const handlePay = async () => {
-    if (!accepted || !allPhonesSet) return;
+    if (!accepted || !retractionAccepted || !allPhonesSet) return;
     if (slots.some((s) => isSlotPast(date, s))) {
       setError('Un ou plusieurs créneaux sont déjà passés. Merci de retourner en arrière et de choisir un autre horaire.');
       return;
@@ -549,6 +574,7 @@ function ModeBPayment({
           amount: effectiveDeposit,
           quantity: 1,
           clientUserId: authData.user?.id || '',
+          retractionConsent: retractionAccepted,
           bookingMeta: {
             bookingId: primaryBookingId,
             memberId: primaryMemberId,
@@ -688,6 +714,8 @@ function ModeBPayment({
         </p>
       </label>
 
+      <RetractionConsentCheckbox checked={retractionAccepted} onChange={setRetractionAccepted} />
+
       {!allPhonesSet && guests.length > 0 && (
         <div id="guest-phone-warning" role="alert" className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2.5 mb-3 flex items-center gap-2">
           <span className="text-amber-400 shrink-0 text-sm">⚠</span>
@@ -705,9 +733,9 @@ function ModeBPayment({
 
       <button
         onClick={handlePay}
-        disabled={loading || !accepted || !allPhonesSet}
+        disabled={loading || !accepted || !retractionAccepted || !allPhonesSet}
         className="w-full rounded-2xl py-4 font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-        style={!loading && accepted && allPhonesSet ? {
+        style={!loading && accepted && retractionAccepted && allPhonesSet ? {
           background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
           boxShadow: '0 4px 24px rgba(99,102,241,0.35)',
           color: '#ffffff',
@@ -752,6 +780,7 @@ function SoloPayment({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [retractionAccepted, setRetractionAccepted] = useState(false);
 
   const fraisGestion = calcFraisGestion(service.price);
   const total = service.deposit + fraisGestion;
@@ -816,6 +845,7 @@ function SoloPayment({
           amount: effectiveDeposit,
           quantity: 1,
           clientUserId: authData.user?.id || '',
+          retractionConsent: retractionAccepted,
           bookingMeta: {
             bookingId: isDemo ? '' : booking.id,
             memberId: isDemo ? '' : member.id,
@@ -919,6 +949,8 @@ function SoloPayment({
         </p>
       </label>
 
+      <RetractionConsentCheckbox checked={retractionAccepted} onChange={setRetractionAccepted} />
+
       {error && (
         <div role="alert" className="mb-4 rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
@@ -927,12 +959,12 @@ function SoloPayment({
 
       <button
         onClick={handlePay}
-        disabled={loading || !accepted}
+        disabled={loading || !accepted || !retractionAccepted}
         className="w-full rounded-2xl py-4 font-semibold text-navy-950 text-sm flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-50"
         style={{
-          background: loading || !accepted ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
-          boxShadow: loading || !accepted ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
-          color: loading || !accepted ? '#94a3b8' : '#0a1224',
+          background: loading || !accepted || !retractionAccepted ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
+          boxShadow: loading || !accepted || !retractionAccepted ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
+          color: loading || !accepted || !retractionAccepted ? '#94a3b8' : '#0a1224',
         }}
       >
         {loading ? (

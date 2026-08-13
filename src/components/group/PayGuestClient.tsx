@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { calcFraisGestion, formatTime } from '@/lib/booking-utils';
+import { RETRACTION_CONSENT_TEXT } from '@/lib/legal';
 
 interface Booking {
   id: string;
@@ -23,6 +25,8 @@ export default function PayGuestClient({ member, booking }: { member: Member; bo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [accepted, setAccepted] = useState(false);
+  const [retractionAccepted, setRetractionAccepted] = useState(false);
 
   const deposit = booking.services?.deposit ?? 0;
   const fraisGestion = calcFraisGestion(booking.services?.price ?? 0);
@@ -44,6 +48,7 @@ export default function PayGuestClient({ member, booking }: { member: Member; bo
   };
 
   const handlePay = async () => {
+    if (!accepted || !retractionAccepted) return;
     setLoading(true);
     setError(null);
     try {
@@ -58,6 +63,7 @@ export default function PayGuestClient({ member, booking }: { member: Member; bo
           amount: deposit,
           quantity: 1,
           clientUserId: '',
+          retractionConsent: retractionAccepted,
           bookingMeta: {
             bookingId: booking.id,
             memberId: member.id,
@@ -180,6 +186,31 @@ export default function PayGuestClient({ member, booking }: { member: Member; bo
           <p className="text-[10px] text-slate-600 mt-1.5 px-1">Facultatif · Uniquement pour les notifications de groupe</p>
         </div>
 
+        {/* CGV */}
+        <label className="flex items-start gap-3 mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={accepted}
+            onChange={(e) => setAccepted(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0"
+          />
+          <p className="text-xs text-slate-400">
+            J&apos;accepte les{' '}
+            <Link href="/cgu" className="text-slate-300 underline underline-offset-2">CGV</Link>{' '}
+            incluant les frais de réservation et les frais de gestion de {fraisGestion.toFixed(2)}€.
+          </p>
+        </label>
+
+        <label className="flex items-start gap-3 mb-4 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={retractionAccepted}
+            onChange={(e) => setRetractionAccepted(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0"
+          />
+          <p className="text-xs text-slate-400">{RETRACTION_CONSENT_TEXT}</p>
+        </label>
+
         {member.name && (
           <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-4 py-3 mb-4 flex items-center gap-2">
             <svg className="w-4 h-4 text-blue-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
@@ -199,12 +230,12 @@ export default function PayGuestClient({ member, booking }: { member: Member; bo
 
         <button
           onClick={handlePay}
-          disabled={loading}
+          disabled={loading || !accepted || !retractionAccepted}
           className="w-full rounded-2xl py-4 font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-50"
           style={{
-            background: loading ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
-            boxShadow: loading ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
-            color: loading ? '#94a3b8' : '#0a1224',
+            background: loading || !accepted || !retractionAccepted ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
+            boxShadow: loading || !accepted || !retractionAccepted ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
+            color: loading || !accepted || !retractionAccepted ? '#94a3b8' : '#0a1224',
           }}
         >
           {loading ? (

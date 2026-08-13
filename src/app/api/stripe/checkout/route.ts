@@ -7,6 +7,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import { isNonRealBusiness } from '@/lib/queries/catalog';
 import { getStripeClientWithMode } from '@/lib/stripe/client';
+import { RETRACTION_CONSENT_VERSION } from '@/lib/legal';
 
 function isAllowedOrigin(url: string, reqOrigin: string | null, reqHost: string | null): boolean {
   try {
@@ -59,10 +60,25 @@ export async function POST(req: NextRequest) {
       fraisGestion: fraisGestionInput,
       quantity = 1,
       groupSize = 1,
+      retractionConsent,
     } = body;
 
     if (!successUrl || !cancelUrl) {
       return NextResponse.json({ error: 'successUrl et cancelUrl requis' }, { status: 400 });
+    }
+
+    // ── Consentement rétractation (art. L221-28 1° C. conso, mécanisme —
+    // texte définitif en attente CCI, voir lib/legal.ts) — jamais fait
+    // confiance à l'état React, un appel direct à l'API doit être rejeté
+    // sans la case cochée. Ne s'applique qu'aux vraies réservations
+    // (bookingMeta.bookingId non vide) : le parcours démo testeur
+    // (bookings/create, bookingId='') n'a pas de booking_members où écrire
+    // la preuve, et n'exécute aucune vraie prestation.
+    if (bookingMeta?.bookingId && retractionConsent !== true) {
+      return NextResponse.json(
+        { error: 'La confirmation de démarrage anticipé de la prestation est requise pour continuer.' },
+        { status: 400 }
+      );
     }
     const reqOrigin = req.headers.get('origin');
     const reqHost = req.headers.get('host');
@@ -414,6 +430,24 @@ export async function POST(req: NextRequest) {
     // accepté), aligné sur INVITE_EXPIRY_MS posé côté booking_members.
     if (!bookingMeta?.groupRef) {
       sessionParams.expires_at = Math.floor(Date.now() / 1000) + Math.floor(INVITE_EXPIRY_MS / 1000);
+    }
+
+    // Timestamp posé côté serveur, jamais transmis par le client — même
+    // pattern que cgu_accepted_at (auth/register/route.ts). Écrit UNIQUEMENT
+    // sur bookingMeta.memberId — celui qui paie et coche cette case précise
+    // (l'organisateur en Mode A : bookingMeta.memberId == primaryMemberId,
+    // voir StepPayment.tsx/ModeAPayment). Ne JAMAIS propager aux autres
+    // membres d'un groupe (allMemberIds) : eux n'ont rien coché, une
+    // écriture sur leur ligne fabriquerait une preuve de consentement
+    // personnelle inexacte — pire qu'une absence de preuve en cas de litige.
+    if (bookingMeta?.bookingId && retractionConsent === true && bookingMeta.memberId) {
+      await supabase
+        .from('booking_members')
+        .update({
+          retraction_consent_at: new Date().toISOString(),
+          retraction_consent_version: RETRACTION_CONSENT_VERSION,
+        })
+        .eq('id', bookingMeta.memberId);
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
