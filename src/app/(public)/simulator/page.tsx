@@ -105,14 +105,19 @@ export default function SimulatorPage() {
     if (outil.commission !== undefined) setCommissionPct(outil.commission);
   };
 
-  const { absencesParMois, perteParMois, coutCommissionActuelle, coutOutilActuel, ecartMensuel } = useMemo(() => {
+  const { absencesParMois, perteParMois, perteAnnuelle, coutCommissionActuelle, coutOutilActuel, ecartMensuel } = useMemo(() => {
     const absencesParMois = nbReservations * (noShowRatePct / 100);
     const perteParMois = absencesParMois * panierMoyen;
+    // Perte CONSTATÉE (déjà calculée ci-dessus) multipliée par 12 — jamais un
+    // gain promis. Volontairement PAS appliqué à ecartMensuel (comparatif de
+    // coût outil) : annualiser un écart négatif serait contre-productif et
+    // n'apporte rien (décision 13/08).
+    const perteAnnuelle = perteParMois * 12;
     const coutCommissionActuelle = nbReservations * panierMoyen * (commissionPct / 100);
     const coutOutilActuel = abonnementActuel + coutCommissionActuelle;
     const ecartMensuel = coutOutilActuel - plan.priceHT;
 
-    return { absencesParMois, perteParMois, coutCommissionActuelle, coutOutilActuel, ecartMensuel };
+    return { absencesParMois, perteParMois, perteAnnuelle, coutCommissionActuelle, coutOutilActuel, ecartMensuel };
   }, [panierMoyen, nbReservations, noShowRatePct, abonnementActuel, commissionPct, plan]);
 
   return (
@@ -137,7 +142,7 @@ export default function SimulatorPage() {
             label="Panier moyen par prestation"
             value={panierMoyen}
             min={20}
-            max={200}
+            max={400}
             step={5}
             unit="€"
             onChange={setPanierMoyen}
@@ -254,7 +259,14 @@ export default function SimulatorPage() {
         <div className="grid gap-4 mb-10">
           <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-5">
             <p className="text-xs text-slate-500 mb-1">Manque à gagner actuel (no-shows)</p>
-            <p className="text-2xl font-black text-white">{formatEuro(perteParMois)} / mois</p>
+            <p className="text-2xl font-black text-white">
+              {formatEuro(perteParMois)} / mois
+              {perteParMois > 0 && (
+                <span className="ml-2 text-sm font-semibold text-slate-500">
+                  — soit {formatEuro(perteAnnuelle)}{' '}sur l&apos;année, à volume constant
+                </span>
+              )}
+            </p>
             <p className="text-[11px] text-slate-600 mt-1">
               {noShowRatePct}% × {nbReservations} résa = {formatNombre(absencesParMois)} absence{absencesParMois > 1 ? 's' : ''}/mois × {panierMoyen}€ perdus
             </p>
