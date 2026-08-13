@@ -18,6 +18,7 @@
 // Corrigé en n'acceptant qu'une whitelist explicite de champs, et en
 // exigeant le rôle pro/admin dès que le statut visé est 'arrived'/'no_show'.
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { createClient } from '@/lib/supabase/server';
 import { logAndRespond } from '@/lib/api-error';
 
@@ -79,14 +80,16 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     if (safeUpdates.status === 'arrived' && previousMember?.status !== 'arrived' && previousMember?.phone) {
-      fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app'}/api/loyalty/update-status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
-        },
-        body: JSON.stringify({ memberPhone: previousMember.phone }),
-      }).catch((e) => console.warn('[updateBookingMember] Échec appel fidélité:', e));
+      waitUntil(
+        fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app'}/api/loyalty/update-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
+          },
+          body: JSON.stringify({ memberPhone: previousMember.phone }),
+        }).catch((e) => console.warn('[updateBookingMember] Échec appel fidélité:', e))
+      );
     }
 
     return NextResponse.json({ success: true, member: updatedMember });

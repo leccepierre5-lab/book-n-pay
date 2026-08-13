@@ -3,6 +3,7 @@
 // base44/functions/notifyNewChatMessage/entry.ts, mais appelé explicitement
 // après l'insert plutôt que via une automation DB.
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
@@ -77,8 +78,14 @@ export async function POST(req: NextRequest) {
     // notifyRecipient ne reçoit plus `text` ni `senderName` — l'email de
     // notification ne doit plus jamais contenir d'extrait du message, ni le
     // nom de la prestation, ni qui a écrit quoi, voir son corps ci-dessous.
-    notifyRecipient(bookingId, senderRole).catch((e) =>
-      console.warn('[Chat] Notification échouée:', e.message)
+    // waitUntil() garde la fonction Vercel vivante jusqu'à la fin de l'envoi
+    // sans faire attendre la réponse HTTP (fire-and-forget non-bloquant, mais
+    // qui ne risque plus d'être coupé par le freeze de l'instance juste après
+    // la réponse — voir constat du 13/08, project_bnp_pitfalls #40).
+    waitUntil(
+      notifyRecipient(bookingId, senderRole).catch((e) =>
+        console.warn('[Chat] Notification échouée:', e.message)
+      )
     );
 
     return NextResponse.json({ message });

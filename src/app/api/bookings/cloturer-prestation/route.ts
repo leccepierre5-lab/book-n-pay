@@ -3,6 +3,7 @@
 // Marque la prestation comme honorée (arrived) avec le mode de paiement du
 // solde choisi par le pro (app/tpe/especes), et envoie un email de reçu.
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, escapeHtml } from '@/lib/email/send';
 import { formatTime, resolveMemberRecipientEmail } from '@/lib/booking-utils';
@@ -62,14 +63,16 @@ export async function POST(req: NextRequest) {
     });
 
     if (member.phone) {
-      fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app'}/api/loyalty/update-status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
-        },
-        body: JSON.stringify({ memberPhone: member.phone }),
-      }).catch((e) => console.warn('[Clôture] Échec appel fidélité:', e));
+      waitUntil(
+        fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app'}/api/loyalty/update-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.INTERNAL_API_SECRET}`,
+          },
+          body: JSON.stringify({ memberPhone: member.phone }),
+        }).catch((e) => console.warn('[Clôture] Échec appel fidélité:', e))
+      );
     }
 
     const clientEmail = resolveMemberRecipientEmail(member, booking);
