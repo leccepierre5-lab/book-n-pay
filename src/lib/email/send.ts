@@ -4,11 +4,14 @@ export async function sendEmail({
   subject,
   text,
   html,
+  attachments,
 }: {
   to: string;
   subject: string;
   text?: string;
   html?: string;
+  /** contentId, si posé, permet de référencer la pièce jointe en inline via <img src="cid:xxx"> (QR check-in, LOT 5 C6). */
+  attachments?: { filename: string; content: string; contentId?: string }[];
 }) {
   if (!process.env.RESEND_API_KEY) {
     console.log('[Email] (non envoyé — RESEND_API_KEY absente) →', to, subject);
@@ -27,6 +30,15 @@ export async function sendEmail({
         subject,
         text,
         html,
+        ...(attachments?.length
+          ? {
+              attachments: attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                ...(a.contentId ? { content_id: a.contentId } : {}),
+              })),
+            }
+          : {}),
       }),
     });
     if (!res.ok) {
@@ -51,6 +63,20 @@ export function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// Bloc QR check-in (LOT 5, C6) — le code en clair reste TOUJOURS affiché à
+// côté de l'image : c'est le repli si le client mail bloque la pièce jointe
+// inline. `contentId` doit correspondre à l'attachment posé au même envoi
+// (voir generateQrPngBase64, lib/qr.ts).
+export function qrCheckinBlockHtml(code: string, contentId: string): string {
+  return `
+    <div style="text-align: center; margin: 20px 0; padding: 20px; background: #0b1220; border-radius: 16px; border: 1px solid #1e293b;">
+      <img src="cid:${contentId}" alt="QR code de check-in" width="160" height="160" style="display: block; margin: 0 auto 12px; border-radius: 8px; background: #fff; padding: 8px;" />
+      <p style="font-family: 'Courier New', Courier, monospace; font-size: 24px; font-weight: bold; letter-spacing: 6px; color: #ffffff; margin: 0 0 4px;">${escapeHtml(code)}</p>
+      <p style="color: #64748b; font-size: 11px; margin: 0;">Présentez ce code à l&apos;accueil — utilisable même si l&apos;image ne s&apos;affiche pas.</p>
+    </div>
+  `;
 }
 
 // Template HTML de base — port du style emailBase() de verifierInactivite/entry.ts

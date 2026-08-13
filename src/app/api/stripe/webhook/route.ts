@@ -7,10 +7,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { sendEmail } from '@/lib/email/send';
+import { sendEmail, emailTemplate, qrCheckinBlockHtml, escapeHtml } from '@/lib/email/send';
 import { notifyProNewBooking } from '@/lib/pro-notifications';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 import { formatTime } from '@/lib/booking-utils';
+import { generateQrPngBase64 } from '@/lib/qr';
 
 // ⚠️ CORRECTIF (test E2E billing) : sur ce compte Stripe (version d'API
 // 2026-05-27.dahlia), invoice.subscription n'est plus peuplé — confirmé en
@@ -368,6 +369,21 @@ export async function POST(req: NextRequest) {
           month: 'long',
           day: 'numeric',
         });
+        // QR check-in (LOT 5, C6) — best-effort : un échec de génération ne
+        // doit jamais empêcher l'email de confirmation lui-même de partir.
+        let qrAttachment: { filename: string; content: string; contentId: string } | null = null;
+        if (member.qr_code) {
+          try {
+            qrAttachment = {
+              filename: 'checkin-qr.png',
+              content: await generateQrPngBase64(member.qr_code),
+              contentId: 'checkin-qr',
+            };
+          } catch (e: any) {
+            console.warn('[Webhook] Génération QR échouée (email envoyé sans image):', e.message);
+          }
+        }
+
         await sendEmail({
           to: customerEmail,
           subject: `✅ Réservation confirmée — ${booking.biz_name}`,
@@ -394,6 +410,26 @@ Présentez ce code à l'accueil le jour J.
 
 À bientôt !
 L'équipe Book'nPay`,
+          html: emailTemplate(`
+            <h2 style="color: #34d399; font-size: 20px; margin: 0 0 12px;">Réservation confirmée 🎉</h2>
+            <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 4px;">Bonjour ${escapeHtml(member.name)},</p>
+            <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
+              📍 ${escapeHtml(booking.biz_name)}<br />
+              💆 ${escapeHtml(booking.service_name)}${booking.staff_name ? `<br />👤 ${escapeHtml(booking.staff_name)}` : ''}<br />
+              📅 ${escapeHtml(dateFormatted)}<br />
+              🕐 ${escapeHtml(formatTime(booking.time))}<br />
+              💶 Frais de réservation versés : ${dep}€
+            </p>
+            ${member.qr_code ? qrCheckinBlockHtml(member.qr_code, 'checkin-qr') : ''}
+            <p style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin: 16px 0 0;">
+              Vous venez → les frais de réservation sont déduits du montant final.<br />
+              Vous annulez &gt; 48h avant → remboursement des frais de réservation.<br />
+              Vous annulez &lt; 48h avant ou no-show → frais conservés par le professionnel.<br />
+              Le professionnel annule → remboursement intégral de vos frais de réservation.
+            </p>
+            <p style="color: #64748b; font-size: 11px; margin: 12px 0 0;">Les frais de gestion Book&apos;nPay ne sont pas remboursés (CGV Art. 2).</p>
+          `),
+          ...(qrAttachment ? { attachments: [qrAttachment] } : {}),
         });
       }
     } catch (err: any) {
