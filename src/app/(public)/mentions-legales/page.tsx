@@ -110,7 +110,7 @@ export default function MentionsLegalesPage() {
               des éléments composant la plateforme (textes, code source, design, base de données,
               algorithmes) sont protégés par le droit de la propriété intellectuelle. Toute
               reproduction ou exploitation non autorisée est interdite. Voir également l&apos;article
-              15 des{' '}
+              14 des{' '}
               <Link href="/cgu" className="text-emerald-500 underline">
                 CGU/CGV
               </Link>

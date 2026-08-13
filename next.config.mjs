@@ -37,16 +37,18 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      // Scripts : app, Stripe, analytics Vercel. unsafe-eval dev uniquement.
-      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''} https://js.stripe.com https://va.vercel-scripts.com`,
+      // Scripts : app, Stripe. unsafe-eval dev uniquement. (va.vercel-scripts.com
+      // retiré le 13/08 — allowlist morte, aucun Vercel Analytics installé,
+      // constaté par LOT 7 : grep package.json + HTML livré sans ce script.)
+      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''} https://js.stripe.com`,
       // Styles : app + Google Fonts
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       // Fonts : Google Fonts
       "font-src 'self' https://fonts.gstatic.com",
       // Images : app, Supabase storage, Stripe
       "img-src 'self' data: blob: https://*.supabase.co https://q.stripe.com",
-      // Connexions : Supabase, Stripe API, Resend, Vercel
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.resend.com https://va.vercel-scripts.com",
+      // Connexions : Supabase, Stripe API, Resend
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://api.resend.com",
       // Frames : Stripe Checkout uniquement
       "frame-src https://js.stripe.com https://checkout.stripe.com https://hooks.stripe.com",
       // Workers inline (Next.js)

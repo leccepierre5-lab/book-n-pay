@@ -751,6 +751,7 @@ function SoloPayment({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accepted, setAccepted] = useState(false);
 
   const fraisGestion = calcFraisGestion(service.price);
   const total = service.deposit + fraisGestion;
@@ -904,6 +905,20 @@ function SoloPayment({
         )}
       </div>
 
+      <label className="flex items-start gap-3 mb-4 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={accepted}
+          onChange={(e) => setAccepted(e.target.checked)}
+          className="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0"
+        />
+        <p className="text-xs text-slate-400">
+          J&apos;accepte les{' '}
+          <Link href="/cgu" className="text-slate-300 underline underline-offset-2">CGV</Link>{' '}
+          incluant les frais de réservation et les frais de gestion de {fraisGestion.toFixed(2)}€.
+        </p>
+      </label>
+
       {error && (
         <div role="alert" className="mb-4 rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
@@ -912,12 +927,12 @@ function SoloPayment({
 
       <button
         onClick={handlePay}
-        disabled={loading}
+        disabled={loading || !accepted}
         className="w-full rounded-2xl py-4 font-semibold text-navy-950 text-sm flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-50"
         style={{
-          background: loading ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
-          boxShadow: loading ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
-          color: loading ? '#94a3b8' : '#0a1224',
+          background: loading || !accepted ? '#334155' : 'linear-gradient(135deg, #34d399, #6ee7b7)',
+          boxShadow: loading || !accepted ? 'none' : '0 4px 24px rgba(52,211,153,0.4)',
+          color: loading || !accepted ? '#94a3b8' : '#0a1224',
         }}
       >
         {loading ? (
