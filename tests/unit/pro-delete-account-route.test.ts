@@ -180,6 +180,48 @@ describe('POST /api/pro/delete-account', () => {
     expect(mockDeleteUser).not.toHaveBeenCalled();
   });
 
+  it("échec de la requête réservations à venir → 500, JAMAIS une suppression qui contourne silencieusement le garde-fou (incident pro_charges/13/08, même motif)", async () => {
+    q('app_users', { data: { biz_id: 'biz-1', role: 'pro' }, error: null });
+    q('businesses', { data: BUSINESS, error: null });
+    q('business_settings', { data: SETTINGS_NO_STRIPE, error: null });
+    q('bookings', { data: null, error: { message: 'connexion DB perdue' } });
+
+    const { POST } = await import('@/app/api/pro/delete-account/route');
+    const res = await POST(buildRequest({ password: 'ok' }) as any);
+
+    expect(res.status).toBe(500);
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+  });
+
+  it("échec de la requête pro_charges → 500, JAMAIS une suppression qui contourne silencieusement le garde-fou", async () => {
+    q('app_users', { data: { biz_id: 'biz-1', role: 'pro' }, error: null });
+    q('businesses', { data: BUSINESS, error: null });
+    q('business_settings', { data: SETTINGS_NO_STRIPE, error: null });
+    q('bookings', { data: [], error: null });
+    q('pro_charges', { count: null, data: null, error: { message: 'timeout' } });
+
+    const { POST } = await import('@/app/api/pro/delete-account/route');
+    const res = await POST(buildRequest({ password: 'ok' }) as any);
+
+    expect(res.status).toBe(500);
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+  });
+
+  it("échec de la requête overage_charges → 500, JAMAIS une suppression qui contourne silencieusement le garde-fou", async () => {
+    q('app_users', { data: { biz_id: 'biz-1', role: 'pro' }, error: null });
+    q('businesses', { data: BUSINESS, error: null });
+    q('business_settings', { data: SETTINGS_NO_STRIPE, error: null });
+    q('bookings', { data: [], error: null });
+    q('pro_charges', { count: 0, data: null, error: null });
+    q('overage_charges', { count: null, data: null, error: { message: 'timeout' } });
+
+    const { POST } = await import('@/app/api/pro/delete-account/route');
+    const res = await POST(buildRequest({ password: 'ok' }) as any);
+
+    expect(res.status).toBe(500);
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+  });
+
   it('pro_charges en attente → 409 pending_charges, aucune mutation', async () => {
     q('app_users', { data: { biz_id: 'biz-1', role: 'pro' }, error: null });
     q('businesses', { data: BUSINESS, error: null });

@@ -144,6 +144,16 @@ describe('reconcileProChargesFromInvoice', () => {
     // Rien à vérifier de plus — pas de 2e appel queue, donc pas de update tenté.
   });
 
+  it("table pro_charges inatteignable → alerte admin (PAS un silence — incident 0041/13/08, même motif que le balayage erreur≠zéro)", async () => {
+    const supabase = fakeSupabase();
+    q('pro_charges', { data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.pro_charges'" } });
+
+    await reconcileProChargesFromInvoice(supabase, 'biz-1', { id: 'in_1', lines: { data: [] } } as any);
+
+    expect(mockNotifyAdminOnFailure).toHaveBeenCalledTimes(1);
+    expect(mockNotifyAdminOnFailure.mock.calls[0][0]).toBe('pro-charge-billing:reconcile-read-failed');
+  });
+
   it('ligne de facture correspondante → passe en invoiced avec la bonne date et le bon invoice id, AUCUNE autre charge touchée', async () => {
     const supabase = fakeSupabase();
     q('pro_charges', {
@@ -213,6 +223,17 @@ describe('invoicePendingChargesOnCancellation', () => {
     await invoicePendingChargesOnCancellation(fakeStripe(), supabase, 'biz-1', 'evt_1');
 
     expect(mockInvoicesCreate).not.toHaveBeenCalled();
+  });
+
+  it("table pro_charges inatteignable → alerte admin, AUCUNE facture créée (pas de silence)", async () => {
+    const supabase = fakeSupabase();
+    q('pro_charges', { data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.pro_charges'" } });
+
+    await invoicePendingChargesOnCancellation(fakeStripe(), supabase, 'biz-1', 'evt_1');
+
+    expect(mockInvoicesCreate).not.toHaveBeenCalled();
+    expect(mockNotifyAdminOnFailure).toHaveBeenCalledTimes(1);
+    expect(mockNotifyAdminOnFailure.mock.calls[0][0]).toBe('pro-charge-billing:cancellation-read-failed');
   });
 
   it("pas de stripe_customer_id → alerte admin, AUCUNE facture créée (pas de prélèvement possible sans moyen de paiement connu)", async () => {

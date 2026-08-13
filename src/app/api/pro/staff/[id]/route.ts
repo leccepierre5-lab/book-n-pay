@@ -62,11 +62,14 @@ export const PATCH = withErrorHandling('[Staff]', async (
     const planConfig = getPlanConfig(planKey);
     const maxStaff = planConfig ? planConfig.maxStaff : 0;
     if (maxStaff !== null) {
-      const { count } = await admin
+      // Erreur de comptage capturée séparément — voir staff/route.ts pour
+      // le raisonnement (incident pro_charges/13/08, même motif).
+      const { count, error: countError } = await admin
         .from('staff')
         .select('id', { count: 'exact', head: true })
         .eq('biz_id', bizId)
         .eq('is_active', true);
+      if (countError) return logAndRespond('[Staff] Erreur comptage:', countError);
       if ((count ?? 0) >= maxStaff) {
         const limit = getPraticiensLimit(planKey);
         return NextResponse.json(
@@ -103,11 +106,16 @@ export const DELETE = withErrorHandling('[Staff]', async (
   const { id } = await params;
   const admin = createServiceRoleClient();
 
-  // Vérifie que ce collaborateur n'a aucune réservation liée
-  const { count } = await admin
+  // Vérifie que ce collaborateur n'a aucune réservation liée — erreur
+  // capturée séparément, sinon une requête en échec autoriserait une
+  // suppression DÉFINITIVE malgré des réservations liées (bookings.staff_id
+  // passerait à NULL par la FK, perte de traçabilité — incident
+  // pro_charges/13/08, même motif).
+  const { count, error: countError } = await admin
     .from('bookings')
     .select('id', { count: 'exact', head: true })
     .eq('staff_id', id);
+  if (countError) return logAndRespond('[Staff] Erreur vérification réservations liées:', countError);
 
   if ((count ?? 0) > 0) {
     return NextResponse.json(

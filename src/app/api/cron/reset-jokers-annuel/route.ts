@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { isValidBearerSecret } from '@/lib/constant-time';
 import { JOKERS_LIMITES } from '@/lib/booking-utils';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 const DOWNGRADE: Record<string, string> = { Gold: 'Argent', Argent: 'Bronze', Bronze: 'Standard' };
 const MIN_RDV_ANNUEL = 5;
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
 
   let reset = 0;
   let degraded = 0;
+  const readFailures: string[] = [];
 
   for (const user of users || []) {
     const statut = user.statut || 'Standard';
@@ -41,19 +43,30 @@ export async function GET(req: NextRequest) {
     }
 
     if (statutFinal !== 'Standard' && statut !== 'Standard' && derniereActivite < oneYearAgo) {
-      const { count } = await supabase
+      // ⚠️ Une erreur de requête ne doit JAMAIS entraîner un déclassement —
+      // trouvé le 13/08 (incident pro_charges/0041, même motif) : l'ancien
+      // code faisait `count || 0`, indiscernable d'un vrai "0 RDV" sur un
+      // échec de requête. Un client fidèle ne doit jamais être sanctionné
+      // sur la base d'une erreur technique. En cas d'échec : on ne touche
+      // pas au statut de CE client, on alerte, et le cron continue pour
+      // les autres.
+      const { count, error: countError } = await supabase
         .from('booking_members')
         .select('id, bookings!inner(date)', { count: 'exact', head: true })
         .eq('phone', user.phone)
         .eq('status', 'arrived')
         .gte('bookings.date', oneYearAgo);
 
-      const rdvRecents = count || 0;
-
-      if (rdvRecents < MIN_RDV_ANNUEL) {
-        statutFinal = DOWNGRADE[statut] || 'Standard';
-        degraded++;
-        console.log(`[Reset 1er jan] Déclassement min RDV ${user.name}: ${statut} → ${statutFinal} (${rdvRecents} RDV/an)`);
+      if (countError) {
+        console.error(`[Reset 1er jan] Comptage RDV échoué pour ${user.name} (${user.id}) — statut NON modifié par prudence:`, countError.message);
+        readFailures.push(`${user.name} (${user.id}) — ${countError.message}`);
+      } else {
+        const rdvRecents = count ?? 0;
+        if (rdvRecents < MIN_RDV_ANNUEL) {
+          statutFinal = DOWNGRADE[statut] || 'Standard';
+          degraded++;
+          console.log(`[Reset 1er jan] Déclassement min RDV ${user.name}: ${statut} → ${statutFinal} (${rdvRecents} RDV/an)`);
+        }
       }
     }
 
@@ -73,6 +86,15 @@ export async function GET(req: NextRequest) {
     reset++;
   }
 
-  console.log(`[resetJokersAnnuel] ${reset} utilisateurs réinitialisés, ${degraded} déclassés`);
-  return NextResponse.json({ success: true, reset, degraded });
+  if (readFailures.length > 0) {
+    await notifyAdminOnFailure('cron/reset-jokers-annuel:rdv-count', {
+      processed: reset - readFailures.length,
+      failed: readFailures.length,
+      failedItems: readFailures,
+      failedDescriptions: readFailures.map((f) => `vérification min. RDV/an ignorée, statut inchangé par prudence — ${f}`),
+    });
+  }
+
+  console.log(`[resetJokersAnnuel] ${reset} utilisateurs réinitialisés, ${degraded} déclassés, ${readFailures.length} vérification(s) échouée(s) (statut non modifié)`);
+  return NextResponse.json({ success: true, reset, degraded, readFailures: readFailures.length });
 }

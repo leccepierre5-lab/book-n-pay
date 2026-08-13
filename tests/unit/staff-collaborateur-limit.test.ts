@@ -17,6 +17,12 @@ const mockGetUser = vi.fn();
 let authProfile: any = { role: 'pro', biz_id: 'biz-1' };
 let planKey = 'starter';
 let activeStaffCount = 0;
+// Simule un échec de la requête de comptage — incident pro_charges/13/08 :
+// une erreur DOIT remonter (500), jamais devenir silencieusement "0" et
+// contourner la limite du plan.
+let simulateStaffCountError = false;
+let simulateBookingsCountError = false;
+let bookingsLinkedCount = 0;
 const recordResult: any = { id: 'staff-1', name: 'Julien', role: null, emoji: null, is_active: true, deactivated_at: null, created_at: '2026-08-12' };
 
 function makeStaffChain() {
@@ -25,10 +31,29 @@ function makeStaffChain() {
   chain.eq = vi.fn(() => chain);
   chain.insert = vi.fn(() => chain);
   chain.update = vi.fn(() => chain);
+  chain.delete = vi.fn(() => chain);
   chain.single = vi.fn(async () => ({ data: recordResult, error: null }));
   // Thenable : couvre `await admin.from('staff').select(...).eq(...).eq(...)`
   // (comptage, sans .single()) — result = { count }.
-  chain.then = (resolve: any) => resolve({ data: null, error: null, count: activeStaffCount });
+  chain.then = (resolve: any) =>
+    resolve(
+      simulateStaffCountError
+        ? { data: null, error: { message: 'connexion DB perdue' }, count: null }
+        : { data: null, error: null, count: activeStaffCount }
+    );
+  return chain;
+}
+
+function makeBookingsChain() {
+  const chain: any = {};
+  chain.select = vi.fn(() => chain);
+  chain.eq = vi.fn(() => chain);
+  chain.then = (resolve: any) =>
+    resolve(
+      simulateBookingsCountError
+        ? { data: null, error: { message: 'timeout requête' }, count: null }
+        : { data: null, error: null, count: bookingsLinkedCount }
+    );
   return chain;
 }
 
@@ -54,6 +79,7 @@ vi.mock('@/lib/supabase/server', () => ({
     from: (t: string) => {
       if (t === 'business_settings') return makeSettingsChain();
       if (t === 'staff') return makeStaffChain();
+      if (t === 'bookings') return makeBookingsChain();
       throw new Error('unexpected table on admin client: ' + t);
     },
   })),
@@ -65,6 +91,9 @@ beforeEach(() => {
   mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
   planKey = 'starter';
   activeStaffCount = 0;
+  simulateStaffCountError = false;
+  simulateBookingsCountError = false;
+  bookingsLinkedCount = 0;
 });
 
 function buildPostRequest(body: any) {
@@ -125,6 +154,15 @@ describe('POST /api/pro/staff — limite par plan', () => {
 
     expect(res.status).toBe(201);
   });
+
+  it("échec de la requête de comptage → 500, JAMAIS un contournement silencieux de la limite (incident pro_charges/13/08, même motif)", async () => {
+    planKey = 'starter'; // maxStaff=0 — si l'erreur devenait "0 collaborateur", la création passerait à tort
+    simulateStaffCountError = true;
+    const { POST } = await import('@/app/api/pro/staff/route');
+    const res = await POST(buildPostRequest({ name: 'Julien' }) as any);
+
+    expect(res.status).toBe(500);
+  });
 });
 
 describe('PATCH /api/pro/staff/[id] (reactivate) — même limite', () => {
@@ -155,5 +193,44 @@ describe('PATCH /api/pro/staff/[id] (reactivate) — même limite', () => {
     const res = await PATCH(buildPatchRequest({ name: 'Nouveau nom' }) as any, { params: Promise.resolve({ id: 'staff-1' }) });
 
     expect(res.status).toBe(200);
+  });
+
+  it('échec de la requête de comptage → 500, JAMAIS une réactivation qui contourne silencieusement la limite', async () => {
+    planKey = 'starter';
+    simulateStaffCountError = true;
+    const { PATCH } = await import('@/app/api/pro/staff/[id]/route');
+    const res = await PATCH(buildPatchRequest({ reactivate: true }) as any, { params: Promise.resolve({ id: 'staff-1' }) });
+
+    expect(res.status).toBe(500);
+  });
+});
+
+describe('DELETE /api/pro/staff/[id] — garde-fou réservations liées', () => {
+  function buildDeleteRequest() {
+    return new Request('http://localhost/api/pro/staff/staff-1', { method: 'DELETE' });
+  }
+
+  it('collaborateur avec des réservations liées → 409, suppression refusée', async () => {
+    bookingsLinkedCount = 3;
+    const { DELETE } = await import('@/app/api/pro/staff/[id]/route');
+    const res = await DELETE(buildDeleteRequest() as any, { params: Promise.resolve({ id: 'staff-1' }) });
+
+    expect(res.status).toBe(409);
+  });
+
+  it('collaborateur sans réservation liée → suppression autorisée', async () => {
+    bookingsLinkedCount = 0;
+    const { DELETE } = await import('@/app/api/pro/staff/[id]/route');
+    const res = await DELETE(buildDeleteRequest() as any, { params: Promise.resolve({ id: 'staff-1' }) });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("échec de la vérification des réservations liées → 500, JAMAIS une suppression DÉFINITIVE qui contourne silencieusement le garde-fou (incident pro_charges/13/08, même motif)", async () => {
+    simulateBookingsCountError = true;
+    const { DELETE } = await import('@/app/api/pro/staff/[id]/route');
+    const res = await DELETE(buildDeleteRequest() as any, { params: Promise.resolve({ id: 'staff-1' }) });
+
+    expect(res.status).toBe(500);
   });
 });

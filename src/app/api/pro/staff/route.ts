@@ -58,11 +58,15 @@ export const POST = withErrorHandling('[Staff]', async (req: NextRequest) => {
   const planConfig = getPlanConfig(planKey);
   const maxStaff = planConfig ? planConfig.maxStaff : 0;
   if (maxStaff !== null) {
-    const { count } = await admin
+    // Erreur de comptage capturée séparément — sinon une requête en échec
+    // devient silencieusement "0 collaborateur actif" et la limite du plan
+    // devient contournable (incident pro_charges/13/08, même motif).
+    const { count, error: countError } = await admin
       .from('staff')
       .select('id', { count: 'exact', head: true })
       .eq('biz_id', bizId)
       .eq('is_active', true);
+    if (countError) return logAndRespond('[Staff] Erreur comptage:', countError);
     if ((count ?? 0) >= maxStaff) {
       const limit = getPraticiensLimit(planKey);
       return NextResponse.json(

@@ -76,16 +76,24 @@ export async function POST(req: NextRequest) {
 
     // ── Garde-fous — rien n'est encore touché en base ──────────────────────
 
+    // ⚠️ Chaque garde-fou ci-dessous capture `error` à côté de `data`/`count`
+    // et le vérifie AVANT tout `?? défaut` — trouvé le 13/08 (incident
+    // pro_charges/migration 0041 jamais exécutée) : les 3 gardes originaux
+    // faisaient `(x ?? 0) > 0`, qui traite une requête EN ÉCHEC exactement
+    // comme "zéro résultat", donc silencieusement comme "rien à bloquer".
+    // Une erreur doit remonter (500), jamais devenir un zéro qui autorise
+    // ce qui devrait être bloqué.
     const today = getParisDateOffsetStr(0);
-    const { data: upcoming } = await admin
+    const { data: upcoming, error: upcomingError } = await admin
       .from('bookings')
       .select('id')
       .eq('biz_id', bizId)
       .neq('status', 'cancelled')
       .gte('date', today);
-    if ((upcoming?.length ?? 0) > 0) {
+    if (upcomingError) return logAndRespond('[pro/delete-account] vérification réservations à venir:', upcomingError);
+    if (upcoming.length > 0) {
       return NextResponse.json(
-        { error: 'upcoming_bookings', count: upcoming!.length },
+        { error: 'upcoming_bookings', count: upcoming.length },
         { status: 409 }
       );
     }
@@ -95,22 +103,24 @@ export async function POST(req: NextRequest) {
     // pro-charge-billing.ts) ou 'invoiced' ne bloque jamais la suppression,
     // vérifié explicitement le 13/08 suite à la demande de Pierre sur ce
     // point précis (facturation effective des pro_charges).
-    const { count: pendingChargesCount } = await admin
+    const { count: pendingChargesCount, error: pendingChargesError } = await admin
       .from('pro_charges')
       .select('id', { count: 'exact', head: true })
       .eq('biz_id', bizId)
       .eq('status', 'pending');
+    if (pendingChargesError) return logAndRespond('[pro/delete-account] vérification pro_charges:', pendingChargesError);
     if ((pendingChargesCount ?? 0) > 0) {
       return NextResponse.json({ error: 'pending_charges', count: pendingChargesCount }, { status: 409 });
     }
 
     // Même risque financier que pro_charges — un dépassement de forfait pas
     // encore facturé (trouvé en audit, pas dans la demande initiale de Pierre).
-    const { count: pendingOverageCount } = await admin
+    const { count: pendingOverageCount, error: pendingOverageError } = await admin
       .from('overage_charges')
       .select('id', { count: 'exact', head: true })
       .eq('biz_id', bizId)
       .in('status', ['pending', 'retry_scheduled', 'failed']);
+    if (pendingOverageError) return logAndRespond('[pro/delete-account] vérification overage_charges:', pendingOverageError);
     if ((pendingOverageCount ?? 0) > 0) {
       return NextResponse.json({ error: 'pending_overage', count: pendingOverageCount }, { status: 409 });
     }

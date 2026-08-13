@@ -115,12 +115,27 @@ export async function reconcileProChargesFromInvoice(
   bizId: string,
   invoice: Stripe.Invoice
 ): Promise<void> {
-  const { data: pendingCharges } = await supabase
+  // error capturée séparément de `data` — sinon une requête en échec (ex.
+  // pro_charges inatteignable) est indiscernable de "aucune charge en
+  // attente" et le rapprochement s'arrête en silence, sans jamais alerter
+  // (incident 0041/13/08, même motif que les autres corrections du jour).
+  const { data: pendingCharges, error: pendingError } = await supabase
     .from('pro_charges')
     .select('id, stripe_invoice_item_id')
     .eq('biz_id', bizId)
     .eq('status', 'pending')
     .not('stripe_invoice_item_id', 'is', null);
+
+  if (pendingError) {
+    console.error(`[ProChargeBilling] Lecture pro_charges échouée (rapprochement) — biz ${bizId}, invoice ${invoice.id}:`, pendingError.message);
+    await notifyAdminOnFailure('pro-charge-billing:reconcile-read-failed', {
+      processed: 0,
+      failed: 1,
+      failedItems: [bizId],
+      failedDescriptions: [`biz ${bizId}, invoice ${invoice.id} — lecture pro_charges échouée, rapprochement impossible — ${pendingError.message}`],
+    });
+    return;
+  }
 
   if (!pendingCharges || pendingCharges.length === 0) return;
 
@@ -156,11 +171,23 @@ export async function invoicePendingChargesOnCancellation(
   bizId: string,
   eventId: string
 ): Promise<void> {
-  const { data: pending } = await supabase
+  // error capturée séparément — même raisonnement que reconcileProChargesFromInvoice.
+  const { data: pending, error: pendingError } = await supabase
     .from('pro_charges')
     .select('id, amount_cents, stripe_invoice_item_id')
     .eq('biz_id', bizId)
     .eq('status', 'pending');
+
+  if (pendingError) {
+    console.error(`[ProChargeBilling] Lecture pro_charges échouée (résiliation) — biz ${bizId}:`, pendingError.message);
+    await notifyAdminOnFailure('pro-charge-billing:cancellation-read-failed', {
+      processed: 0,
+      failed: 1,
+      failedItems: [bizId],
+      failedDescriptions: [`biz ${bizId} — abonnement résilié, lecture pro_charges échouée, impossible de vérifier s'il reste des charges à facturer — ${pendingError.message}`],
+    });
+    return;
+  }
 
   if (!pending || pending.length === 0) return;
 
