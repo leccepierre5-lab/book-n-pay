@@ -15,7 +15,7 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   return profile.biz_id as string;
 }
 
-// PATCH /api/pro/staff/[id] — renommer ou désactiver un praticien
+// PATCH /api/pro/staff/[id] — renommer ou désactiver un collaborateur
 export const PATCH = withErrorHandling('[Staff]', async (
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -71,7 +71,7 @@ export const PATCH = withErrorHandling('[Staff]', async (
         const limit = getPraticiensLimit(planKey);
         return NextResponse.json(
           {
-            error: `Limite de ${limit} praticien${(limit ?? 0) > 1 ? 's' : ''} atteinte pour votre plan ${getPlanConfig(planKey)?.label ?? planKey} (vous y compris). Passez à un plan supérieur pour réactiver ce collaborateur.`,
+            error: `Limite de ${limit} collaborateur${(limit ?? 0) > 1 ? 's' : ''} atteinte pour votre plan ${getPlanConfig(planKey)?.label ?? planKey} (vous y compris). Passez à un plan supérieur pour réactiver ce collaborateur.`,
           },
           { status: 403 }
         );
@@ -103,7 +103,7 @@ export const DELETE = withErrorHandling('[Staff]', async (
   const { id } = await params;
   const admin = createServiceRoleClient();
 
-  // Vérifie que ce praticien n'a aucune réservation liée
+  // Vérifie que ce collaborateur n'a aucune réservation liée
   const { count } = await admin
     .from('bookings')
     .select('id', { count: 'exact', head: true })
@@ -111,7 +111,7 @@ export const DELETE = withErrorHandling('[Staff]', async (
 
   if ((count ?? 0) > 0) {
     return NextResponse.json(
-      { error: 'Ce praticien a des réservations associées. Utilisez la désactivation plutôt que la suppression.' },
+      { error: 'Ce collaborateur a des réservations associées. Utilisez la désactivation plutôt que la suppression.' },
       { status: 409 }
     );
   }

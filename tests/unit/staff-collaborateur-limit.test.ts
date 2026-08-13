@@ -83,7 +83,7 @@ describe('POST /api/pro/staff — limite par plan', () => {
     const json = await res.json();
 
     expect(res.status).toBe(403);
-    expect(json.error).toContain('Limite de 1 praticien');
+    expect(json.error).toContain('Limite de 1 collaborateur');
     expect(json.error).toContain('Starter');
   });
 
@@ -95,7 +95,7 @@ describe('POST /api/pro/staff — limite par plan', () => {
     const json = await res.json();
 
     expect(res.status).toBe(403);
-    expect(json.error).toContain('Limite de 3 praticiens');
+    expect(json.error).toContain('Limite de 3 collaborateurs');
     expect(json.error).toContain('Business');
   });
 
@@ -136,7 +136,7 @@ describe('PATCH /api/pro/staff/[id] (reactivate) — même limite', () => {
     const json = await res.json();
 
     expect(res.status).toBe(403);
-    expect(json.error).toContain('Limite de 3 praticiens');
+    expect(json.error).toContain('Limite de 3 collaborateurs');
   });
 
   it('Business (maxStaff=2), 1 staff actif → réactivation autorisée', async () => {

@@ -15,7 +15,7 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   return profile.biz_id as string;
 }
 
-// GET /api/pro/staff/[id]/absences — congés/absences ponctuelles d'un praticien
+// GET /api/pro/staff/[id]/absences — congés/absences ponctuelles d'un collaborateur
 export const GET = withErrorHandling('[StaffAbsences]', async (
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -80,7 +80,7 @@ export const POST = withErrorHandling('[StaffAbsences]', async (
     return NextResponse.json({ error: 'reason doit être une chaîne' }, { status: 400 });
   }
 
-  // Vérifie que le praticien appartient bien à ce biz
+  // Vérifie que le collaborateur appartient bien à ce biz
   const admin = createServiceRoleClient();
   const { data: staffRow } = await admin
     .from('staff')
@@ -89,7 +89,7 @@ export const POST = withErrorHandling('[StaffAbsences]', async (
     .eq('biz_id', bizId)
     .maybeSingle();
 
-  if (!staffRow) return NextResponse.json({ error: 'Praticien introuvable' }, { status: 404 });
+  if (!staffRow) return NextResponse.json({ error: 'Collaborateur introuvable' }, { status: 404 });
 
   const { data, error } = await admin
     .from('staff_absences')

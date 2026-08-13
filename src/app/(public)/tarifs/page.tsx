@@ -1,9 +1,20 @@
 'use client';
 import Link from 'next/link';
 import { calcFraisGestion } from '@/lib/booking-utils';
-import { BNP_PLANS, getPraticiensLimit } from '@/lib/plans-config';
+import { BNP_PLANS, getPraticiensLimit, type PlanKey } from '@/lib/plans-config';
 
-const businessPraticiensLimit = getPraticiensLimit('business'); // 3 (2 collaborateurs + le pro)
+// "Collaborateur", pas "praticien" — vocabulaire aligné le 13/08/2026 :
+// "praticien" est connoté bien-être et exclut tatoueurs, photographes,
+// toiletteurs, coachs. La fonction source (getPraticiensLimit) garde son
+// nom (identifiant interne, pas un texte affiché) — voir plans-config.ts.
+// Toujours dérivé de BNP_PLANS.maxStaff, jamais un chiffre en dur : si le
+// barème change, ce libellé suit automatiquement.
+function teamSizeLabel(planKey: PlanKey): string {
+  const limit = getPraticiensLimit(planKey); // total incluant le pro lui-même
+  if (limit === null) return 'Collaborateurs illimités';
+  if (limit === 1) return '1 collaborateur';
+  return `Jusqu'à ${limit} collaborateurs`;
+}
 
 const FEE_BRACKETS = [
   { label: '≤ 50 €', fee: calcFraisGestion(30) },
@@ -12,27 +23,37 @@ const FEE_BRACKETS = [
   { label: '> 100 €', fee: calcFraisGestion(150) },
 ];
 
+// Même produit partout — seule la taille d'équipe change de plan à plan
+// (vérifié en code le 13/08/2026 : aucune fonctionnalité réelle n'est
+// gardée derrière Business/Scale en dehors du nombre de collaborateurs et
+// du support — recherche exhaustive de plan_key/planKey dans tout src/,
+// 9 occurrences, aucune autre que staff/billing/admin/marketing). Le
+// programme de parrainage n'apparaît nulle part ici : c'est une
+// fonctionnalité CLIENT (referral_events n'a pas de biz_id, un filleul
+// peut réserver chez n'importe quel pro), pas un avantage du pro — le
+// lister comme argument de vente pro serait faux, pas seulement mal placé.
 const PLANS = [
   {
-    key: 'starter',
+    key: 'starter' as const,
     badge: 'Pour Démarrer',
     title: 'STARTER',
     promise: 'Votre agenda en ligne, et plus jamais de créneau perdu.',
+    featuresIntro: 'Toutes les fonctionnalités incluses',
     accentColor: 'text-blue-400',
     borderColor: 'border-blue-500/30',
     glowColor: 'rgba(59,130,246,0.12)',
     features: [
-      '1 praticien (solo)',
       'Réservations illimitées',
       'Protection anti-no-show & acomptes',
       'Encaissement direct via Stripe Connect',
       'Check-in QR',
       'Apple Pay & Google Pay',
+      'Suivi des paiements',
     ],
     cta: 'Démarrer sans engagement →',
   },
   {
-    key: 'business',
+    key: 'business' as const,
     badge: 'Le Plus Populaire',
     title: 'BUSINESS',
     promise: 'Votre équipe sur un seul agenda, vos paiements au clair.',
@@ -42,23 +63,20 @@ const PLANS = [
     highlighted: true,
     features: [
       'Tout le plan Starter',
-      `Agenda multi-collaborateurs (jusqu'à ${businessPraticiensLimit} praticiens)`,
-      'Suivi clair des paiements (en ligne et sur place)',
-      'Programme de parrainage entre vos clients',
+      'Agenda multi-collaborateurs',
     ],
     cta: 'Choisir le plan Business →',
   },
   {
-    key: 'scale',
+    key: 'scale' as const,
     badge: 'Grande Équipe',
     title: 'SCALE',
-    promise: 'Toute votre structure, sans limite de praticiens.',
+    promise: 'Toute votre structure, sans limite de collaborateurs.',
     accentColor: 'text-purple-400',
     borderColor: 'border-purple-500/30',
     glowColor: 'rgba(168,85,247,0.12)',
     features: [
       'Tout le plan Business',
-      'Praticiens illimités',
       'Support prioritaire',
     ],
     cta: 'Sélectionner le plan Scale →',
@@ -135,9 +153,19 @@ export default function TarifsPage() {
                 </div>
                 <p className="text-xs text-slate-600 mb-1 italic">
                   {planConfig.engagementMonths === 0 ? 'Sans engagement' : `Engagement ${planConfig.engagementMonths} mois`}
+                  {' · '}
+                  {teamSizeLabel(plan.key)}
                 </p>
                 <p className={`text-xs font-medium mb-5 ${plan.accentColor}`}>{plan.promise}</p>
-                <ul className="flex-1 space-y-2.5">
+                {plan.featuresIntro && (
+                  <p className="mb-2 text-xs font-semibold text-white">{plan.featuresIntro}</p>
+                )}
+                {/* flex+justify-center (pas juste flex-1) : Business/Scale ont
+                    moins d'items que Starter depuis le retrait des fausses
+                    features (13/08) — répartit l'espace resté libre avant ET
+                    après la liste plutôt qu'un seul gros vide entre le
+                    dernier item et le bouton. */}
+                <ul className="flex-1 flex flex-col justify-center space-y-2.5">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-slate-300">
                       <svg className={`w-4 h-4 shrink-0 mt-0.5 ${plan.accentColor}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

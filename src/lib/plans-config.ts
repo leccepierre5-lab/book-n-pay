@@ -16,8 +16,8 @@ export interface PlanConfig {
   // Nombre de COLLABORATEURS (lignes table `staff`) au-delà du pro lui-même,
   // qui n'a jamais de ligne `staff` (il n'est que owner_id sur `businesses` +
   // biz_id sur app_users — vérifié dans le flux de création de business,
-  // aucun insert `staff` n'y est fait). Le total de praticiens affiché au
-  // pro (voir /tarifs, EquipeManager) est donc TOUJOURS maxStaff+1.
+  // aucun insert `staff` n'y est fait). Le total de collaborateurs affiché
+  // au pro (voir /tarifs, EquipeManager) est donc TOUJOURS maxStaff+1.
   // null = illimité.
   maxStaff: number | null;
   // Clé Stripe Price à renseigner dans les variables d'env — voir STRIPE_PRICE_IDS
@@ -38,7 +38,7 @@ export const BNP_PLANS: PlanConfig[] = [
     label: 'Business',
     priceHT: 89,
     engagementMonths: 6,
-    maxStaff: 2, // + le pro lui-même = 3 praticiens au total
+    maxStaff: 2, // + le pro lui-même = 3 collaborateurs au total
     stripePriceEnvKey: 'STRIPE_PRICE_BUSINESS',
   },
   {
@@ -61,8 +61,8 @@ export function getPlanConfig(key: string): PlanConfig | undefined {
   return BNP_PLANS.find((p) => p.key === key);
 }
 
-// Nombre total de praticiens (le pro + ses collaborateurs) autorisé par un
-// plan — null = illimité. C'est ce nombre-là qui doit être montré au pro
+// Nombre total de collaborateurs (le pro + ses collaborateurs) autorisé par
+// un plan — null = illimité. C'est ce nombre-là qui doit être montré au pro
 // (jamais maxStaff seul, qui exclut le pro et l'induirait en erreur).
 // ⚠️ Ne PAS écrire `plan?.maxStaff ?? 0` : maxStaff peut légitimement valoir
 // `null` (Scale, illimité) et `??` traiterait ce null comme une valeur

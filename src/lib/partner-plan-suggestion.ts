@@ -2,9 +2,9 @@
 // l'admin à l'approbation (AdminDashboard.tsx) — deux champs distincts, PAS
 // un remplacement l'un de l'autre (décision explicite, 12/08/2026) :
 //
-// - practitioners_count : nombre de praticiens déclaré par le pro. C'est LUI
-//   qui suggère un plan (Starter/Business/Scale se distinguent par le nombre
-//   de praticiens autorisés, voir BNP_PLANS.maxStaff et
+// - practitioners_count : nombre de collaborateurs déclaré par le pro. C'est
+//   LUI qui suggère un plan (Starter/Business/Scale se distinguent par le
+//   nombre de collaborateurs autorisés, voir BNP_PLANS.maxStaff et
 //   [[project_bnp_staff_limit_by_plan]]). Nullable en base (candidatures
 //   antérieures à ce champ) — dans ce cas, AUCUNE suggestion de plan n'est
 //   faite (on ne retombe pas sur le volume, qui n'a plus de rapport avec le
@@ -22,7 +22,7 @@ export interface PractitionersCountOption {
   plan: PlanKey;
 }
 
-// Un bucket par plan, borné par son nombre total de praticiens
+// Un bucket par plan, borné par son nombre total de collaborateurs
 // (getPraticiensLimit — LA MÊME source que la limite serveur posée en
 // 6be5bc8, voir plans-config.ts) : si BNP_PLANS.maxStaff change, les
 // libellés ET la logique de suggestion (PRACTITIONERS_COUNT_OPTIONS[i].plan)
@@ -39,12 +39,12 @@ export const PRACTITIONERS_COUNT_OPTIONS: PractitionersCountOption[] = BNP_PLANS
   const limit = getPraticiensLimit(plan.key);
   const min = prevLimit + 1;
   if (limit === null) {
-    return { value: `${min}+`, label: `${min} praticiens ou plus`, plan: plan.key };
+    return { value: `${min}+`, label: `${min} collaborateurs ou plus`, plan: plan.key };
   }
   if (min === limit) {
-    return { value: `${min}`, label: `${min} praticien (solo)`, plan: plan.key };
+    return { value: `${min}`, label: `${min} collaborateur (solo)`, plan: plan.key };
   }
-  return { value: `${min}-${limit}`, label: `${min} à ${limit} praticiens`, plan: plan.key };
+  return { value: `${min}-${limit}`, label: `${min} à ${limit} collaborateurs`, plan: plan.key };
 });
 
 // undefined = pas de suggestion (valeur absente/inconnue — ancienne

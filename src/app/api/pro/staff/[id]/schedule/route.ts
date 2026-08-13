@@ -14,7 +14,7 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   return profile.biz_id as string;
 }
 
-// GET /api/pro/staff/[id]/schedule — horaires individuels d'un praticien
+// GET /api/pro/staff/[id]/schedule — horaires individuels d'un collaborateur
 export const GET = withErrorHandling('[StaffSchedule]', async (
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,7 +39,7 @@ export const GET = withErrorHandling('[StaffSchedule]', async (
 
 const DAY_LABELS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 
-// PUT /api/pro/staff/[id]/schedule — remplace tous les horaires d'un praticien
+// PUT /api/pro/staff/[id]/schedule — remplace tous les horaires d'un collaborateur
 // Body : { schedules: [{ day_of_week: 1, open_time: "09:00", close_time: "18:00" }, ...] }
 // Plusieurs plages par jour sont autorisées (horaires coupés, ex. pause
 // déjeuner) depuis la migration 0031 — d'où la validation anti-chevauchement
@@ -98,7 +98,7 @@ export const PUT = withErrorHandling('[StaffSchedule]', async (
     }
   }
 
-  // Vérifie que le praticien appartient bien à ce biz
+  // Vérifie que le collaborateur appartient bien à ce biz
   const admin = createServiceRoleClient();
   const { data: staffRow } = await admin
     .from('staff')
@@ -107,7 +107,7 @@ export const PUT = withErrorHandling('[StaffSchedule]', async (
     .eq('biz_id', bizId)
     .maybeSingle();
 
-  if (!staffRow) return NextResponse.json({ error: 'Praticien introuvable' }, { status: 404 });
+  if (!staffRow) return NextResponse.json({ error: 'Collaborateur introuvable' }, { status: 404 });
 
   // Remplacement atomique : supprime puis réinsère
   await admin.from('staff_schedules').delete().eq('staff_id', staffId).eq('biz_id', bizId);

@@ -16,9 +16,9 @@ import {
 describe('PRACTITIONERS_COUNT_OPTIONS — dérivé de BNP_PLANS.maxStaff', () => {
   it('3 buckets, un par plan, valeurs alignées sur les seuils actuels (1 / 3 / illimité)', () => {
     expect(PRACTITIONERS_COUNT_OPTIONS).toEqual([
-      { value: '1', label: '1 praticien (solo)', plan: 'starter' },
-      { value: '2-3', label: '2 à 3 praticiens', plan: 'business' },
-      { value: '4+', label: '4 praticiens ou plus', plan: 'scale' },
+      { value: '1', label: '1 collaborateur (solo)', plan: 'starter' },
+      { value: '2-3', label: '2 à 3 collaborateurs', plan: 'business' },
+      { value: '4+', label: '4 collaborateurs ou plus', plan: 'scale' },
     ]);
   });
 });
@@ -47,7 +47,7 @@ describe('getSuggestedPlanFromPractitionersCount', () => {
 
 describe('getPractitionersCountLabel', () => {
   it('valeur connue → libellé humain', () => {
-    expect(getPractitionersCountLabel('2-3')).toBe('2 à 3 praticiens');
+    expect(getPractitionersCountLabel('2-3')).toBe('2 à 3 collaborateurs');
   });
 
   it('null/absent → libellé de repli explicite, jamais un crash ni une valeur vide', () => {

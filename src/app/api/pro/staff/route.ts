@@ -15,7 +15,7 @@ async function getProBizId(supabase: Awaited<ReturnType<typeof createClient>>) {
   return profile.biz_id as string;
 }
 
-// GET /api/pro/staff — liste les praticiens actifs (et inactifs) de l'établissement
+// GET /api/pro/staff — liste les collaborateurs actifs (et inactifs) de l'établissement
 export const GET = withErrorHandling('[Staff]', async () => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
@@ -32,7 +32,7 @@ export const GET = withErrorHandling('[Staff]', async () => {
   return NextResponse.json({ staff: data ?? [] });
 });
 
-// POST /api/pro/staff — créer un nouveau praticien
+// POST /api/pro/staff — créer un nouveau collaborateur
 export const POST = withErrorHandling('[Staff]', async (req: NextRequest) => {
   const supabase = await createClient();
   const bizId = await getProBizId(supabase);
@@ -67,7 +67,7 @@ export const POST = withErrorHandling('[Staff]', async (req: NextRequest) => {
       const limit = getPraticiensLimit(planKey);
       return NextResponse.json(
         {
-          error: `Limite de ${limit} praticien${(limit ?? 0) > 1 ? 's' : ''} atteinte pour votre plan ${getPlanConfig(planKey)?.label ?? planKey} (vous y compris). Passez à un plan supérieur pour ajouter des collaborateurs.`,
+          error: `Limite de ${limit} collaborateur${(limit ?? 0) > 1 ? 's' : ''} atteinte pour votre plan ${getPlanConfig(planKey)?.label ?? planKey} (vous y compris). Passez à un plan supérieur pour ajouter des collaborateurs.`,
         },
         { status: 403 }
       );

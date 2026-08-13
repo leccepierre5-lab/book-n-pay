@@ -34,7 +34,7 @@ export default function StepEquipe({
       <div>
         <h2 className="text-xl font-semibold text-white">Votre équipe</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Si vous travaillez seul, vous pouvez publier maintenant. Vous pourrez ajouter des praticiens à tout moment depuis votre dashboard.
+          Si vous travaillez seul, vous pouvez publier maintenant. Vous pourrez ajouter des collaborateurs à tout moment depuis votre dashboard.
         </p>
       </div>
 
@@ -55,7 +55,7 @@ export default function StepEquipe({
       <div className="rounded-2xl border border-white/[0.08] bg-navy-900/60 px-5 py-5">
         <h3 className="text-sm font-semibold text-white mb-1">Vous avez une équipe ?</h3>
         <p className="text-xs text-slate-400 mb-4">
-          Vous pourrez ajouter vos praticiens, définir leurs horaires individuels et les gérer en cas de départ depuis{' '}
+          Vous pourrez ajouter vos collaborateurs, définir leurs horaires individuels et les gérer en cas de départ depuis{' '}
           <strong className="text-white">Dashboard → Équipe</strong>.
         </p>
         <a

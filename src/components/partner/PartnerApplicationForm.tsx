@@ -61,7 +61,7 @@ export default function PartnerApplicationForm() {
       setError('Décrivez votre secteur d\'activité.');
       return;
     }
-    if (!practitionersCount) { setError('Sélectionnez le nombre de praticiens de votre établissement.'); return; }
+    if (!practitionersCount) { setError('Sélectionnez le nombre de collaborateurs de votre établissement.'); return; }
     if (!acceptedCgu) { setError('Vous devez accepter les CGU/CGV pour envoyer votre candidature.'); return; }
     setLoading(true);
     setError(null);
@@ -197,10 +197,10 @@ export default function PartnerApplicationForm() {
         )}
       </section>
 
-      {/* Nombre de praticiens — obligatoire, détermine le plan suggéré */}
+      {/* Nombre de collaborateurs — obligatoire, détermine le plan suggéré */}
       <section className="space-y-3">
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-          Nombre de praticiens <span className="text-red-400">*</span>
+          Nombre de collaborateurs <span className="text-red-400">*</span>
         </h2>
         <div className="space-y-2">
           {PRACTITIONERS_COUNT_OPTIONS.map(({ value, label, plan }) => (

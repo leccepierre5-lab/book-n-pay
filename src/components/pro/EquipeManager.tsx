@@ -89,8 +89,8 @@ export default function EquipeManager({
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const activeCount = staffList.filter((s) => s.is_active).length;
-  // Le pro lui-même n'a pas de ligne `staff` — total praticiens = collaborateurs actifs + 1.
-  const totalPraticiens = activeCount + 1;
+  // Le pro lui-même n'a pas de ligne `staff` — total collaborateurs = collaborateurs actifs + 1.
+  const totalCollaborateurs = activeCount + 1;
   const totalLimit = maxStaff === null ? null : maxStaff + 1;
   const atLimit = maxStaff !== null && activeCount >= maxStaff;
   const overLimit = maxStaff !== null && activeCount > maxStaff;
@@ -248,7 +248,7 @@ export default function EquipeManager({
   };
 
   const handleDeactivate = async (staffId: string) => {
-    if (!confirm('Désactiver ce praticien ? Il ne sera plus proposé aux clients, mais ses réservations passées restent accessibles.')) return;
+    if (!confirm('Désactiver ce collaborateur ? Il ne sera plus proposé aux clients, mais ses réservations passées restent accessibles.')) return;
     setError('');
     setTogglingId(staffId);
     try {
@@ -333,26 +333,26 @@ export default function EquipeManager({
   return (
     <div className="space-y-5">
       <p className="text-sm text-slate-400">
-        Gérez vos praticiens. Les clients pourront choisir un praticien précis ou "sans préférence" lors de la réservation.
+        Gérez vos collaborateurs. Les clients pourront choisir un collaborateur précis ou "sans préférence" lors de la réservation.
       </p>
 
       <p className="text-xs text-slate-500">
         {totalLimit === null
-          ? `${totalPraticiens} praticien${totalPraticiens > 1 ? 's' : ''} — plan ${planLabel}, illimité`
-          : `${totalPraticiens} / ${totalLimit} praticien${totalLimit > 1 ? 's' : ''} — plan ${planLabel}`}
+          ? `${totalCollaborateurs} collaborateur${totalCollaborateurs > 1 ? 's' : ''} — plan ${planLabel}, illimité`
+          : `${totalCollaborateurs} / ${totalLimit} collaborateur${totalLimit > 1 ? 's' : ''} — plan ${planLabel}`}
       </p>
 
       {overLimit && (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 text-xs text-amber-300">
-          Vous dépassez la limite de votre plan {planLabel} ({totalPraticiens} praticiens pour {totalLimit} autorisés). Vos praticiens existants restent actifs, mais vous ne pouvez pas en ajouter ou en réactiver de nouveaux tant que vous n'êtes pas passé à un plan adapté.
+          Vous dépassez la limite de votre plan {planLabel} ({totalCollaborateurs} collaborateurs pour {totalLimit} autorisés). Vos collaborateurs existants restent actifs, mais vous ne pouvez pas en ajouter ou en réactiver de nouveaux tant que vous n'êtes pas passé à un plan adapté.
         </div>
       )}
 
-      {/* Liste praticiens actifs */}
+      {/* Liste collaborateurs actifs */}
       <div className="space-y-2">
         {activeStaff.length === 0 && panel !== 'add' && (
           <div className="rounded-2xl border border-dashed border-white/[0.10] px-5 py-8 text-center text-slate-500 text-sm">
-            Aucun praticien — vous travaillez seul ou ajoutez-en un.
+            Aucun collaborateur — vous travaillez seul ou ajoutez-en un.
           </div>
         )}
         {activeStaff.map((s) => (
@@ -409,7 +409,7 @@ export default function EquipeManager({
             onClick={openAdd}
             className="w-full rounded-xl border border-dashed border-white/[0.12] py-2.5 text-sm text-slate-400 hover:text-white hover:border-white/20 transition-colors"
           >
-            + Ajouter un praticien
+            + Ajouter un collaborateur
           </button>
         )
       )}
@@ -417,7 +417,7 @@ export default function EquipeManager({
       {/* Panneau ajout */}
       {panel === 'add' && (
         <div className="rounded-2xl border border-white/[0.08] bg-navy-900/60 px-5 py-5 space-y-3">
-          <h3 className="text-sm font-semibold text-white">Nouveau praticien</h3>
+          <h3 className="text-sm font-semibold text-white">Nouveau collaborateur</h3>
           <div>
             <label className="block text-xs text-slate-400 mb-1">Prénom / Nom <span className="text-red-400">*</span></label>
             <input type="text" value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="Ex : Julien" className="w-full rounded-xl bg-white/[0.06] border border-white/[0.08] px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-mint-500/40" />
@@ -679,7 +679,7 @@ export default function EquipeManager({
         </div>
       )}
 
-      {/* Praticiens inactifs */}
+      {/* Collaborateurs inactifs */}
       {inactiveStaff.length > 0 && (
         <div className="space-y-2 pt-2">
           <p className="text-xs text-slate-600 uppercase tracking-wide font-medium px-1">Inactifs</p>
