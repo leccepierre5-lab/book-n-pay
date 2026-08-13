@@ -416,6 +416,38 @@ export default function CGUPage() {
               </p>
             </div>
           </section>
+
+          <section>
+            <h2 className="mb-2 text-base font-semibold text-white">
+              15. Contenu du chat et des intitulés de prestation
+            </h2>
+            <div className="space-y-3">
+              <p>
+                <strong className="text-white">15.1.</strong> La messagerie intégrée à une réservation
+                (« le chat ») a pour seul objet l'organisation pratique du rendez-vous entre le Client
+                et le Professionnel (horaires, accès, imprévus). Elle n'est pas destinée à l'échange
+                d'informations médicales, de santé, ou plus largement de toute donnée sensible ou
+                confidentielle au sens de la réglementation applicable.
+              </p>
+              <p>
+                <strong className="text-white">15.2.</strong> L'Utilisateur, qu'il soit Client ou
+                Professionnel, s'interdit de faire figurer une information de santé ou une donnée
+                sensible/confidentielle dans le chat, ainsi que dans l'intitulé ou la description
+                d'une prestation (nom du service publié par le Professionnel). Toute information de
+                cette nature qui y serait néanmoins saisie l'est sous la seule responsabilité de son
+                auteur.
+              </p>
+              <p>
+                <strong className="text-white">15.3.</strong> Book'nPay met en œuvre des mesures
+                raisonnables pour limiter la quantité de données échangées dans le chat (longueur
+                maximale du message) et pour ne pas relayer le contenu des messages dans les
+                notifications envoyées par email. Ces mesures réduisent l'exposition de la donnée mais
+                ne constituent ni une certification, ni une garantie d'hébergement de données de santé
+                au sens de la réglementation applicable à ce type de données ; le chat ne doit donc
+                jamais être utilisé à cette fin, quelles que soient les mesures en place.
+              </p>
+            </div>
+          </section>
         </div>
       </div>
     </div>

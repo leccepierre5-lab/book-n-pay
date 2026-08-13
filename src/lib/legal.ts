@@ -1,7 +1,13 @@
 // Version affichée sur /cgu ("Dernière mise à jour") — à incrémenter à chaque
 // changement de texte pour que cgu_accepted_at/cgu_version restent traçables
 // et opposables même après une modification future des CGU.
-export const CGU_VERSION = '2026-08';
+//
+// Convention : 'AAAA-MM' pour le premier changement du mois, puis
+// 'AAAA-MM-N' (N = 2, 3, ...) pour chaque bump supplémentaire le même mois —
+// reste triable en comparaison de chaînes tant que N < 10 (pas encore
+// arrivé). Ici : ajout de l'article 15 (chat / intitulés de prestation —
+// interdiction des données de santé), voir docs/legal-archive/.
+export const CGU_VERSION = '2026-08-2';
 
 // ⚠️ TEXTE PROVISOIRE — "draft-1", PAS le texte définitif. Rédigé pour que le
 // mécanisme (case à cocher + preuve serveur, migration 0045) soit testable

@@ -7,6 +7,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 import { formatTime } from '@/lib/booking-utils';
+import { CHAT_MESSAGE_MAX_LENGTH } from '@/lib/chat';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +18,18 @@ export async function POST(req: NextRequest) {
     const { bookingId, text } = await req.json();
     if (!bookingId || !text) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 });
+    }
+
+    // Revalidation serveur de la longueur — jamais confiance dans le seul
+    // `maxLength` du champ côté client (même principe que partout ailleurs
+    // dans ce repo, ex. stripe/checkout/route.ts qui revalide tout côté
+    // serveur). Minimisation de données, pas une mesure de conformité HDS :
+    // voir le commentaire de CHAT_MESSAGE_MAX_LENGTH (src/lib/chat.ts).
+    if (typeof text !== 'string' || text.length > CHAT_MESSAGE_MAX_LENGTH) {
+      return NextResponse.json(
+        { error: `Le message ne doit pas dépasser ${CHAT_MESSAGE_MAX_LENGTH} caractères.` },
+        { status: 400 }
+      );
     }
 
     // senderRole/senderName ne sont jamais pris depuis le body (auto-déclarables
@@ -60,7 +73,11 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    notifyRecipient(bookingId, senderRole, senderName, text).catch((e) =>
+    // ⚠️ MINIMISATION DE DONNÉES (audit, pas une mesure de conformité HDS) :
+    // notifyRecipient ne reçoit plus `text` ni `senderName` — l'email de
+    // notification ne doit plus jamais contenir d'extrait du message, ni le
+    // nom de la prestation, ni qui a écrit quoi, voir son corps ci-dessous.
+    notifyRecipient(bookingId, senderRole).catch((e) =>
       console.warn('[Chat] Notification échouée:', e.message)
     );
 
@@ -70,16 +87,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function notifyRecipient(
-  bookingId: string,
-  senderRole: 'client' | 'pro',
-  senderName: string | null,
-  text: string
-) {
+async function notifyRecipient(bookingId: string, senderRole: 'client' | 'pro') {
   const supabase = createServiceRoleClient();
   const { data: booking } = await supabase
     .from('bookings')
-    .select('biz_id, biz_name, service_name, date, time, client_name, client_email')
+    .select('biz_id, biz_name, date, time, client_name, client_email')
     .eq('id', bookingId)
     .single();
 
@@ -129,9 +141,22 @@ async function notifyRecipient(
     ? new Date(booking.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
     : booking.date;
 
+  // Lien vers le fil de chat réel — seule page qui affiche ChatThread
+  // aujourd'hui, cliente comme pro (la page ne filtre pas par rôle, elle
+  // dérive juste l'alignement des bulles du profil connecté). Pas de lien
+  // pro dédié distinct pour l'instant.
+  const chatUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app'}/mes-reservations/${bookingId}`;
+
+  // ⚠️ MINIMISATION DE DONNÉES (audit, pas une mesure de conformité HDS) :
+  // cet email ne doit contenir NI extrait du message NI nom de prestation
+  // (service_name) — chat_messages.text n'est pas hébergé en environnement
+  // certifié HDS, et un message de coordination de rendez-vous peut
+  // involontairement contenir une donnée de santé. Réduire ce que Resend
+  // reçoit réduit la surface d'exposition ; ça ne rend rien "conforme".
+  // Le sujet de l'email suit la même règle (pas de service_name non plus).
   await sendEmail({
     to: recipientEmail,
-    subject: `${subjectPrefix} — ${booking.service_name || booking.biz_name}`,
-    text: `Bonjour ${recipientName},\n\nVous avez reçu un nouveau message concernant votre réservation :\n\n📍 ${booking.biz_name}\n💆 ${booking.service_name}\n📅 ${dateLabel} à ${formatTime(booking.time)}\n\n${senderName} : « ${text} »\n\nConnectez-vous à Book'nPay pour répondre.\n\nL'équipe Book'nPay`,
+    subject: `${subjectPrefix} — ${booking.biz_name}`,
+    text: `Bonjour ${recipientName},\n\nVous avez un nouveau message concernant votre réservation du ${dateLabel} à ${formatTime(booking.time)} chez ${booking.biz_name}.\n\nConnectez-vous à Book'nPay pour le consulter :\n${chatUrl}\n\nL'équipe Book'nPay`,
   });
 }

@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { ChatMessage } from '@/lib/database.types';
+import { CHAT_MESSAGE_MAX_LENGTH } from '@/lib/chat';
 
 export default function ChatThread({
   bookingId,
@@ -43,6 +44,13 @@ export default function ChatThread({
 
   const send = async () => {
     if (!text.trim()) return;
+    // Garde-fou client, en plus du `maxLength` du champ — ne remplace pas la
+    // revalidation serveur (route.ts), même principe qu'ailleurs dans le
+    // repo : ne jamais faire confiance à une seule validation côté client.
+    if (text.length > CHAT_MESSAGE_MAX_LENGTH) {
+      setError(`Le message ne doit pas dépasser ${CHAT_MESSAGE_MAX_LENGTH} caractères.`);
+      return;
+    }
     setSending(true);
     setError(null);
     const res = await fetch('/api/chat/send', {
@@ -81,18 +89,35 @@ export default function ChatThread({
         )}
       </div>
       {error && <p className="px-3 pb-1 text-xs text-red-400">{error}</p>}
-      <div className="flex gap-2 p-3">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder="Écrire un message..."
-          className="flex-1 rounded-lg bg-navy-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
-        />
+      {/* Mention minimisation des données (Pierre, texte exact — ne pas
+          reformuler) : ce chat n'est pas hébergé en environnement certifié
+          HDS, donc rien ici ne "sécurise" une donnée de santé qui y serait
+          saisie — la mention réduit seulement le risque qu'elle y entre. */}
+      <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+        <span className="shrink-0 text-sm text-amber-400">⚠</span>
+        <p className="text-[11px] leading-snug text-amber-300">
+          Ce chat sert à organiser votre rendez-vous. N&apos;y indiquez aucune information de santé
+          ou donnée confidentielle.
+        </p>
+      </div>
+      <div className="flex gap-2 p-3 pt-0">
+        <div className="flex-1">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value.slice(0, CHAT_MESSAGE_MAX_LENGTH))}
+            onKeyDown={(e) => e.key === 'Enter' && send()}
+            placeholder="Écrire un message..."
+            maxLength={CHAT_MESSAGE_MAX_LENGTH}
+            className="w-full rounded-lg bg-navy-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-mint-500"
+          />
+          <p className="mt-1 text-right text-[10px] text-white/30">
+            {text.length}/{CHAT_MESSAGE_MAX_LENGTH}
+          </p>
+        </div>
         <button
           onClick={send}
           disabled={sending}
-          className="rounded-lg bg-mint-500 px-4 py-2 text-sm font-medium text-navy-950 disabled:opacity-50"
+          className="h-fit rounded-lg bg-mint-500 px-4 py-2 text-sm font-medium text-navy-950 disabled:opacity-50"
         >
           Envoyer
         </button>
