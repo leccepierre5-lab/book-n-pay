@@ -19,11 +19,10 @@ export default async function ProPrestationsPage() {
   }
 
   const serviceClient = createServiceRoleClient();
-  const { data: services } = await serviceClient
-    .from('services')
-    .select('*')
-    .eq('biz_id', profile.biz_id)
-    .order('created_at');
+  const [{ data: services }, { data: business }] = await Promise.all([
+    serviceClient.from('services').select('*').eq('biz_id', profile.biz_id).order('created_at'),
+    serviceClient.from('businesses').select('category').eq('id', profile.biz_id).maybeSingle(),
+  ]);
 
   return (
     <div className="min-h-dvh">
@@ -33,7 +32,7 @@ export default async function ProPrestationsPage() {
             ←
           </Link>
         </div>
-        <PrestationsManager initial={services ?? []} />
+        <PrestationsManager initial={services ?? []} category={business?.category} />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { Service } from '@/lib/database.types';
 import { MAX_DEPOSIT_EUROS } from '@/lib/booking-utils';
+import { getServiceNameSuggestions, SERVICE_NAME_AUTRE, SERVICE_NAME_MAX_LENGTH } from '@/lib/service-name-suggestions';
 
 type GenreValue = '' | 'homme' | 'femme' | 'enfants' | 'garcon' | 'fille';
 
@@ -62,7 +63,16 @@ function serviceToForm(s: Service): FormState {
   };
 }
 
-export default function PrestationsManager({ initial }: { initial: Service[] }) {
+export default function PrestationsManager({
+  initial,
+  category,
+}: {
+  initial: Service[];
+  // Catégorie du business (businesses.category) — détermine quel jeu
+  // d'intitulés suggérer. `undefined` (ex: ancien appelant pas encore mis à
+  // jour) retombe sur le référentiel "autre", jamais un crash.
+  category?: string | null;
+}) {
   const [services, setServices] = useState<Service[]>(initial);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -71,12 +81,20 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const nameSuggestions = getServiceNameSuggestions(category);
+  // Un service déjà en base peut porter un nom hors référentiel (créé avant
+  // ce chantier, ou un "Autre" antérieur) — dans ce cas le formulaire doit
+  // s'ouvrir directement en mode texte libre avec ce nom, jamais le
+  // remplacer silencieusement par une suggestion qui ne correspond pas.
+  const [nameIsAutre, setNameIsAutre] = useState(false);
+
   const inputClass =
     'w-full rounded-xl bg-navy-950 border border-white/[0.08] px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-mint-500/40 focus:ring-1 focus:ring-mint-500/15 transition-all';
 
   const openNew = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setNameIsAutre(false);
     setError(null);
     setShowForm(true);
   };
@@ -84,6 +102,7 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
   const openEdit = (s: Service) => {
     setEditingId(s.id);
     setForm(serviceToForm(s));
+    setNameIsAutre(!nameSuggestions.includes(s.name));
     setError(null);
     setShowForm(true);
   };
@@ -230,14 +249,58 @@ export default function PrestationsManager({ initial }: { initial: Service[] }) 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label className="block text-[10px] text-slate-500 uppercase tracking-widest mb-1.5">Nom *</label>
-              <input
-                type="text"
-                placeholder="Ex : Coupe homme, Soin visage..."
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                required
-                className={inputClass}
-              />
+              {nameIsAutre ? (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Nom de la prestation"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value.slice(0, SERVICE_NAME_MAX_LENGTH) }))}
+                    maxLength={SERVICE_NAME_MAX_LENGTH}
+                    required
+                    className={inputClass}
+                  />
+                  <div className="mt-1 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => { setNameIsAutre(false); setForm((f) => ({ ...f, name: '' })); }}
+                      className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                      ← revenir à la liste
+                    </button>
+                    <span className="text-[10px] text-slate-600 tabular-nums">
+                      {form.name.length}/{SERVICE_NAME_MAX_LENGTH}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <select
+                  value={form.name}
+                  onChange={(e) => {
+                    if (e.target.value === SERVICE_NAME_AUTRE) {
+                      setNameIsAutre(true);
+                      setForm((f) => ({ ...f, name: '' }));
+                    } else {
+                      setForm((f) => ({ ...f, name: e.target.value }));
+                    }
+                  }}
+                  required
+                  className={inputClass}
+                >
+                  <option value="" disabled>
+                    Choisir un intitulé…
+                  </option>
+                  {nameSuggestions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                  <option value={SERVICE_NAME_AUTRE}>Autre…</option>
+                </select>
+              )}
+              <p className="mt-1 text-[10px] text-slate-600">
+                N&apos;indiquez aucune information de santé ou pathologie dans l&apos;intitulé.
+              </p>
             </div>
 
             <div>

@@ -11,6 +11,7 @@ interface Photo { id: string; url: string; sort_order: number }
 interface Props {
   bizId: string;
   bizName: string;
+  bizCategory: string | null;
   initialStep: number;
   step1Done: boolean;
   step2Done: boolean;
@@ -31,6 +32,7 @@ interface Props {
 export default function OnboardingWizard({
   bizId,
   bizName,
+  bizCategory,
   initialStep,
   step1Done: s1,
   step2Done: s2,
@@ -82,6 +84,7 @@ export default function OnboardingWizard({
         {step === 2 && (
           <StepPrestations
             bizId={bizId}
+            category={bizCategory}
             onDone={() => { setStep2Done(true); setStep(3); }}
           />
         )}

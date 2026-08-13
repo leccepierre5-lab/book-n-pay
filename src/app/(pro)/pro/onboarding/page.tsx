@@ -72,6 +72,7 @@ export default async function ProOnboardingPage({
     <OnboardingWizard
       bizId={biz.id}
       bizName={biz.name}
+      bizCategory={biz.category}
       initialStep={!step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : 4}
       step1Done={step1Done}
       step2Done={step2Done}

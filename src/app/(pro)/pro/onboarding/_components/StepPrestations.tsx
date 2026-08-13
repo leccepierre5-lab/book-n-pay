@@ -5,9 +5,11 @@ import PrestationsManager from '@/components/pro/PrestationsManager';
 
 export default function StepPrestations({
   bizId,
+  category,
   onDone,
 }: {
   bizId: string;
+  category: string | null;
   onDone: () => void;
 }) {
   const [services, setServices] = useState<Service[]>([]);
@@ -55,7 +57,7 @@ export default function StepPrestations({
         </p>
       </div>
 
-      <PrestationsManager initial={services} />
+      <PrestationsManager initial={services} category={category} />
 
       {error && <p className="text-xs text-red-400">{error}</p>}
 

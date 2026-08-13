@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond, withErrorHandling } from '@/lib/api-error';
 import { MAX_DEPOSIT_EUROS } from '@/lib/booking-utils';
+import { SERVICE_NAME_MAX_LENGTH } from '@/lib/service-name-suggestions';
 
 async function getBizId(): Promise<string | null> {
   const supabase = await createClient();
@@ -40,6 +41,16 @@ export const POST = withErrorHandling('[Services]', async (req: NextRequest) => 
 
   if (!name || !duration_minutes || price == null) {
     return NextResponse.json({ error: 'name, duration_minutes et price requis' }, { status: 400 });
+  }
+
+  // Défense en profondeur (client + serveur + CHECK 0049) — jamais confiance
+  // dans le seul maxLength du champ côté client, même principe que
+  // chat_messages/chat/send/route.ts.
+  if (String(name).trim().length > SERVICE_NAME_MAX_LENGTH) {
+    return NextResponse.json(
+      { error: `Le nom de la prestation ne doit pas dépasser ${SERVICE_NAME_MAX_LENGTH} caractères.` },
+      { status: 400 }
+    );
   }
 
   // ⚠️ CORRECTIF (LOT 2 #1, audit tarification 27/07) : un dépôt à 0€ (ou
@@ -111,6 +122,13 @@ export const PATCH = withErrorHandling('[Services]', async (req: NextRequest) =>
     .eq('biz_id', bizId)
     .maybeSingle();
   if (!existing) return NextResponse.json({ error: 'Service introuvable' }, { status: 404 });
+
+  if (name !== undefined && String(name).trim().length > SERVICE_NAME_MAX_LENGTH) {
+    return NextResponse.json(
+      { error: `Le nom de la prestation ne doit pas dépasser ${SERVICE_NAME_MAX_LENGTH} caractères.` },
+      { status: 400 }
+    );
+  }
 
   if (deposit !== undefined) {
     // Même correctif que POST — voir commentaire ci-dessus.
