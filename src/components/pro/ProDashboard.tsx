@@ -314,12 +314,12 @@ export default function ProDashboard({
             valeur reçue).
             Libellé "à refacturer", PAS "ce mois" (relecture 11/08, même
             classe d'erreur que le bug CA `0655d92`) : proChargesPendingAmount
-            est un cumul de TOUTES les charges 'pending' depuis toujours (la
-            facturation réelle qui viderait ce cumul chaque mois n'existe pas
-            encore, hors périmètre de ce lot) — un libellé "ce mois" serait
-            faux dès le deuxième mois d'activité. À revoir quand la
-            facturation effective (rapprochement facture mensuelle) sera
-            construite. */}
+            est un cumul de TOUTES les charges 'pending' depuis toujours — un
+            libellé "ce mois" serait faux dès le deuxième mois d'activité.
+            Facturation effective (13/08) : une charge quitte ce cumul dès
+            qu'elle passe 'invoiced' (rattachée à la prochaine facture
+            d'abonnement, ou à une facture autonome si le pro résilie avant),
+            jamais sur une base calendaire — voir pro-charge-billing.ts. */}
         {stats.proChargesPendingAmount > 0 && (
           <div className="mb-6 rounded-2xl bg-navy-900 border border-amber-500/20 p-4">
             <p className="text-xs text-slate-500 mb-2 flex items-center gap-1.5">
@@ -327,8 +327,30 @@ export default function ProDashboard({
             </p>
             <p className="text-2xl font-bold text-amber-400">{stats.proChargesPendingAmount}€</p>
             <p className="text-xs text-slate-500 mt-1">
-              Suite à vos annulations de rendez-vous (client remboursé intégralement) — prélevés sur votre prochaine facture.
+              Suite à vos annulations de rendez-vous (client remboursé intégralement) — prélevés sur une prochaine facture.
             </p>
+          </div>
+        )}
+
+        {/* Historique de ce qui a déjà été facturé — distinct du bloc "à
+            refacturer" ci-dessus, jamais fondu dedans : le pro doit pouvoir
+            vérifier CE QUI est parti et QUAND, pas seulement le cumul en
+            attente (règle posée le 13/08, facturation effective). */}
+        {stats.proChargesInvoiced.length > 0 && (
+          <div className="mb-6 rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
+            <p className="text-xs text-slate-500 mb-2 flex items-center gap-1.5">
+              <span>✅</span>Frais de gestion déjà facturés
+            </p>
+            <ul className="space-y-1">
+              {stats.proChargesInvoiced.map((c, i) => (
+                <li key={i} className="flex items-center justify-between text-xs text-slate-400">
+                  <span>
+                    {new Date(c.invoicedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </span>
+                  <span className="font-semibold text-white">{c.amount.toFixed(2)}€</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

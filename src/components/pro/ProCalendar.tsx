@@ -447,7 +447,7 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
           </p>
           <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-300">
             Les frais de gestion{cancelManagementFee != null ? ` (${cancelManagementFee.toFixed(2)}€)` : ''} vous
-            seront refacturés sur votre prochaine facture — c&apos;est vous, pas le client, qui les prenez en
+            seront refacturés sur une prochaine facture — c&apos;est vous, pas le client, qui les prenez en
             charge sur cette annulation.
           </p>
           <p className="mt-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] font-medium text-rose-300">

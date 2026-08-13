@@ -96,17 +96,21 @@ export interface ProStats {
   offHoursBookingsCount: number; // RDV RÉSERVÉS (created_at) hors jour/heure d'ouverture ce mois
   // Frais de gestion refacturés au pro suite à ses propres annulations de RDV
   // (pro_charges, migration 0041 — C15 uniquement, voir pro/cancel-booking).
-  // Somme de TOUTES les charges 'pending' (pas de borne de date, la
-  // facturation effective n'est pas encore implémentée — elles restent
-  // 'pending' jusqu'à rapprochement avec la facture mensuelle, hors périmètre
-  // de ce lot). Sans ce chiffre, ce serait exactement le frais caché reproché
-  // à la concurrence — obligatoire, jamais retirable sans repasser par cette
+  // Somme de TOUTES les charges 'pending' (pas de borne de date — la
+  // facturation effective, 13/08, ne vide le cumul QUE quand une charge
+  // passe réellement 'invoiced', pas sur une base calendaire). Sans ce
+  // chiffre, ce serait exactement le frais caché reproché à la
+  // concurrence — obligatoire, jamais retirable sans repasser par cette
   // décision.
   // ⚠️ Ce chiffre est un CUMUL, pas un montant mensuel — le composant
   // (ProDashboard.tsx) doit l'afficher sous un libellé "à refacturer", jamais
   // "ce mois" (relecture 11/08 : même classe d'erreur que le bug CA `0655d92`,
   // un libellé "ce mois" sur un cumul devient faux dès le 2e mois).
   proChargesPendingAmount: number;
+  // Historique des charges déjà facturées (les 5 plus récentes) — le pro
+  // doit voir CE QUI a été facturé et QUAND, pas seulement le cumul en
+  // attente ci-dessus (règle posée le 13/08 avec la facturation effective).
+  proChargesInvoiced: { amount: number; invoicedAt: string }[];
 }
 
 export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProStats> {
@@ -201,6 +205,22 @@ export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProS
     (proChargesRows || []).reduce((sum, r) => sum + (r.amount_cents || 0), 0)
   ) / 100;
 
+  // Historique récent des charges déjà facturées — le pro doit voir CE QUI
+  // a été facturé et QUAND, pas seulement le cumul en attente (règle posée
+  // par Pierre le 13/08, facturation effective des pro_charges). Les 5
+  // dernières suffisent pour un dashboard, pas un historique complet.
+  const { data: proChargesInvoicedRows } = await supabase
+    .from('pro_charges')
+    .select('amount_cents, invoiced_at')
+    .eq('biz_id', bizId)
+    .eq('status', 'invoiced')
+    .order('invoiced_at', { ascending: false })
+    .limit(5);
+
+  const proChargesInvoiced = (proChargesInvoicedRows || [])
+    .filter((r) => r.invoiced_at)
+    .map((r) => ({ amount: Math.round(r.amount_cents) / 100, invoicedAt: r.invoiced_at as string }));
+
   return {
     totalBookings: bookings?.length || 0,
     onlineRevenue: onlineRevenueRounded,
@@ -211,5 +231,6 @@ export async function getProStats(bizId: string, biz: BizHoraires): Promise<ProS
     depositSecuredAmount,
     offHoursBookingsCount,
     proChargesPendingAmount,
+    proChargesInvoiced,
   };
 }

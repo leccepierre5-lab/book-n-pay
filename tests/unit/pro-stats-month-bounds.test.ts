@@ -31,6 +31,8 @@ function buildSupabaseMock() {
       lte: (...args: unknown[]) => { chain.calls.push({ method: 'lte', args }); return builder; },
       neq: (...args: unknown[]) => { chain.calls.push({ method: 'neq', args }); return builder; },
       in: (...args: unknown[]) => { chain.calls.push({ method: 'in', args }); return builder; },
+      order: (...args: unknown[]) => { chain.calls.push({ method: 'order', args }); return builder; },
+      limit: (...args: unknown[]) => { chain.calls.push({ method: 'limit', args }); return builder; },
       // Query builders Supabase sont "thenable" — `await query` résout ainsi
       // sans jamais appeler .then() explicitement dans le code testé.
       then: (resolve: (v: unknown) => void) => resolve({ data: [], count: 0, error: null }),

@@ -25,6 +25,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
+import { attachProChargeToNextInvoice } from '@/lib/stripe/pro-charge-billing';
 
 // Préfixe constant et parsable — devient la source de comptage des
 // annulations pro (litige, stats, futur indicateur de fiabilité). Ne pas
@@ -224,6 +225,15 @@ export async function POST(req: NextRequest) {
           }
         } else {
           chargeId = chargeRow?.id ?? null;
+          // Rattache immédiatement la charge à la prochaine facture
+          // d'abonnement du pro (invoice item en attente, jamais un
+          // prélèvement immédiat) — voir pro-charge-billing.ts pour le
+          // raisonnement complet. Best-effort : un échec ici laisse la
+          // charge 'pending' (déjà alertée en interne par la fonction),
+          // ne remet jamais en cause l'annulation/remboursement déjà actés.
+          if (chargeId) {
+            await attachProChargeToNextInvoice(stripe, serviceSupabase, chargeId, booking.biz_id, Math.round(managementFeeAmount * 100));
+          }
         }
       } catch (chargeErr: any) {
         console.error('[ProCancelBooking] Insertion pro_charges échouée:', chargeErr.message);
@@ -337,7 +347,7 @@ Vous avez annulé le rendez-vous suivant :
 📅 Date : ${new Date(booking.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
 🕐 Heure : ${formatTime(booking.time)}
 
-Votre client a été intégralement remboursé. Les frais de gestion de cette réservation (${feeFormatted} €) vous seront refacturés sur votre prochaine facture.
+Votre client a été intégralement remboursé. Les frais de gestion de cette réservation (${feeFormatted} €) vous seront refacturés sur une prochaine facture.
 
 L'équipe Book'nPay`,
           }).catch(() => {});

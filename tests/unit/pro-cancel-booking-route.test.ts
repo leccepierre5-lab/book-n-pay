@@ -34,10 +34,16 @@ let authProfile: any = null;
 // avec un objet.
 const mockRefundsCreate = vi.fn(async (..._args: any[]) => ({ id: 're_test' }));
 const mockSessionsRetrieve = vi.fn(async () => ({ metadata: {} }));
+// Rattachement pro_charges à la prochaine facture (pro-charge-billing.ts,
+// 13/08) — succès par défaut, sans effet sur ce que ces tests vérifient
+// déjà (le remboursement/la charge elle-même), voir tests dédiés dans
+// pro-charge-billing.test.ts pour le comportement de cette fonction.
+const mockInvoiceItemsCreate = vi.fn(async (..._args: any[]) => ({ id: 'ii_test' }));
 vi.mock('@/lib/stripe/client', () => ({
   getStripeClient: vi.fn(async () => ({
     refunds: { create: mockRefundsCreate },
     checkout: { sessions: { retrieve: mockSessionsRetrieve } },
+    invoiceItems: { create: mockInvoiceItemsCreate },
   })),
 }));
 
@@ -107,6 +113,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockCheckRateLimit.mockResolvedValue({ allowed: true, currentCount: 1 });
   chains = {};
+  // Défaut : customer Stripe connu, le rattachement à la prochaine facture
+  // réussit silencieusement — les tests qui veulent vérifier le cas "pas de
+  // stripe_customer_id" écrasent ceci explicitement.
+  chains.business_settings = makeChain([], { stripe_customer_id: 'cus_test_1' });
   authProfile = { role: 'pro', biz_id: 'biz-1' };
 });
 
@@ -237,7 +247,7 @@ describe('POST /api/pro/cancel-booking', () => {
 
     const proCall = mockSendEmail.mock.calls.find((c: any[]) => c[0].to === 'proowner@example.com');
     expect(proCall![0].text).toContain(
-      "Votre client a été intégralement remboursé. Les frais de gestion de cette réservation (1,99 €) vous seront refacturés sur votre prochaine facture."
+      "Votre client a été intégralement remboursé. Les frais de gestion de cette réservation (1,99 €) vous seront refacturés sur une prochaine facture."
     );
 
     expect(mockNotifyAdminOnFailure).not.toHaveBeenCalled();

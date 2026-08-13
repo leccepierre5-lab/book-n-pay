@@ -90,6 +90,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Filtre déjà strictement sur 'pending' — une charge 'waived' (remise
+    // décidée par un admin ou seuil défensif automatique, voir
+    // pro-charge-billing.ts) ou 'invoiced' ne bloque jamais la suppression,
+    // vérifié explicitement le 13/08 suite à la demande de Pierre sur ce
+    // point précis (facturation effective des pro_charges).
     const { count: pendingChargesCount } = await admin
       .from('pro_charges')
       .select('id', { count: 'exact', head: true })

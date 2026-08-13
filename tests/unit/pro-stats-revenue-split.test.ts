@@ -23,6 +23,8 @@ function buildSupabaseMock(statsRows: any[]) {
       lte: () => builder,
       neq: () => builder,
       in: () => builder,
+      order: () => builder,
+      limit: () => builder,
       then: (resolve: (v: unknown) => void) => {
         // Distingue la requête stats (bookings + booking_members imbriqués)
         // de la requête "upcomingCount" (bookings, count-only) et de

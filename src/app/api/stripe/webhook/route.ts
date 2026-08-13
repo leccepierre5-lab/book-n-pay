@@ -10,6 +10,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate, qrCheckinBlockHtml, escapeHtml } from '@/lib/email/send';
 import { notifyProNewBooking } from '@/lib/pro-notifications';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
+import { reconcileProChargesFromInvoice, invoicePendingChargesOnCancellation } from '@/lib/stripe/pro-charge-billing';
 import { formatTime } from '@/lib/booking-utils';
 import { generateQrPngBase64 } from '@/lib/qr';
 
@@ -582,6 +583,23 @@ L'équipe Book'nPay`,
           .eq('biz_id', settings.biz_id);
         console.log(`[Webhook] ✅ Abonnement actif — biz ${settings.biz_id}`);
       }
+
+      if (settings) {
+        await reconcileProChargesFromInvoice(supabase, settings.biz_id, invoice);
+      }
+    } else if (typeof invoice.customer === 'string') {
+      // Pas de subscriptionId : facture AUTONOME (pro_charges facturées à
+      // la résiliation, voir invoicePendingChargesOnCancellation) — bizId
+      // résolu via le customer plutôt que l'abonnement, qui n'existe plus.
+      const { data: settingsByCustomer } = await supabase
+        .from('business_settings')
+        .select('biz_id')
+        .eq('stripe_customer_id', invoice.customer)
+        .maybeSingle();
+
+      if (settingsByCustomer) {
+        await reconcileProChargesFromInvoice(supabase, settingsByCustomer.biz_id, invoice);
+      }
     }
   }
 
@@ -650,6 +668,13 @@ L'équipe Book'nPay`,
         .update({ subscription_status: 'cancelled' })
         .eq('biz_id', settings.biz_id);
       console.log(`[Webhook] Abonnement résilié — biz ${settings.biz_id}`);
+
+      // pro_charges encore pending : plus de prochaine facture d'abonnement
+      // à laquelle les attacher — bascule sur une facture autonome
+      // (send_invoice, 14 jours). Voir pro-charge-billing.ts. Réutilise le
+      // client `stripe` du haut de la fonction (toujours live, cohérent
+      // avec le reste de ce fichier).
+      await invoicePendingChargesOnCancellation(stripe, supabase, settings.biz_id, event.id);
     }
   }
 
