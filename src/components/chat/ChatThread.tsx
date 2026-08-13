@@ -64,7 +64,8 @@ export default function ChatThread({
     if (res.ok) {
       setText('');
     } else {
-      setError("Le message n'a pas pu être envoyé. Réessaie.");
+      const body = await res.json().catch(() => ({}));
+      setError(body.error || "Le message n'a pas pu être envoyé. Réessaie.");
     }
     setSending(false);
   };
