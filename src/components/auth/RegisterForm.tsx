@@ -98,6 +98,8 @@ export default function RegisterForm() {
       <input
         type="text"
         placeholder="Nom et prénom"
+        aria-label="Nom et prénom"
+        autoComplete="name"
         value={fullName}
         onChange={(e) => setFullName(e.target.value)}
         required
@@ -106,6 +108,8 @@ export default function RegisterForm() {
       <input
         type="tel"
         placeholder="Téléphone"
+        aria-label="Téléphone"
+        autoComplete="tel"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
         className={inputClass}
@@ -113,6 +117,8 @@ export default function RegisterForm() {
       <input
         type="email"
         placeholder="Email"
+        aria-label="Email"
+        autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
@@ -121,6 +127,8 @@ export default function RegisterForm() {
       <input
         type="password"
         placeholder="Mot de passe (6 caractères min.)"
+        aria-label="Mot de passe, 6 caractères minimum"
+        autoComplete="new-password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         required
@@ -130,6 +138,8 @@ export default function RegisterForm() {
       <input
         type="password"
         placeholder="Confirmer le mot de passe"
+        aria-label="Confirmer le mot de passe"
+        autoComplete="new-password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
         required
@@ -157,7 +167,7 @@ export default function RegisterForm() {
       </label>
 
       {error && (
-        <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
+        <div role="alert" className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
         </div>
       )}

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import { translateAuthError } from '@/lib/auth-errors';
 
 export default function AuthWall({ onAuth }: { onAuth: () => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -52,7 +52,7 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
       }
       onAuth();
     } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue');
+      setError(translateAuthError(err.message));
     } finally {
       setLoading(false);
     }
@@ -63,10 +63,6 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
   if (emailSent) {
     return (
       <div className="text-center py-4">
-        <div className="flex items-center justify-center gap-2 mb-5">
-          <Image src="/logo.jpg" alt="Book'nPay" width={36} height={36} className="rounded-xl ring-1 ring-mint-500/20" />
-          <span className="font-bold text-white text-sm tracking-tight">Book'nPay</span>
-        </div>
         <div className="rounded-xl bg-mint-500/10 border border-mint-500/20 px-4 py-5 mb-4">
           <p className="text-mint-400 font-semibold text-sm mb-1">Vérifie ta boîte mail</p>
           <p className="text-slate-400 text-xs leading-relaxed">
@@ -87,13 +83,9 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
 
   return (
     <div>
-      {/* Logo */}
-      <div className="flex items-center justify-center gap-2 mb-5">
-        <Image src="/logo.jpg" alt="Book'nPay" width={36} height={36} className="rounded-xl ring-1 ring-mint-500/20" />
-        <span className="font-bold text-white text-sm tracking-tight">Book'nPay</span>
-      </div>
-
-      {/* Mode toggle */}
+      {/* Mode toggle — pas de logo ici : AuthWall est toujours rendu dans
+          BookingFlow, qui affiche déjà son propre header (nom de
+          l'établissement, retour, step dots) juste au-dessus. */}
       <div className="flex gap-1 p-1 bg-navy-900 rounded-xl border border-white/[0.06] mb-4">
         {(['signup', 'login'] as const).map((m) => (
           <button

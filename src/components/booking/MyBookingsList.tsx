@@ -7,6 +7,7 @@ import type { GroupMap } from '@/app/(public)/mes-reservations/page';
 import { phonesMatch, formatTime, isBookingDateUpcoming } from '@/lib/booking-utils';
 import WeekCalendar from './WeekCalendar';
 import GroupTimer from './GroupTimer';
+import Modal from '@/components/ui/Modal';
 
 type BookingWithMembers = Booking & { booking_members: BookingMember[] };
 
@@ -289,7 +290,7 @@ function GroupCard({
 
       {expanded && isCancellable && myBooking && myMemberEntry && (
         <div className="border-t border-white/[0.05] px-4 py-2.5 flex items-center justify-between">
-          <p className="text-[10px] text-slate-600">Remboursé si annulé 48h avant</p>
+          <p className="text-xs text-slate-500">Remboursé si annulé 48h avant</p>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -360,7 +361,7 @@ function BookingCard({
 
       {isCancellable && member && (
         <div className="border-t border-white/[0.05] px-4 py-2.5 flex items-center justify-between">
-          <p className="text-[10px] text-slate-600">Remboursé si annulé 48h avant</p>
+          <p className="text-xs text-slate-500">Remboursé si annulé 48h avant</p>
           <button
             onClick={() => onCancel(booking, member)}
             disabled={cancellingId === booking.id}
@@ -393,6 +394,7 @@ export default function MyBookingsList({
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{ booking: BookingWithMembers; member: BookingMember } | null>(null);
 
   const filteredBookings = localBookings.filter((b) =>
     period === 'upcoming' ? isBookingDateUpcoming(b.date) : !isBookingDateUpcoming(b.date)
@@ -400,7 +402,10 @@ export default function MyBookingsList({
 
   const myPhone = profile?.phone ?? null;
 
-  const handleCancel = async (booking: BookingWithMembers, member: BookingMember) => {
+  // Retourne true si l'annulation a réellement abouti — sert au confirmTarget
+  // (C5, LOT 5) pour ne fermer la modale de confirmation qu'en cas de succès,
+  // et laisser l'erreur visible sinon plutôt que de la reléguer hors contexte.
+  const handleCancel = async (booking: BookingWithMembers, member: BookingMember): Promise<boolean> => {
     setCancellingId(booking.id);
     setCancelError(null);
 
@@ -427,7 +432,7 @@ export default function MyBookingsList({
             )
           );
           setCancellingId(null);
-          return;
+          return true;
         }
       }
 
@@ -440,7 +445,7 @@ export default function MyBookingsList({
       if (!cancelRes.ok) {
         setCancelError(cancelData.error || "L'annulation a échoué. Réessaie.");
         setCancellingId(null);
-        return;
+        return false;
       }
       setLocalBookings((prev) =>
         prev.map((b) =>
@@ -449,6 +454,7 @@ export default function MyBookingsList({
             : b
         )
       );
+      return true;
     } finally {
       setCancellingId(null);
     }
@@ -543,7 +549,7 @@ export default function MyBookingsList({
                   key={`group-${item.ref}`}
                   groupBookings={groupMap[item.ref]}
                   myPhone={myPhone}
-                  onCancel={handleCancel}
+                  onCancel={(booking, member) => setConfirmTarget({ booking, member })}
                   cancellingId={cancellingId}
                 />
               ) : (
@@ -551,7 +557,7 @@ export default function MyBookingsList({
                   key={item.booking.id}
                   booking={item.booking}
                   myPhone={myPhone}
-                  onCancel={handleCancel}
+                  onCancel={(booking, member) => setConfirmTarget({ booking, member })}
                   cancellingId={cancellingId}
                 />
               )
@@ -577,6 +583,52 @@ export default function MyBookingsList({
           </div>
         )}
       </div>
+
+      {confirmTarget && (
+        <Modal
+          onClose={() => {
+            if (cancellingId === confirmTarget.booking.id) return;
+            setConfirmTarget(null);
+          }}
+          overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
+          panelClassName="w-full max-w-sm rounded-2xl border border-white/10 bg-navy-900 p-5"
+          ariaLabel="Annuler ce rendez-vous"
+          closeOnBackdrop={cancellingId !== confirmTarget.booking.id}
+        >
+          <h3 className="text-sm font-semibold text-white">Annuler ce rendez-vous ?</h3>
+          <p className="mt-2 text-xs text-white/60">
+            {confirmTarget.booking.biz_name} · {formatBookingDate(confirmTarget.booking.date)} à{' '}
+            {formatTime(confirmTarget.booking.time)}
+          </p>
+          <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-300">
+            Remboursé si annulé plus de 48h avant le RDV. En dessous de 48h, les frais de gestion restent dus.
+          </p>
+          {cancelError && (
+            <p role="alert" className="mt-2 text-[11px] font-medium text-rose-400">
+              {cancelError}
+            </p>
+          )}
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => setConfirmTarget(null)}
+              disabled={cancellingId === confirmTarget.booking.id}
+              className="flex-1 rounded-xl border border-white/[0.08] bg-navy-800 py-2.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors disabled:opacity-50"
+            >
+              Retour
+            </button>
+            <button
+              onClick={async () => {
+                const ok = await handleCancel(confirmTarget.booking, confirmTarget.member);
+                if (ok) setConfirmTarget(null);
+              }}
+              disabled={cancellingId === confirmTarget.booking.id}
+              className="flex-1 rounded-xl bg-rose-600 py-2.5 text-xs font-semibold text-white hover:bg-rose-500 transition-colors disabled:opacity-50"
+            >
+              {cancellingId === confirmTarget.booking.id ? 'Annulation...' : "Confirmer l'annulation"}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

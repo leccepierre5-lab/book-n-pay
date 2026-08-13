@@ -392,6 +392,7 @@ function ModeAPayment({
             <span className="text-xs text-slate-500">Frais de gestion</span>
             <span className="text-xs text-slate-300">{fraisGestion.toFixed(2)}€</span>
           </div>
+          <p className="text-[11px] text-slate-600 -mt-1">Non remboursables en cas d&apos;annulation &lt;48h ou de no-show.</p>
           <div className="flex justify-between items-center pt-1">
             <span className="text-sm font-bold text-white">Total débité maintenant</span>
             <span className="text-lg font-bold text-emerald-400">{totalNow.toFixed(2)}€</span>
@@ -660,10 +661,11 @@ function ModeBPayment({
           <span className="text-sm text-slate-400">Frais de réservation</span>
           <span className="text-sm font-semibold text-white">{service.deposit}€</span>
         </div>
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-1">
           <span className="text-sm text-slate-400">Frais de gestion</span>
           <span className="text-sm text-slate-300">{fraisGestion.toFixed(2)}€</span>
         </div>
+        <p className="text-[11px] text-slate-600 mb-3">Non remboursables en cas d&apos;annulation &lt;48h ou de no-show.</p>
         <div className="h-px bg-white/[0.06] mb-3" />
         <div className="flex justify-between items-center">
           <span className="text-sm font-bold text-white">Total à payer</span>
@@ -885,6 +887,7 @@ function SoloPayment({
             <span className="text-xs text-slate-500">Frais de gestion</span>
             <span className="text-xs font-medium text-slate-300">{fraisGestion.toFixed(2)}€</span>
           </div>
+          <p className="text-[11px] text-slate-600">Non remboursables en cas d&apos;annulation &lt;48h ou de no-show.</p>
         </div>
         <div className="mx-4 border-t border-white/[0.08]" />
         <div className="px-4 py-4 flex justify-between items-center">

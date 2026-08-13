@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { translateAuthError } from '@/lib/auth-errors';
 
 type View = 'login' | 'forgot' | 'forgot-sent';
 
@@ -30,7 +31,7 @@ export default function LoginForm() {
     const supabase = createClient();
     const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (signInError) {
-      setError(signInError.message);
+      setError(translateAuthError(signInError.message));
       setLoading(false);
       return;
     }
@@ -99,13 +100,15 @@ export default function LoginForm() {
         <input
           type="email"
           placeholder="Email"
+          aria-label="Email"
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
           className={inputClass}
         />
         {error && (
-          <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
+          <div role="alert" className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
             <p className="text-xs text-red-400">{error}</p>
           </div>
         )}
@@ -129,6 +132,8 @@ export default function LoginForm() {
       <input
         type="email"
         placeholder="Email"
+        aria-label="Email"
+        autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
@@ -138,6 +143,8 @@ export default function LoginForm() {
         <input
           type="password"
           placeholder="Mot de passe"
+          aria-label="Mot de passe"
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -154,7 +161,7 @@ export default function LoginForm() {
         </div>
       </div>
       {error && (
-        <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
+        <div role="alert" className="rounded-xl bg-red-950/40 border border-red-500/20 px-3 py-2.5">
           <p className="text-xs text-red-400">{error}</p>
         </div>
       )}

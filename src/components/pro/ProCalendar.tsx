@@ -18,7 +18,7 @@ import {
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import CaisseEncaissement from './CaisseEncaissement';
-import { formatTime, parseParisDatetime } from '@/lib/booking-utils';
+import { formatTime, parseParisDatetime, calcFraisGestion } from '@/lib/booking-utils';
 import Modal from '@/components/ui/Modal';
 
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -185,6 +185,19 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
     const deposits = allMembers.reduce((s, m) => s + (m.deposit || 0), 0);
     return { total: allMembers.length, arrived, paid, deposits };
   }, [selectedDayBookings]);
+
+  // C15 (annulation pro) rembourse le client dépôt + frais de gestion —
+  // voir proCancellationRefundAmountCents dans lib/refunds.ts — puis
+  // refacture ces mêmes frais de gestion au pro (pro_charges). Le prix du
+  // service est déjà chargé côté client (services(price), bookings-month) :
+  // calcFraisGestion() donne la même estimation que celle affichée au
+  // client au moment de payer — pas garanti au centime près si un palier a
+  // été surchargé côté admin, mais infiniment plus juste que d'annoncer
+  // l'inverse de ce qui va réellement se passer.
+  const cancelDeposit = cancelTarget?.member.deposit ?? 0;
+  const cancelServicePrice = cancelTarget?.booking.services?.price ?? null;
+  const cancelManagementFee = cancelServicePrice != null ? calcFraisGestion(cancelServicePrice) : null;
+  const cancelTotalRefund = cancelDeposit + (cancelManagementFee ?? 0);
 
   return (
     <div className="space-y-3">
@@ -422,10 +435,22 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
           </p>
           <p className="mt-1 text-xs text-white/60">
             Montant remboursé au client :{' '}
-            <span className="font-semibold text-white">{(cancelTarget.member.deposit ?? 0)}€</span> (frais de
-            réservation intégraux — les frais de gestion Book&apos;nPay ne sont jamais remboursés).
+            <span className="font-semibold text-white">{cancelTotalRefund.toFixed(2)}€</span>{' '}
+            {cancelManagementFee != null ? (
+              <>
+                (frais de réservation {cancelDeposit}€ + frais de gestion {cancelManagementFee.toFixed(2)}€ —
+                remboursement intégral, le client n&apos;est pas en faute).
+              </>
+            ) : (
+              <>(remboursement intégral incluant les frais de gestion — le client n&apos;est pas en faute).</>
+            )}
           </p>
-          <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] font-medium text-rose-300">
+          <p className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-300">
+            Les frais de gestion{cancelManagementFee != null ? ` (${cancelManagementFee.toFixed(2)}€)` : ''} vous
+            seront refacturés sur votre prochaine facture — c&apos;est vous, pas le client, qui les prenez en
+            charge sur cette annulation.
+          </p>
+          <p className="mt-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] font-medium text-rose-300">
             Action irréversible : le créneau sera libéré et le client sera notifié par email.
           </p>
           {cancelError && (
