@@ -141,6 +141,8 @@ export interface Booking {
   client_email: string | null;
   created_at: string;
   updated_at: string;
+  // Migration 0051 — RFC 5545 SEQUENCE du .ics envoyé au client, voir src/lib/ics.ts
+  ics_sequence: number;
 }
 
 export interface BookingMember {

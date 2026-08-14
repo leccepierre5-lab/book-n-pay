@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, formatTime } from '@/lib/booking-utils';
+import { buildIcs } from '@/lib/ics';
 import { proCancellationRefundAmountCents } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
@@ -64,7 +65,12 @@ export async function POST(req: NextRequest) {
     const serviceSupabase = createServiceRoleClient();
     const { data: booking } = await serviceSupabase
       .from('bookings')
-      .select('biz_id, biz_name, service_name, date, time, client_email')
+      // ⚠️ '*' et non une liste explicite : nommer ics_sequence ici ferait
+      // échouer TOUT le select (colonne inconnue tant que la migration 0051
+      // n'a pas tourné) — la route renverrait 404 sur chaque annulation.
+      // '*' renvoie simplement les colonnes existantes ; nextIcsSequence lit
+      // ensuite booking.ics_sequence avec un ?? 0 tolérant.
+      .select('*, services(duration_minutes), businesses(business_locations(address))')
       .eq('id', bookingId)
       .maybeSingle();
 
@@ -189,6 +195,15 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', memberId);
 
+    // SEQUENCE RFC 5545 — pour que le .ics METHOD:CANCEL envoyé plus bas mette
+    // à jour l'événement dans l'agenda du client au lieu d'en créer un doublon
+    // (voir src/lib/ics.ts). Même UID que celui envoyé à la confirmation.
+    const nextIcsSequence = (booking.ics_sequence ?? 0) + 1;
+    await serviceSupabase
+      .from('bookings')
+      .update({ ics_sequence: nextIcsSequence })
+      .eq('id', bookingId);
+
     // Sans ça le créneau reste occupé pour toujours (agenda pro + anti-
     // collision réelle) — voir lib/booking-lifecycle.ts.
     await cancelBookingIfNoActiveMembers(serviceSupabase, bookingId);
@@ -302,6 +317,31 @@ export async function POST(req: NextRequest) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app';
       const rebookUrl = biz?.slug ? `${siteUrl}/etablissement/${biz.slug}` : `${siteUrl}/recherche`;
 
+      // .ics METHOD:CANCEL — même UID que la confirmation, SEQUENCE incrémenté
+      // ci-dessus, pour que l'agenda du client retire l'événement (best-effort,
+      // voir src/lib/ics.ts).
+      let icsCancelAttachment: { filename: string; content: string } | null = null;
+      try {
+        const svc = Array.isArray((booking as any).services) ? (booking as any).services[0] : (booking as any).services;
+        const bizRel = Array.isArray((booking as any).businesses) ? (booking as any).businesses[0] : (booking as any).businesses;
+        const loc = Array.isArray(bizRel?.business_locations) ? bizRel.business_locations[0] : bizRel?.business_locations;
+        const ics = buildIcs({
+          uid: `${bookingId}@book-n-pay.com`,
+          start: parseParisDatetime(booking.date, booking.time),
+          durationMin: svc?.duration_minutes ?? 60,
+          summary: `RDV — ${booking.service_name}`,
+          location: loc?.address,
+          organizerName: booking.biz_name,
+          organizerEmail: 'noreply@book-n-pay.com',
+          attendeeEmail: clientEmail,
+          sequence: nextIcsSequence,
+          method: 'CANCEL',
+        });
+        icsCancelAttachment = { filename: 'annulation.ics', content: Buffer.from(ics, 'utf8').toString('base64') };
+      } catch (e: any) {
+        console.warn('[ProCancelBooking] Génération ICS CANCEL échouée (email envoyé sans pièce jointe calendrier):', e.message);
+      }
+
       await sendEmail({
         to: clientEmail,
         subject: `Rendez-vous annulé par le professionnel — ${booking.biz_name}`,
@@ -321,6 +361,7 @@ Vous pouvez reprendre une réservation dès maintenant si vous le souhaitez : ${
 Si vous avez des questions : contact@book-n-pay.com
 
 L'équipe Book'nPay`,
+        ...(icsCancelAttachment ? { attachments: [icsCancelAttachment] } : {}),
       }).catch(() => {});
     }
 

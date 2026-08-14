@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, phonesMatch, formatTime } from '@/lib/booking-utils';
+import { buildIcs } from '@/lib/ics';
 import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     const { data: booking } = await serviceSupabase
       .from('bookings')
-      .select('*')
+      .select('*, services(duration_minutes), businesses(business_locations(address))')
       .eq('id', bookingId)
       .maybeSingle();
     if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });
@@ -163,6 +164,15 @@ export async function POST(req: NextRequest) {
       .update({ status: 'cancelled' })
       .eq('id', memberId);
 
+    // SEQUENCE RFC 5545 — pour que le .ics METHOD:CANCEL envoyé plus bas mette
+    // à jour l'événement dans l'agenda du client au lieu d'en créer un doublon
+    // (voir src/lib/ics.ts). Même UID que celui envoyé à la confirmation.
+    const nextIcsSequence = (booking.ics_sequence ?? 0) + 1;
+    await serviceSupabase
+      .from('bookings')
+      .update({ ics_sequence: nextIcsSequence })
+      .eq('id', bookingId);
+
     // Sans ça, le créneau restait occupé pour toujours (agenda pro ET
     // anti-collision réelle — ni /api/pro/agenda, ni la RPC Postgres
     // assign_staff_and_create_booking ne regardent booking_members, les
@@ -210,6 +220,31 @@ export async function POST(req: NextRequest) {
         ? `❌ Conservé : ${managementFeeAmount.toFixed(2)}€ (frais de gestion Book'nPay, CGV Art. 2 — jamais remboursés)`
         : `⚠️ Les frais de gestion Book'nPay ne sont jamais remboursés (CGV Art. 2).`;
 
+      // .ics METHOD:CANCEL — même UID que la confirmation, SEQUENCE incrémenté
+      // ci-dessus, pour que l'agenda du client retire l'événement (best-effort,
+      // voir src/lib/ics.ts).
+      let icsCancelAttachment: { filename: string; content: string } | null = null;
+      try {
+        const svc = Array.isArray((booking as any).services) ? (booking as any).services[0] : (booking as any).services;
+        const biz = Array.isArray((booking as any).businesses) ? (booking as any).businesses[0] : (booking as any).businesses;
+        const loc = Array.isArray(biz?.business_locations) ? biz.business_locations[0] : biz?.business_locations;
+        const ics = buildIcs({
+          uid: `${bookingId}@book-n-pay.com`,
+          start: parseParisDatetime(booking.date, booking.time),
+          durationMin: svc?.duration_minutes ?? 60,
+          summary: `RDV — ${booking.service_name}`,
+          location: loc?.address,
+          organizerName: booking.biz_name,
+          organizerEmail: 'noreply@book-n-pay.com',
+          attendeeEmail: clientEmail,
+          sequence: nextIcsSequence,
+          method: 'CANCEL',
+        });
+        icsCancelAttachment = { filename: 'annulation.ics', content: Buffer.from(ics, 'utf8').toString('base64') };
+      } catch (e: any) {
+        console.warn('[CancelClient] Génération ICS CANCEL échouée (email envoyé sans pièce jointe calendrier):', e.message);
+      }
+
       await sendEmail({
         to: clientEmail,
         subject: `❌ Réservation annulée — ${booking.biz_name}`,
@@ -229,6 +264,7 @@ Si vous avez des questions : contact@book-n-pay.com
 
 À bientôt,
 L'équipe Book'nPay`,
+        ...(icsCancelAttachment ? { attachments: [icsCancelAttachment] } : {}),
       }).catch(() => {});
     }
 

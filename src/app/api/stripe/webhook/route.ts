@@ -11,8 +11,9 @@ import { sendEmail, emailTemplate, qrCheckinBlockHtml, escapeHtml } from '@/lib/
 import { notifyProNewBooking } from '@/lib/pro-notifications';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 import { reconcileProChargesFromInvoice, invoicePendingChargesOnCancellation } from '@/lib/stripe/pro-charge-billing';
-import { formatTime } from '@/lib/booking-utils';
+import { formatTime, parseParisDatetime } from '@/lib/booking-utils';
 import { generateQrPngBase64 } from '@/lib/qr';
+import { buildIcs } from '@/lib/ics';
 
 // ⚠️ CORRECTIF (test E2E billing) : sur ce compte Stripe (version d'API
 // 2026-05-27.dahlia), invoice.subscription n'est plus peuplé — confirmé en
@@ -358,7 +359,12 @@ export async function POST(req: NextRequest) {
       // Email de confirmation
       const { data: booking } = await supabase
         .from('bookings')
-        .select('biz_name, service_name, staff_name, date, time')
+        // ⚠️ '*' et non une liste explicite : nommer ics_sequence ici ferait
+        // échouer TOUT le select (colonne inconnue tant que la migration 0051
+        // n'a pas tourné) — `booking` serait null et l'email de confirmation
+        // ne partirait plus jamais, silencieusement, pour aucun client payant.
+        // '*' renvoie les colonnes existantes ; le ?? 0 plus bas gère l'absence.
+        .select('*, services(duration_minutes), businesses(business_locations(address))')
         .eq('id', bookingId)
         .single();
 
@@ -383,6 +389,37 @@ export async function POST(req: NextRequest) {
           } catch (e: any) {
             console.warn('[Webhook] Génération QR échouée (email envoyé sans image):', e.message);
           }
+        }
+
+        // Pièce jointe .ics (agenda) — best-effort, même logique que le QR :
+        // un échec de génération ne doit jamais empêcher l'email de confirmation
+        // de partir. UID = bookingId + domaine, stable sur toute la vie du RDV
+        // (voir src/lib/ics.ts) ; à réutiliser tel quel si une annulation ou un
+        // report renvoie un .ics plus tard (METHOD:CANCEL, SEQUENCE incrémenté).
+        let icsAttachment: { filename: string; content: string } | null = null;
+        try {
+          const svc = Array.isArray((booking as any).services) ? (booking as any).services[0] : (booking as any).services;
+          const biz = Array.isArray((booking as any).businesses) ? (booking as any).businesses[0] : (booking as any).businesses;
+          const loc = Array.isArray(biz?.business_locations) ? biz.business_locations[0] : biz?.business_locations;
+          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://book-n-pay-next.vercel.app';
+          const manageUrl = `${siteUrl}/mes-reservations/${bookingId}`;
+          const ics = buildIcs({
+            uid: `${bookingId}@book-n-pay.com`,
+            start: parseParisDatetime(booking.date, booking.time),
+            durationMin: svc?.duration_minutes ?? 60,
+            summary: `RDV — ${booking.service_name}`,
+            description: `${booking.biz_name}\nGérer / annuler : ${manageUrl}`,
+            location: loc?.address,
+            organizerName: booking.biz_name,
+            organizerEmail: 'noreply@book-n-pay.com',
+            attendeeEmail: customerEmail,
+            url: manageUrl,
+            sequence: (booking as any).ics_sequence ?? 0,
+            method: 'REQUEST',
+          });
+          icsAttachment = { filename: 'rendez-vous.ics', content: Buffer.from(ics, 'utf8').toString('base64') };
+        } catch (e: any) {
+          console.warn('[Webhook] Génération ICS échouée (email envoyé sans pièce jointe calendrier):', e.message);
         }
 
         await sendEmail({
@@ -430,7 +467,9 @@ L'équipe Book'nPay`,
             </p>
             <p style="color: #64748b; font-size: 11px; margin: 12px 0 0;">Les frais de gestion Book&apos;nPay ne sont pas remboursés (CGV Art. 2).</p>
           `),
-          ...(qrAttachment ? { attachments: [qrAttachment] } : {}),
+          ...(qrAttachment || icsAttachment
+            ? { attachments: [...(qrAttachment ? [qrAttachment] : []), ...(icsAttachment ? [icsAttachment] : [])] }
+            : {}),
         });
       }
     } catch (err: any) {
