@@ -15,6 +15,7 @@ import {
 } from '@/lib/queries/catalog';
 import { createClient } from '@/lib/supabase/server';
 import { isDemoTesterEmail } from '@/lib/demo-mode';
+import { logSearchMiss } from '@/lib/search-misses';
 import { SearchResults } from './_components/SearchResults';
 import { CityAutocomplete } from './_components/CityAutocomplete';
 import { BusinessNameAutocomplete } from './_components/BusinessNameAutocomplete';
@@ -72,6 +73,20 @@ export default async function SearchPage({
     ? businesses.filter((b) => b.type === selectedType)
     : businesses;
   const formatType = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+  const searchContext = {
+    query: filters.query ?? null,
+    category: filters.category && filters.category !== 'all' ? filters.category : null,
+    city: params.city ?? null,
+  };
+
+  // Journal silencieux (migration 0054) — écrit à chaque recherche vide,
+  // même sans geste du visiteur. Aucun identifiant joint (voir
+  // src/lib/search-misses.ts) : ce n'est volontairement pas relié aux
+  // actions notify/invite du composant client.
+  if (displayedBusinesses.length === 0) {
+    await logSearchMiss(searchContext);
+  }
 
   return (
     <div className="min-h-dvh">
@@ -183,7 +198,7 @@ export default async function SearchPage({
           </p>
         </div>
 
-        <SearchResults businesses={displayedBusinesses} />
+        <SearchResults businesses={displayedBusinesses} searchContext={searchContext} />
       </div>
     </div>
   );

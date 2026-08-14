@@ -327,3 +327,21 @@ export interface RefundFailureWithBooking extends RefundFailure {
     time: string;
   } | null;
 }
+
+// Migration 0054 — écran zéro résultat /recherche (Bloc B, 14/08). action
+// distingue le journal silencieux ('none', sans consentement, aucun
+// identifiant) des deux actions consenties ('notify'/'invite') — chacune sa
+// propre ligne, jamais partagée (voir 0054_search_misses.sql).
+export interface SearchMiss {
+  id: string;
+  query: string | null;
+  category: string | null;
+  city: string | null;
+  postal_code: string | null;
+  user_email: string | null;
+  action: 'none' | 'notify' | 'invite';
+  invited_business_name: string | null;
+  invited_business_contact: string | null;
+  informed_at: string | null;
+  created_at: string;
+}

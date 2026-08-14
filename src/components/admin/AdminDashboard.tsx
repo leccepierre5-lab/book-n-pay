@@ -120,12 +120,20 @@ export default function AdminDashboard({
       <div className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-white">Administration</h1>
-          <Link
-            href="/admin/remboursements"
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
-          >
-            Remboursements en échec →
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/admin/remboursements"
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
+            >
+              Remboursements en échec →
+            </Link>
+            <Link
+              href="/admin/recherches-vides"
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
+            >
+              Recherches sans résultat →
+            </Link>
+          </div>
         </div>
 
         <div className="mb-5 flex gap-2">

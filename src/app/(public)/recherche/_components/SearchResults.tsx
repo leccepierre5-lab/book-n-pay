@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getCityCoordinates, haversineKm } from '@/lib/cityCoordinates';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
+import { ZeroResultsPanel } from './ZeroResultsPanel';
 
 const CAT_EMOJI: Record<string, string> = {
   beaute: '✂️',
@@ -68,7 +69,13 @@ function formatDistance(km: number): string {
   return `${km.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`;
 }
 
-export function SearchResults({ businesses }: { businesses: BusinessWithDetails[] }) {
+export function SearchResults({
+  businesses,
+  searchContext,
+}: {
+  businesses: BusinessWithDetails[];
+  searchContext?: { query: string | null; category: string | null; city: string | null };
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [nearStatus, setNearStatus] = useState<NearStatus>('idle');
@@ -233,13 +240,11 @@ export function SearchResults({ businesses }: { businesses: BusinessWithDetails[
         })}
 
         {businesses.length === 0 && (
-          <div className="py-16 text-center">
-            <p className="text-4xl mb-4">🔍</p>
-            <p className="text-slate-400 text-sm">Aucun établissement ne correspond.</p>
-            <Link href="/recherche" className="mt-3 inline-block text-mint-400 text-xs hover:underline">
-              Voir tous les établissements →
-            </Link>
-          </div>
+          <ZeroResultsPanel
+            query={searchContext?.query ?? null}
+            category={searchContext?.category ?? null}
+            city={searchContext?.city ?? null}
+          />
         )}
       </div>
     </div>
