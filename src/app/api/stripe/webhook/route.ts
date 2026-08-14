@@ -41,14 +41,48 @@ export async function POST(req: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: STRIPE_API_VERSION });
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
-  let event: Stripe.Event;
-  try {
-    event = await stripe.webhooks.constructEventAsync(body, sig!, webhookSecret);
-  } catch (err: any) {
-    console.error('[Webhook] Signature invalide:', err.message);
-    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
+  // Deux destinations Stripe pointent vers cette même URL (Bloc C, 14/08) :
+  // le webhook plateforme historique (STRIPE_WEBHOOK_SECRET) et la nouvelle
+  // destination "Comptes connectés" pour account.updated
+  // (STRIPE_CONNECT_WEBHOOK_SECRET) — chacune signe avec SON PROPRE secret.
+  // Stripe ne dit nulle part dans la requête quelle destination l'a envoyée
+  // (pas d'ID de destination dans le header stripe-signature ni le payload),
+  // donc le seul moyen de savoir quel secret utiliser est d'essayer chacun
+  // jusqu'à ce qu'un HMAC valide. Calcul local, coût négligeable.
+  // `.filter(Boolean)` : tant que STRIPE_CONNECT_WEBHOOK_SECRET n'est pas
+  // encore posé sur un environnement (local/Preview), un seul secret est
+  // tenté — comportement identique à avant ce changement.
+  const webhookSecrets = [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET]
+    .filter((s): s is string => !!s);
+
+  let event: Stripe.Event | undefined;
+  let lastVerificationError: any;
+  for (const secret of webhookSecrets) {
+    try {
+      event = await stripe.webhooks.constructEventAsync(body, sig!, secret);
+      break;
+    } catch (err: any) {
+      lastVerificationError = err;
+    }
+  }
+
+  if (!event) {
+    // Panne muette à éviter absolument (c'est tout l'objet du Bloc C) :
+    // best-effort, JAMAIS utilisé pour traiter l'événement — seul le
+    // diagnostic compte ici, la signature n'a validé sur AUCUN secret
+    // connu, ce payload brut n'est pas fiable.
+    let unverifiedHint = '';
+    try {
+      const raw = JSON.parse(body);
+      unverifiedHint = ` — payload NON VÉRIFIÉ: type=${raw?.type ?? 'inconnu'}, id=${raw?.id ?? 'inconnu'}`;
+    } catch {
+      // body pas exploitable en JSON — le message ci-dessous suffit déjà.
+    }
+    console.error(
+      `[Webhook] ❌ SIGNATURE STRIPE REJETÉE — aucun des ${webhookSecrets.length} secret(s) configuré(s) ne valide ce payload${unverifiedHint}. Dernière erreur Stripe: ${lastVerificationError?.message}`
+    );
+    return new NextResponse(`Webhook Error: ${lastVerificationError?.message}`, { status: 400 });
   }
 
   const supabase = createServiceRoleClient();
