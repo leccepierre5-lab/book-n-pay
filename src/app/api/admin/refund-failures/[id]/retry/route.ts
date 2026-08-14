@@ -63,6 +63,20 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
     const charge = pi.latest_charge;
     const hasTransfer = Boolean(charge && typeof charge !== 'string' && charge.transfer);
 
+    // Garde-fou (14/08, booking 59a81eb2) : Stripe ne rejette que le cas
+    // "montant trop élevé" — un amount_cents trop BAS (ex: erreur de
+    // backfill) passerait sans qu'aucun filet ne le signale. Vérifié ici,
+    // avant l'appel refunds.create, contre le montant réel de la charge —
+    // jamais après coup. Le throw est intentionnellement attrapé par le
+    // catch ci-dessous (même traitement qu'un vrai refus Stripe : attempts
+    // incrémenté, error_message posé, status reste 'open').
+    const chargeAmount = charge && typeof charge !== 'string' ? charge.amount : null;
+    if (chargeAmount != null && failure.amount_cents > chargeAmount) {
+      throw new Error(
+        `Montant à rembourser (${(failure.amount_cents / 100).toFixed(2)}€) supérieur au montant réel de la charge (${(chargeAmount / 100).toFixed(2)}€) — refusé avant tout appel Stripe.`
+      );
+    }
+
     await stripe.refunds.create({
       payment_intent: failure.stripe_charge_id,
       amount: failure.amount_cents,
