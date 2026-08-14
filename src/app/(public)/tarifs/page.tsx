@@ -40,6 +40,21 @@ const FEE_BRACKETS = [
 // fonctionnalité CLIENT (referral_events n'a pas de biz_id, un filleul
 // peut réserver chez n'importe quel pro), pas un avantage du pro — le
 // lister comme argument de vente pro serait faux, pas seulement mal placé.
+// Liste complète répétée sur chaque carte (14/08) — auparavant Business/Scale
+// disaient juste "Tout le plan Starter"/"Tout le plan Business", ce qui
+// laissait un grand vide visuel avec seulement 2 items listés. Les trois
+// formules ont exactement les mêmes fonctionnalités (voir commentaire
+// au-dessus de PLANS) : les répéter en toutes lettres comble le vide sans
+// rien inventer.
+const STARTER_FEATURES = [
+  'Réservations illimitées',
+  'Protection anti-no-show & acomptes',
+  'Encaissement direct via Stripe Connect',
+  'Check-in QR',
+  'Apple Pay & Google Pay',
+  'Suivi des paiements',
+];
+
 const PLANS = [
   {
     key: 'starter' as const,
@@ -50,14 +65,7 @@ const PLANS = [
     accentColor: 'text-blue-400',
     borderColor: 'border-blue-500/30',
     glowColor: 'rgba(59,130,246,0.12)',
-    features: [
-      'Réservations illimitées',
-      'Protection anti-no-show & acomptes',
-      'Encaissement direct via Stripe Connect',
-      'Check-in QR',
-      'Apple Pay & Google Pay',
-      'Suivi des paiements',
-    ],
+    features: STARTER_FEATURES,
     cta: 'Démarrer sans engagement →',
   },
   {
@@ -69,10 +77,7 @@ const PLANS = [
     borderColor: 'border-mint-500/40',
     glowColor: 'rgba(52,211,153,0.12)',
     highlighted: true,
-    features: [
-      'Tout le plan Starter',
-      'Agenda multi-collaborateurs',
-    ],
+    features: [...STARTER_FEATURES, 'Agenda multi-collaborateurs'],
     cta: 'Choisir le plan Business →',
   },
   {
@@ -83,11 +88,8 @@ const PLANS = [
     accentColor: 'text-purple-400',
     borderColor: 'border-purple-500/30',
     glowColor: 'rgba(168,85,247,0.12)',
-    features: [
-      'Tout le plan Business',
-      'Support prioritaire',
-    ],
-    cta: 'Sélectionner le plan Scale →',
+    features: [...STARTER_FEATURES, 'Agenda multi-collaborateurs', 'Support prioritaire'],
+    cta: 'Choisir le plan Scale →',
   },
 ];
 
@@ -130,7 +132,7 @@ export default function TarifsPage() {
           <p className="text-slate-500 text-sm">Vous ne payez aucune commission sur vos rendez-vous. Quel que soit votre volume, votre abonnement ne bouge pas.</p>
         </header>
 
-        <div className="mb-16 grid gap-5 sm:grid-cols-3">
+        <div className="mb-4 grid gap-5 sm:grid-cols-3">
           {PLANS.map((plan) => {
           const planConfig = BNP_PLANS.find((p) => p.key === plan.key)!;
           return (
@@ -168,11 +170,11 @@ export default function TarifsPage() {
                 {plan.featuresIntro && (
                   <p className="mb-2 text-xs font-semibold text-white">{plan.featuresIntro}</p>
                 )}
-                {/* flex+justify-center (pas juste flex-1) : Business/Scale ont
-                    moins d'items que Starter depuis le retrait des fausses
-                    features (13/08) — répartit l'espace resté libre avant ET
-                    après la liste plutôt qu'un seul gros vide entre le
-                    dernier item et le bouton. */}
+                {/* Listes désormais quasi équilibrées entre cartes (14/08 :
+                    Business/Scale listent la totalité des fonctionnalités,
+                    pas juste "Tout le plan Starter") — justify-center gardé
+                    en filet, répartit un éventuel écart résiduel avant ET
+                    après la liste plutôt qu'un seul gros vide en bas. */}
                 <ul className="flex-1 flex flex-col justify-center space-y-2.5">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-slate-300">
@@ -199,6 +201,10 @@ export default function TarifsPage() {
           );
           })}
         </div>
+
+        <p className="mb-16 text-center text-sm font-medium text-slate-300">
+          Le prix dépend uniquement du nombre de collaborateurs. Toutes les fonctionnalités sont incluses dans les trois formules.
+        </p>
 
         <section className="border-t border-white/[0.07] pt-12">
           <h2 className="mb-2 text-center text-xl font-bold text-white">Le mécanisme de compensation</h2>
