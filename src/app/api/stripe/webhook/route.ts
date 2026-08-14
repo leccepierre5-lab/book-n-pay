@@ -15,6 +15,7 @@ import { formatTime, parseParisDatetime } from '@/lib/booking-utils';
 import { generateQrPngBase64 } from '@/lib/qr';
 import { buildIcs } from '@/lib/ics';
 import { mapAccountRequirements } from '@/lib/stripe-requirements';
+import { computeSubscriptionSyncUpdate } from '@/lib/subscription-sync';
 
 // ⚠️ CORRECTIF (test E2E billing) : sur ce compte Stripe (version d'API
 // 2026-05-27.dahlia), invoice.subscription n'est plus peuplé — confirmé en
@@ -722,6 +723,30 @@ L'équipe Book'nPay`,
             }).catch(() => {});
           }
         }
+      }
+    }
+  }
+
+  // ── ABONNEMENT PRO — changement de formule / statut (Bloc D, 14/08) ─────
+  // `customer.subscription.updated` couvre tout changement fait sur
+  // l'abonnement — y compris depuis le Dashboard Stripe, pas seulement via
+  // un flux applicatif (aucun upgrade/downgrade en libre-service n'existe
+  // encore côté app). Avant ce handler, un changement de plan ou un passage
+  // en impayé côté Stripe ne se répercutait jamais sur business_settings.
+  if (event.type === 'customer.subscription.updated') {
+    const subscription = event.data.object as Stripe.Subscription;
+
+    const { data: settings } = await supabase
+      .from('business_settings')
+      .select('biz_id, plan_key, subscription_status')
+      .eq('stripe_subscription_id', subscription.id)
+      .maybeSingle();
+
+    if (settings) {
+      const update = computeSubscriptionSyncUpdate(subscription, settings);
+      if (Object.keys(update).length > 0) {
+        await supabase.from('business_settings').update(update).eq('biz_id', settings.biz_id);
+        console.log(`[Webhook] Abonnement mis à jour — biz ${settings.biz_id}: ${JSON.stringify(update)}`);
       }
     }
   }

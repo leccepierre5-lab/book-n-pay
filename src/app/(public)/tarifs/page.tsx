@@ -12,8 +12,16 @@ import { BNP_PLANS, getPraticiensLimit, type PlanKey } from '@/lib/plans-config'
 function teamSizeLabel(planKey: PlanKey): string {
   const limit = getPraticiensLimit(planKey); // total incluant le pro lui-même
   if (limit === null) return 'Collaborateurs illimités';
-  if (limit === 1) return '1 collaborateur';
-  return `Jusqu'à ${limit} collaborateurs`;
+  // "1 collaborateur" se lisait comme une entitlement ("j'ai le droit d'en
+  // ajouter un") alors que Starter est structurellement 0 collaborateur —
+  // maxStaff=0, testé et assumé (staff-collaborateur-limit.test.ts) — le
+  // pro n'est jamais une ligne `staff`. Trouvé le 14/08 en traçant un piège
+  // de réactivation post-downgrade (voir plans-config.ts:getStaffQuotaStatus).
+  if (limit === 1) return 'Solo';
+  // limit inclut le pro (getPraticiensLimit = maxStaff + 1) : "Jusqu'à 3
+  // collaborateurs" promettait un de plus que maxStaff réel (Business:
+  // maxStaff=2). "Vous + N" isole le nombre de collaborateurs ajoutables.
+  return `Vous + ${limit - 1} collaborateurs`;
 }
 
 const FEE_BRACKETS = [

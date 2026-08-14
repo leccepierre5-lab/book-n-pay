@@ -73,6 +73,30 @@ export function getPraticiensLimit(planKey: string): number | null {
   return maxStaff === null ? null : maxStaff + 1;
 }
 
+// Bandeau dashboard pro (14/08) — décision actée : avertissement seul,
+// jamais de désactivation automatique (un collaborateur au-dessus du quota
+// peut avoir des RDV assignés ; le couper sans que personne ne l'ait
+// demandé serait pire que le silence qu'on corrige). État atteignable
+// uniquement par downgrade (voir subscription-sync.ts) — aucune création ni
+// réactivation ne peut faire dépasser le quota, c'est déjà gardé ailleurs
+// (pro/staff/route.ts, pro/staff/[id]/route.ts).
+// `activeStaffCount` compte les lignes `staff` uniquement (jamais le pro,
+// qui n'a pas de ligne `staff` — voir PlanConfig.maxStaff ci-dessus).
+export interface StaffQuotaStatus {
+  overQuota: boolean;
+  max: number | null; // maxStaff du plan — null = illimité, jamais en excédent
+  active: number;
+  excess: number; // active - max, borné à 0 (jamais négatif, jamais si illimité)
+}
+
+export function getStaffQuotaStatus(planKey: string, activeStaffCount: number): StaffQuotaStatus {
+  const plan = getPlanConfig(planKey);
+  const max = plan ? plan.maxStaff : 0;
+  if (max === null) return { overQuota: false, max: null, active: activeStaffCount, excess: 0 };
+  const excess = Math.max(0, activeStaffCount - max);
+  return { overQuota: excess > 0, max, active: activeStaffCount, excess };
+}
+
 // Retourne la date de fin d'engagement à partir de la date d'activation.
 //
 // ⚠️ Bug réel trouvé le 12/08/2026 (test rouge depuis sa création, bc648e9,

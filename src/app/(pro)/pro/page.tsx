@@ -6,6 +6,7 @@ import { getProBookings, getProStats } from '@/lib/queries/pro';
 import ProDashboard from '@/components/pro/ProDashboard';
 import type { Business } from '@/lib/database.types';
 import { getParisDateOffsetStr } from '@/lib/booking-utils';
+import { getStaffQuotaStatus } from '@/lib/plans-config';
 
 export default async function ProPage() {
   const supabase = await createClient();
@@ -49,14 +50,20 @@ export default async function ProPage() {
   }
 
   const today = getParisDateOffsetStr(0);
-  const [todayBookings, stats] = await Promise.all([
+  const [todayBookings, stats, { count: activeStaffCount }] = await Promise.all([
     getProBookings(profile.biz_id, { from: today, to: today }),
     getProStats(profile.biz_id, {
       open_time: biz?.open_time ?? null,
       close_time: biz?.close_time ?? null,
       open_days: biz?.open_days ?? [],
     }),
+    // Bandeau "quota dépassé" (14/08) — atteignable seulement par downgrade
+    // (voir plans-config.ts:getStaffQuotaStatus), jamais par une création ou
+    // réactivation normale (déjà gardées côté API).
+    admin.from('staff').select('id', { count: 'exact', head: true })
+      .eq('biz_id', profile.biz_id).eq('is_active', true),
   ]);
+  const staffQuota = getStaffQuotaStatus(settings?.plan_key ?? 'starter', activeStaffCount ?? 0);
 
   return (
     <Suspense>
@@ -72,6 +79,7 @@ export default async function ProPage() {
           futureDeadline: settings.stripe_future_deadline ?? null,
         } : null}
         notificationPrefs={settings?.notification_prefs ?? null}
+        staffQuota={staffQuota}
       />
     </Suspense>
   );

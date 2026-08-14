@@ -12,6 +12,7 @@ import FicheClientIntelligente from './FicheClientIntelligente';
 import CaisseEncaissement from './CaisseEncaissement';
 import AlertsPanel from './AlertsPanel';
 import { getStripeRequirementsBannerLevel, type StripeRequirementsBannerInput } from '@/lib/stripe-requirements';
+import type { StaffQuotaStatus } from '@/lib/plans-config';
 
 interface BookingMemberRow {
   id: string;
@@ -48,6 +49,7 @@ export default function ProDashboard({
   stripeConnected,
   stripeRequirements,
   notificationPrefs,
+  staffQuota,
 }: {
   business: Business;
   todayBookings: BookingRow[];
@@ -55,6 +57,7 @@ export default function ProDashboard({
   stripeConnected: boolean;
   stripeRequirements?: StripeRequirementsBannerInput | null;
   notificationPrefs?: Record<string, boolean> | null;
+  staffQuota?: StaffQuotaStatus | null;
 }) {
   const [bookings, setBookings] = useState(todayBookings);
   const [connectLoading, setConnectLoading] = useState(false);
@@ -344,6 +347,36 @@ export default function ProDashboard({
             >
               {remediationLoading ? '...' : 'Mettre à jour mes informations Stripe →'}
             </button>
+          </div>
+        )}
+
+        {/* Quota de collaborateurs dépassé (14/08) — atteignable uniquement
+            par un downgrade Stripe (voir subscription-sync.ts) : plans-
+            config.ts:getStaffQuotaStatus. Décision actée : avertissement
+            seul, JAMAIS de désactivation automatique (des RDV peuvent être
+            assignés à un collaborateur au-dessus du quota). */}
+        {staffQuota?.overQuota && (
+          <div className="mb-5 rounded-2xl border border-amber-500/25 bg-amber-500/8 p-4">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-300">Quota de collaborateurs dépassé</p>
+                <p className="text-xs text-amber-400/70 mt-0.5">
+                  Votre formule autorise {staffQuota.max} collaborateur{staffQuota.max === 1 ? '' : 's'}, vous en avez {staffQuota.active} actif{staffQuota.active === 1 ? '' : 's'}.
+                  {' '}Passez à la formule supérieure ou désactivez-en {staffQuota.excess}.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/pro/equipe"
+              className="block w-full text-center rounded-xl py-2.5 text-sm font-semibold text-navy-950 bg-amber-400 transition-all"
+            >
+              Gérer mon équipe →
+            </Link>
           </div>
         )}
 
