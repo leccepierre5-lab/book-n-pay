@@ -65,6 +65,12 @@ export default async function ProPage() {
         todayBookings={todayBookings}
         stats={stats}
         stripeConnected={!!settings?.stripe_onboarding_complete}
+        stripeRequirements={settings ? {
+          payoutsEnabled: settings.stripe_payouts_enabled ?? null,
+          pastDue: settings.stripe_past_due ?? null,
+          currentDeadline: settings.stripe_current_deadline ?? null,
+          futureDeadline: settings.stripe_future_deadline ?? null,
+        } : null}
         notificationPrefs={settings?.notification_prefs ?? null}
       />
     </Suspense>

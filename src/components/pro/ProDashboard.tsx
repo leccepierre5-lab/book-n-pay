@@ -11,6 +11,7 @@ import ProCalendar from './ProCalendar';
 import FicheClientIntelligente from './FicheClientIntelligente';
 import CaisseEncaissement from './CaisseEncaissement';
 import AlertsPanel from './AlertsPanel';
+import { getStripeRequirementsBannerLevel, type StripeRequirementsBannerInput } from '@/lib/stripe-requirements';
 
 interface BookingMemberRow {
   id: string;
@@ -45,16 +46,19 @@ export default function ProDashboard({
   todayBookings,
   stats,
   stripeConnected,
+  stripeRequirements,
   notificationPrefs,
 }: {
   business: Business;
   todayBookings: BookingRow[];
   stats: ProStats;
   stripeConnected: boolean;
+  stripeRequirements?: StripeRequirementsBannerInput | null;
   notificationPrefs?: Record<string, boolean> | null;
 }) {
   const [bookings, setBookings] = useState(todayBookings);
   const [connectLoading, setConnectLoading] = useState(false);
+  const [remediationLoading, setRemediationLoading] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
   const [stripeConnectedLocal, setStripeConnectedLocal] = useState(stripeConnected);
@@ -136,6 +140,18 @@ export default function ProDashboard({
         )
       );
     }
+  };
+
+  const stripeRequirementsLevel = stripeConnectedLocal && stripeRequirements
+    ? getStripeRequirementsBannerLevel(stripeRequirements)
+    : null;
+
+  const handleStripeRemediation = async () => {
+    setRemediationLoading(true);
+    const res = await fetch('/api/pro/stripe/remediation', { method: 'POST' });
+    const { url } = await res.json();
+    if (url) window.location.href = url;
+    setRemediationLoading(false);
   };
 
   const connectStripe = async () => {
@@ -238,6 +254,95 @@ export default function ProDashboard({
               style={{ background: 'linear-gradient(135deg, #f59e0b, #fbbf24)', boxShadow: '0 4px 16px rgba(245,158,11,0.3)' }}
             >
               {connectLoading ? '...' : 'Activer Stripe Connect →'}
+            </button>
+          </div>
+        )}
+
+        {/* Bloc C — exigences Stripe 2026 sur le compte Connect. Texte
+            volontairement générique : les codes bruts (currently_due, ex.
+            "individual.verification.document") ne sont jamais montrés au
+            pro, le bouton suffit — Stripe précise lui-même ce qu'il attend
+            une fois sur son flux hébergé. */}
+        {stripeRequirementsLevel && (
+          <div
+            className={
+              'mb-5 rounded-2xl border p-4 ' +
+              (stripeRequirementsLevel === 'red'
+                ? 'border-red-500/25 bg-red-500/8'
+                : stripeRequirementsLevel === 'orange'
+                ? 'border-amber-500/25 bg-amber-500/8'
+                : 'border-blue-500/25 bg-blue-500/8')
+            }
+          >
+            <div className="flex items-start gap-3 mb-3">
+              <div
+                className={
+                  'w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ' +
+                  (stripeRequirementsLevel === 'red'
+                    ? 'bg-red-500/15'
+                    : stripeRequirementsLevel === 'orange'
+                    ? 'bg-amber-500/15'
+                    : 'bg-blue-500/15')
+                }
+              >
+                <svg
+                  className={
+                    'w-4 h-4 ' +
+                    (stripeRequirementsLevel === 'red'
+                      ? 'text-red-400'
+                      : stripeRequirementsLevel === 'orange'
+                      ? 'text-amber-400'
+                      : 'text-blue-400')
+                  }
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                >
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div>
+                <p className={
+                  'text-sm font-semibold ' +
+                  (stripeRequirementsLevel === 'red'
+                    ? 'text-red-300'
+                    : stripeRequirementsLevel === 'orange'
+                    ? 'text-amber-300'
+                    : 'text-blue-300')
+                }>
+                  {stripeRequirementsLevel === 'red'
+                    ? 'Vos virements Stripe sont suspendus'
+                    : stripeRequirementsLevel === 'orange'
+                    ? 'Informations Stripe à compléter rapidement'
+                    : 'Stripe demandera bientôt des informations complémentaires'}
+                </p>
+                <p className={
+                  'text-xs mt-0.5 ' +
+                  (stripeRequirementsLevel === 'red'
+                    ? 'text-red-400/70'
+                    : stripeRequirementsLevel === 'orange'
+                    ? 'text-amber-400/70'
+                    : 'text-blue-400/70')
+                }>
+                  {stripeRequirementsLevel === 'red'
+                    ? "Stripe a besoin d'informations supplémentaires pour reprendre vos paiements."
+                    : stripeRequirementsLevel === 'orange'
+                    ? "Sans action de votre part avant l'échéance, vos virements seront suspendus."
+                    : "Rien d'urgent — préparez-le tranquillement avant l'échéance indiquée par Stripe."}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleStripeRemediation}
+              disabled={remediationLoading}
+              className={
+                'w-full rounded-xl py-2.5 text-sm font-semibold text-navy-950 transition-all disabled:opacity-50 ' +
+                (stripeRequirementsLevel === 'red'
+                  ? 'bg-red-400'
+                  : stripeRequirementsLevel === 'orange'
+                  ? 'bg-amber-400'
+                  : 'bg-blue-400')
+              }
+            >
+              {remediationLoading ? '...' : 'Mettre à jour mes informations Stripe →'}
             </button>
           </div>
         )}

@@ -14,6 +14,7 @@ import { reconcileProChargesFromInvoice, invoicePendingChargesOnCancellation } f
 import { formatTime, parseParisDatetime } from '@/lib/booking-utils';
 import { generateQrPngBase64 } from '@/lib/qr';
 import { buildIcs } from '@/lib/ics';
+import { mapAccountRequirements } from '@/lib/stripe-requirements';
 
 // ⚠️ CORRECTIF (test E2E billing) : sur ce compte Stripe (version d'API
 // 2026-05-27.dahlia), invoice.subscription n'est plus peuplé — confirmé en
@@ -714,6 +715,37 @@ L'équipe Book'nPay`,
       // client `stripe` du haut de la fonction (toujours live, cohérent
       // avec le reste de ce fichier).
       await invoicePendingChargesOnCancellation(stripe, supabase, settings.biz_id, event.id);
+    }
+  }
+
+  // ── COMPTE CONNECT — exigences KYC (Bloc C, échéance Stripe 31/10/2026) ──
+  // ⚠️ Nécessite que cet endpoint soit coché "Écouter les événements sur les
+  // comptes connectés" côté Dashboard Stripe (onglet Connect), pas seulement
+  // les événements plateforme — sinon ce bloc ne s'exécute jamais (dormant,
+  // sans risque, comme checkout.session.expired plus haut).
+  // Événement bruyant (déclenché à chaque micro-changement d'un compte
+  // Express, y compris hors requirements) : aucun email envoyé depuis ce
+  // handler, on se contente de synchroniser business_settings — le bandeau
+  // dashboard pro lit cet état à la demande.
+  if (event.type === 'account.updated') {
+    const account = event.data.object as Stripe.Account;
+
+    const { data: settings } = await supabase
+      .from('business_settings')
+      .select('biz_id')
+      .eq('stripe_account_id', account.id)
+      .maybeSingle();
+
+    if (settings) {
+      await supabase
+        .from('business_settings')
+        .update(mapAccountRequirements(account))
+        .eq('biz_id', settings.biz_id);
+      console.log(`[Webhook] Exigences Stripe synchronisées — biz ${settings.biz_id}, compte ${account.id}`);
+    } else {
+      // Compte Stripe sans business_settings correspondant (test Dashboard,
+      // compte d'un autre environnement...) — pas une erreur, rien à faire.
+      console.warn(`[Webhook] account.updated pour un compte Stripe inconnu: ${account.id}`);
     }
   }
 
