@@ -23,6 +23,9 @@ export const metadata: Metadata = {
     template: "%s | Book'nPay",
   },
   description: SITE_DESCRIPTION,
+  // Audit SEO 13/08, point 5 : metadataBase seul ne génère pas de balise
+  // canonical — sans ça, la home n'en avait aucune.
+  alternates: { canonical: '/' },
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,

@@ -80,6 +80,22 @@ export default async function SearchPage({
     city: params.city ?? null,
   };
 
+  // H1 (point 6 de l'audit SEO du 13/08) — /recherche n'avait aucun H1/H2,
+  // alors que c'est la page qui porte le poids SEO des requêtes "métier +
+  // ville". Dynamique pour rester pertinent quand de nouvelles catégories
+  // arrivent, jamais un texte générique fixe.
+  const categoryLabel = searchContext.category
+    ? CATEGORIES.find((c) => c.id === searchContext.category)?.label
+    : null;
+  const pageTitle =
+    categoryLabel && searchContext.city
+      ? `${categoryLabel} à ${searchContext.city}`
+      : categoryLabel
+      ? `${categoryLabel} près de chez vous`
+      : searchContext.city
+      ? `Trouvez un professionnel à ${searchContext.city}`
+      : 'Trouvez et réservez un professionnel près de chez vous';
+
   // Journal silencieux (migration 0054) — écrit à chaque recherche vide,
   // même sans geste du visiteur. Aucun identifiant joint (voir
   // src/lib/search-misses.ts) : ce n'est volontairement pas relié aux
@@ -96,6 +112,8 @@ export default async function SearchPage({
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           Accueil
         </Link>
+
+        <h1 className="sr-only">{pageTitle}</h1>
 
         {/* Search bar */}
         <form className="mb-5 space-y-3" action="/recherche" method="get">
