@@ -23,6 +23,7 @@ import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnected
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
+import { insertRefundFailure } from '@/lib/refund-failures';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
@@ -125,6 +126,13 @@ export async function POST(req: NextRequest) {
           failed: 1,
           failedItems: [memberId],
           failedDescriptions: [`membre ${memberId} (booking ${bookingId}, ${member.deposit ?? 0}€) — ${stripeErr.message}`],
+        }, 'action');
+        await insertRefundFailure(serviceSupabase, {
+          bookingId,
+          stripeChargeId: member.stripe_payment_intent_id ?? null,
+          amountCents: depositRefundAmountCents(member.deposit),
+          errorCode: stripeErr.code ?? null,
+          errorMessage: stripeErr.message,
         });
       }
     }
@@ -155,6 +163,13 @@ export async function POST(req: NextRequest) {
           failedDescriptions: [
             `membre ${memberId} (booking ${bookingId}) — récupération du dépôt (${member.deposit ?? 0}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
           ],
+        }, 'action');
+        await insertRefundFailure(serviceSupabase, {
+          bookingId,
+          stripeChargeId: member.stripe_payment_intent_id ?? null,
+          amountCents: depositRefundAmountCents(member.deposit),
+          errorCode: null,
+          errorMessage: `réversal du dépôt auprès du pro échouée — ${reversal.error}`,
         });
       }
     }

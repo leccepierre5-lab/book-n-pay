@@ -8,7 +8,20 @@
 import { sendEmail } from '@/lib/email/send';
 import type { BatchResult } from '@/lib/cron-batch';
 
-export async function notifyAdminOnFailure<T>(label: string, result: BatchResult<T>): Promise<void> {
+// `context` distingue une vraie boucle planifiée (Vercel Cron) d'une action
+// synchrone déclenchée par un utilisateur (clic pro, webhook Stripe...) qui
+// réutilise ce helper juste pour la visibilité admin. Avant ce paramètre, le
+// mot "cron" était codé en dur dans le sujet quel que soit l'appelant —
+// induit en erreur pendant le diagnostic du 14/08 (l'alerte
+// "pro/cancel-booking:refund" ressemblait à un job périodique alors que
+// c'était un échec ponctuel sur un clic pro). Défaut 'cron' : préserve le
+// libellé existant pour tous les appelants sous src/app/api/cron/* sans les
+// toucher.
+export async function notifyAdminOnFailure<T>(
+  label: string,
+  result: BatchResult<T>,
+  context: 'cron' | 'action' = 'cron'
+): Promise<void> {
   if (result.failed === 0) return;
 
   const adminEmail = process.env.ADMIN_EMAIL;
@@ -20,8 +33,8 @@ export async function notifyAdminOnFailure<T>(label: string, result: BatchResult
   try {
     await sendEmail({
       to: adminEmail,
-      subject: `[Book'nPay] cron ${label} : ${result.failed} échec(s)`,
-      text: `Le cron "${label}" a échoué sur ${result.failed} item(s) (${result.processed} traité(s) avec succès).
+      subject: `[Book'nPay] ${context} ${label} : ${result.failed} échec(s)`,
+      text: `${context === 'cron' ? 'Le cron' : "L'action"} "${label}" a échoué sur ${result.failed} item(s) (${result.processed} traité(s) avec succès).
 
 Items en échec :
 ${result.failedDescriptions.map((d) => `- ${d}`).join('\n')}`,

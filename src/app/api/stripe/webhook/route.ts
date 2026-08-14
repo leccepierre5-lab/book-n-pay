@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
               failedDescriptions: [
                 `membre ${memberId} (booking ${bookingId}, payment_intent ${session.payment_intent}) — ${refundErr.message}`,
               ],
-            });
+            }, 'action');
           }
         }
 

@@ -96,7 +96,7 @@ export async function attachProChargeToNextInvoice(
       failed: 1,
       failedItems: [chargeId],
       failedDescriptions: [`charge ${chargeId} (biz ${bizId}, ${(amountCents / 100).toFixed(2)}€) — ${e.message}`],
-    });
+    }, 'action');
     // Reste 'pending' — idempotencyKey stable, un futur appel avec le même
     // chargeId retentera proprement sans jamais créer de doublon.
   }
@@ -133,7 +133,7 @@ export async function reconcileProChargesFromInvoice(
       failed: 1,
       failedItems: [bizId],
       failedDescriptions: [`biz ${bizId}, invoice ${invoice.id} — lecture pro_charges échouée, rapprochement impossible — ${pendingError.message}`],
-    });
+    }, 'action');
     return;
   }
 
@@ -185,7 +185,7 @@ export async function invoicePendingChargesOnCancellation(
       failed: 1,
       failedItems: [bizId],
       failedDescriptions: [`biz ${bizId} — abonnement résilié, lecture pro_charges échouée, impossible de vérifier s'il reste des charges à facturer — ${pendingError.message}`],
-    });
+    }, 'action');
     return;
   }
 
@@ -210,7 +210,7 @@ export async function invoicePendingChargesOnCancellation(
       failedDescriptions: [
         `biz ${bizId} — abonnement résilié, ${pending.length} charge(s) pending sans stripe_customer_id, aucune facturation automatique possible — traitement manuel requis`,
       ],
-    });
+    }, 'action');
     return;
   }
 
@@ -240,6 +240,6 @@ export async function invoicePendingChargesOnCancellation(
       failed: 1,
       failedItems: [bizId],
       failedDescriptions: [`biz ${bizId} — création facture autonome de résiliation échouée — ${e.message}`],
-    });
+    }, 'action');
   }
 }

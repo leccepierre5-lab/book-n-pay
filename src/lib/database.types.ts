@@ -300,3 +300,30 @@ export interface EnrichedReferralEvent extends ReferralEvent {
 export interface BookingWithMembers extends Booking {
   booking_members: BookingMember[];
 }
+
+// Migration 0052 — mécanisme réel derrière "vérification manuelle" sur un
+// remboursement en échec (voir src/lib/refund-failures.ts).
+export interface RefundFailure {
+  id: string;
+  booking_id: string;
+  stripe_charge_id: string | null;
+  amount_cents: number;
+  error_code: string | null;
+  error_message: string;
+  attempts: number;
+  status: 'open' | 'resolved' | 'manual';
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_note: string | null;
+}
+
+export interface RefundFailureWithBooking extends RefundFailure {
+  bookings: {
+    biz_name: string;
+    service_name: string;
+    client_email: string | null;
+    date: string;
+    time: string;
+  } | null;
+}

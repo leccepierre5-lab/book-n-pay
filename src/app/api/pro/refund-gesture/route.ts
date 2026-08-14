@@ -13,6 +13,7 @@ import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
 import { formatTime } from '@/lib/booking-utils';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
+import { insertRefundFailure } from '@/lib/refund-failures';
 
 export async function POST(req: NextRequest) {
   try {
@@ -93,6 +94,13 @@ export async function POST(req: NextRequest) {
         failed: 1,
         failedItems: [memberId],
         failedDescriptions: [`membre ${memberId} (booking ${bookingId}, ${member.deposit ?? 0}€) — ${stripeErr.message}`],
+      }, 'action');
+      await insertRefundFailure(serviceSupabase, {
+        bookingId,
+        stripeChargeId: member.stripe_payment_intent_id ?? null,
+        amountCents: depositCents,
+        errorCode: stripeErr.code ?? null,
+        errorMessage: stripeErr.message,
       });
       return NextResponse.json(
         { error: 'Le remboursement Stripe a échoué — notre équipe a été alertée, réessaie ou contacte-nous si ça persiste.' },
@@ -121,6 +129,13 @@ export async function POST(req: NextRequest) {
         failedDescriptions: [
           `membre ${memberId} (booking ${bookingId}) — récupération du dépôt (${member.deposit ?? 0}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
         ],
+      }, 'action');
+      await insertRefundFailure(serviceSupabase, {
+        bookingId,
+        stripeChargeId: member.stripe_payment_intent_id ?? null,
+        amountCents: depositCents,
+        errorCode: null,
+        errorMessage: `réversal du dépôt auprès du pro échouée — ${reversal.error}`,
       });
     }
 

@@ -13,6 +13,7 @@ import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
 import { formatTime, getParisDateOffsetStr } from '@/lib/booking-utils';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
+import { insertRefundFailure } from '@/lib/refund-failures';
 
 export async function POST(req: NextRequest) {
   try {
@@ -124,6 +125,13 @@ export async function POST(req: NextRequest) {
                   deposit: member.deposit ?? 0,
                   message: `récupération du dépôt auprès du pro échouée (client déjà remboursé) — ${reversal.error}`,
                 });
+                await insertRefundFailure(serviceSupabase, {
+                  bookingId: booking.id,
+                  stripeChargeId: member.stripe_payment_intent_id ?? null,
+                  amountCents: depositCents,
+                  errorCode: null,
+                  errorMessage: `réversal du dépôt auprès du pro échouée — ${reversal.error}`,
+                });
               }
 
               await serviceSupabase
@@ -167,6 +175,13 @@ export async function POST(req: NextRequest) {
                 deposit: member.deposit ?? 0,
                 message: err.message,
               });
+              await insertRefundFailure(serviceSupabase, {
+                bookingId: booking.id,
+                stripeChargeId: member.stripe_payment_intent_id ?? null,
+                amountCents: depositRefundAmountCents(member.deposit),
+                errorCode: err.code ?? null,
+                errorMessage: err.message,
+              });
             }
           } else {
             // Statut paid/arrived mais pas d'ID de paiement (paiement especes/tpe) — pas de remboursement Stripe possible.
@@ -184,7 +199,7 @@ export async function POST(req: NextRequest) {
           failedDescriptions: refundFailures.map(
             (f) => `membre ${f.memberId} (booking ${f.bookingId}, ${f.deposit}€) — ${f.message}`
           ),
-        });
+        }, 'action');
       }
 
       console.log(`[FreezeBusiness] ${business.name} gelé — ${cancelledCount} membre(s) annulé(s), ${refundedCount} remboursement(s), ${refundFailures.length} échec(s)`);

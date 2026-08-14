@@ -39,11 +39,22 @@ const mockSessionsRetrieve = vi.fn(async () => ({ metadata: {} }));
 // déjà (le remboursement/la charge elle-même), voir tests dédiés dans
 // pro-charge-billing.test.ts pour le comportement de cette fonction.
 const mockInvoiceItemsCreate = vi.fn(async (..._args: any[]) => ({ id: 'ii_test' }));
+// reverse_transfer conditionnel (bug corrigé 14/08, booking 59a81eb2) : la
+// route retrieve la charge avant le refund pour savoir si un transfert
+// existe. Transfert PRÉSENT par défaut (cas Connect actif, majorité des
+// tests existants) — le test dédié "pas de transfert" l'écrase.
+// Annotation explicite (transfer: string | null) — sinon TS infère `string`
+// depuis ce seul usage par défaut et rejette mockResolvedValueOnce({
+// transfer: null }) plus bas (même piège que reverse-transfer-refunds.test.ts).
+const mockPiRetrieve = vi.fn(async (..._args: any[]): Promise<{ latest_charge: { transfer: string | null } }> => ({
+  latest_charge: { transfer: 'tr_test' },
+}));
 vi.mock('@/lib/stripe/client', () => ({
   getStripeClient: vi.fn(async () => ({
     refunds: { create: mockRefundsCreate },
     checkout: { sessions: { retrieve: mockSessionsRetrieve } },
     invoiceItems: { create: mockInvoiceItemsCreate },
+    paymentIntents: { retrieve: (...args: any[]) => mockPiRetrieve(...args) },
   })),
 }));
 
@@ -58,6 +69,14 @@ vi.mock('@/lib/email/send', () => ({ sendEmail: (...args: any[]) => mockSendEmai
 const mockNotifyAdminOnFailure = vi.fn(async (..._args: any[]) => {});
 vi.mock('@/lib/notify-admin', () => ({
   notifyAdminOnFailure: (...args: any[]) => mockNotifyAdminOnFailure(...args),
+}));
+
+// Table refund_failures (migration 0052) — mock direct (pas de dépendance à
+// `chains`, qui n'est réassigné qu'après beforeEach) : ces tests vérifient
+// le contenu réel via ce mock plutôt que via le chain générique.
+const mockRefundFailureInsert = vi.fn(async (..._args: any[]) => ({}));
+vi.mock('@/lib/refund-failures', () => ({
+  insertRefundFailure: (...args: any[]) => mockRefundFailureInsert(...args),
 }));
 
 function makeChain(listData: any[], singleData: any = listData[0] ?? null, error: any = null) {
@@ -214,6 +233,7 @@ describe('POST /api/pro/cancel-booking', () => {
       metadata: { email_sent: 'true', reason: 'pro_cancellation' },
     });
     expect(mockRefundsCreate.mock.calls[0][0]).not.toHaveProperty('refund_application_fee');
+    expect(mockPiRetrieve).toHaveBeenCalledWith('pi_123', { expand: ['latest_charge'] });
 
     // Statut réutilisé, montant_rembourse = TOTAL.
     const memberUpdateCall = chains.booking_members.update.mock.calls[0][0];
@@ -412,8 +432,53 @@ describe('POST /api/pro/cancel-booking', () => {
     expect(mockNotifyAdminOnFailure).toHaveBeenCalledTimes(1);
     expect(mockNotifyAdminOnFailure.mock.calls[0][0]).toBe('pro/cancel-booking:refund');
 
+    // Migration 0052 — le mécanisme réel derrière "vérification manuelle" :
+    // une ligne refund_failures écrite, pas seulement l'email admin.
+    expect(mockRefundFailureInsert).toHaveBeenCalledTimes(1);
+    expect(mockRefundFailureInsert.mock.calls[0][1]).toEqual({
+      bookingId: 'bk1',
+      stripeChargeId: 'pi_123',
+      amountCents: 1699,
+      errorCode: null,
+      errorMessage: 'solde Connect insuffisant',
+    });
+
     // Pas d'email pro (refundDone=false).
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
     expect(mockSendEmail.mock.calls[0][0].to).toBe('client@example.com');
+  });
+
+  it("pas de transfert associé (pro sans compte Connect actif) : reverse_transfer omis, refund quand même exécuté avec succès", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'pro1', email: 'pro@example.com' } } });
+    chains.bookings = makeChain([], FUTURE_BOOKING);
+    chains.booking_members = makeChain([], PAID_MEMBER_WITH_FEE);
+    chains.booking_logs = makeChain([]);
+    chains.pro_charges = makeChain([], { id: 'charge-1' });
+    chains.businesses = makeChain([], { slug: null, owner_id: 'owner-1' });
+    mockSessionsRetrieve.mockResolvedValueOnce({ metadata: { fraisGestion: '1.99' } });
+    // Bug réel constaté le 14/08 (booking 3afbff0f puis 59a81eb2) : charge
+    // sans transfert associé, faute de compte Connect actif chez le pro.
+    mockPiRetrieve.mockResolvedValueOnce({ latest_charge: { transfer: null } });
+
+    const { POST } = await import('@/app/api/pro/cancel-booking/route');
+    const res = await POST(buildRequest({ bookingId: 'bk1', memberId: 'm1' }) as any);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.refundDone).toBe(true);
+
+    // Avant le correctif, reverse_transfer:true était toujours envoyé et
+    // Stripe rejetait l'appel entier ("does not have an associated
+    // transfer") — ici le refund réussit, sans le flag.
+    expect(mockRefundsCreate).toHaveBeenCalledWith({
+      payment_intent: 'pi_123',
+      amount: 1699,
+      reason: 'requested_by_customer',
+      metadata: { email_sent: 'true', reason: 'pro_cancellation' },
+    });
+    expect(mockRefundsCreate.mock.calls[0][0]).not.toHaveProperty('reverse_transfer');
+
+    expect(mockNotifyAdminOnFailure).not.toHaveBeenCalled();
+    expect(mockRefundFailureInsert).not.toHaveBeenCalled();
   });
 });

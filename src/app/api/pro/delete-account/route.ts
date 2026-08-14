@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
             failedDescriptions: [
               `business ${bizId} (${business.name}) — abonnement ${settings.stripe_subscription_id} — ${e.message}`,
             ],
-          });
+          }, 'action');
           return NextResponse.json(
             { error: "L'annulation de l'abonnement a échoué. Réessayez, ou contactez le support si ça persiste." },
             { status: 500 }
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
             failedDescriptions: [
               `business ${bizId} (${business.name}) — compte Connect ${settings.stripe_account_id} — ${e.message}`,
             ],
-          });
+          }, 'action');
           return NextResponse.json(
             { error: 'La suppression du compte Stripe a échoué. Réessayez, ou contactez le support si ça persiste.' },
             { status: 500 }
@@ -315,7 +315,7 @@ export async function POST(req: NextRequest) {
         failedDescriptions: [
           `business ${bizId} (${business.name}) — ${e.message} — Stripe déjà traité (abonnement annulé${settings?.stripe_account_id ? '/Connect supprimé' : ''}), établissement déjà dépublié, à rattraper manuellement (compte auth PAS supprimé)`,
         ],
-      });
+      }, 'action');
       return NextResponse.json(
         {
           error:

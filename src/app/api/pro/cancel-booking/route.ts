@@ -22,6 +22,7 @@ import { buildIcs } from '@/lib/ics';
 import { proCancellationRefundAmountCents } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
+import { insertRefundFailure } from '@/lib/refund-failures';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
@@ -146,27 +147,40 @@ export async function POST(req: NextRequest) {
     let refundDone = false;
     if (member.stripe_payment_intent_id) {
       try {
+        // reverse_transfer ne peut être posé QUE si la charge a réellement un
+        // transfert associé (transfer_data.destination, stripe/checkout/
+        // route.ts:325) — celui-ci n'existe que si le pro avait un compte
+        // Connect actif au moment du paiement (stripe_account_id +
+        // stripe_onboarding_complete). Sinon la réservation est quand même
+        // acceptée (100% encaissé côté plateforme, fallback volontaire), et
+        // reverse_transfer:true sur un refund sans transfert associé fait
+        // échouer TOUT le refund côté Stripe ("Cannot reverse transfer on
+        // charge ... because it does not have an associated transfer.") —
+        // bug réel constaté le 14/08 (booking 3afbff0f). Même vérification
+        // que reverseConnectedAccountTransfer (lib/refunds.ts) pour les 3
+        // autres routes.
+        const pi = await stripe.paymentIntents.retrieve(member.stripe_payment_intent_id, {
+          expand: ['latest_charge'],
+        });
+        const charge = pi.latest_charge;
+        const hasTransfer = Boolean(charge && typeof charge !== 'string' && charge.transfer);
+
         await stripe.refunds.create({
           payment_intent: member.stripe_payment_intent_id,
           amount: refundAmountCents,
           reason: 'requested_by_customer',
-          // reverse_transfer: true — ce remboursement couvre 100% de la charge
-          // (dépôt + frais de gestion, proCancellationRefundAmountCents
-          // ci-dessus) : Stripe annule alors 100% du transfert automatique
-          // (transfer_data.destination, stripe/checkout/route.ts) fait au pro
-          // à la réservation. Sans ce flag, le pro garderait le dépôt déjà
-          // transféré et la PLATEFORME absorberait seule ce remboursement —
-          // vérifié dans la doc Stripe (Connect > Destination charges >
-          // Émettre des remboursements). Seule cette route peut utiliser le
-          // flag natif tel quel : c'est la seule des 4 à rembourser 100% de la
-          // charge — les 3 autres (dépôt seul) passent par
-          // reverseConnectedAccountTransfer (lib/refunds.ts) à la place, le
-          // flag sous-récupérant sur un remboursement partiel. Aucune
+          // Ce remboursement couvre 100% de la charge (dépôt + frais de
+          // gestion, proCancellationRefundAmountCents ci-dessus) : quand un
+          // transfert existe, Stripe annule alors 100% du transfert
+          // automatique fait au pro à la réservation. Sans transfert
+          // (fallback checkout sans Connect actif), il n'y a rien à
+          // récupérer — le flag est simplement omis, pas envoyé à `false`
+          // (Stripe le rejette aussi si aucun transfert n'existe). Aucune
           // interaction avec pro_charges plus bas : ce flag ne touche que le
           // dépôt transféré, jamais les frais de gestion (qui ne sont jamais
           // transférés au pro, application_fee_amount reste sur la
           // plateforme) — donc pas de double récupération.
-          reverse_transfer: true,
+          ...(hasTransfer ? { reverse_transfer: true } : {}),
           metadata: { email_sent: 'true', reason: 'pro_cancellation' },
         });
         refundDone = true;
@@ -183,6 +197,13 @@ export async function POST(req: NextRequest) {
           failedDescriptions: [
             `membre ${memberId} (booking ${bookingId}, ${member.deposit ?? 0}€) — annulation par le pro ${authData.user.email ?? authData.user.id} — ${stripeErr.message}`,
           ],
+        }, 'action');
+        await insertRefundFailure(serviceSupabase, {
+          bookingId,
+          stripeChargeId: member.stripe_payment_intent_id ?? null,
+          amountCents: refundAmountCents,
+          errorCode: stripeErr.code ?? null,
+          errorMessage: stripeErr.message,
         });
       }
     }
@@ -263,7 +284,7 @@ export async function POST(req: NextRequest) {
           failedDescriptions: [
             `booking ${bookingId} — frais de gestion ${managementFeeAmount.toFixed(2)}€ non facturés au pro (échec insertion pro_charges) — ${chargeErr.message}`,
           ],
-        });
+        }, 'action');
       }
     } else if (refundDone && managementFeeAmount == null) {
       // Client remboursé du dépôt seul (montant total inconnu), le pro n'est
@@ -282,7 +303,7 @@ export async function POST(req: NextRequest) {
         failedDescriptions: [
           `booking ${bookingId} — frais de gestion non identifiables (session Stripe introuvable ou metadata absente), pro NON facturé — vérification manuelle nécessaire`,
         ],
-      });
+      }, 'action');
     }
 
     const fraisGestionImpute = refundDone && managementFeeAmount != null ? managementFeeAmount.toFixed(2) : '0.00';

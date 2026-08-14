@@ -45,6 +45,11 @@ vi.mock('@/lib/pro-notifications', () => ({
 const notifyAdminOnFailure = vi.fn(async (_label: string, _result: any) => {});
 vi.mock('@/lib/notify-admin', () => ({ notifyAdminOnFailure }));
 
+// Migration 0052 — chaque échec de remboursement/réversal des 4 routes doit
+// écrire dans refund_failures, pas seulement déclencher l'email admin.
+const insertRefundFailure = vi.fn(async (..._args: any[]) => {});
+vi.mock('@/lib/refund-failures', () => ({ insertRefundFailure }));
+
 const mockRefundsCreate = vi.fn(async () => ({ id: 're_1' }));
 // Type explicite (transfer: string | null) : un pi.latest_charge.transfer
 // null est un cas réel testé plus bas (fixture sans compte Connect) — sans
@@ -143,6 +148,9 @@ describe('bookings/cancel — récupération du dépôt auprès du pro', () => {
     expect(notifyAdminOnFailure.mock.calls[0][0]).toBe('bookings/cancel:reverse_transfer');
     expect(notifyAdminOnFailure.mock.calls[0][1].failedDescriptions[0]).toContain('à vérifier manuellement');
     expect(notifyAdminOnFailure.mock.calls[0][1].failedDescriptions[0]).not.toContain('solde insuffisant');
+
+    expect(insertRefundFailure).toHaveBeenCalledTimes(1);
+    expect(insertRefundFailure.mock.calls[0][1]).toMatchObject({ bookingId: 'bk1' });
   });
 
   it("pas de transfert à l'origine (fixture sans compte Connect) → pas d'alerte, rien à récupérer", async () => {
@@ -167,6 +175,9 @@ describe('bookings/cancel — récupération du dépôt auprès du pro', () => {
     // Une seule alerte (le refund), pas de seconde alerte réversal.
     expect(notifyAdminOnFailure).toHaveBeenCalledTimes(1);
     expect(notifyAdminOnFailure.mock.calls[0][0]).toBe('bookings/cancel:refund');
+
+    expect(insertRefundFailure).toHaveBeenCalledTimes(1);
+    expect(insertRefundFailure.mock.calls[0][1]).toMatchObject({ bookingId: 'bk1', errorMessage: 'carte refusée' });
   });
 });
 
@@ -236,6 +247,9 @@ describe('pro/refund-gesture — récupération du dépôt auprès du pro', () =
     expect(mockCreateReversal).not.toHaveBeenCalled();
     expect(notifyAdminOnFailure).toHaveBeenCalledTimes(1);
     expect(notifyAdminOnFailure.mock.calls[0][0]).toBe('pro/refund-gesture:refund');
+
+    expect(insertRefundFailure).toHaveBeenCalledTimes(1);
+    expect(insertRefundFailure.mock.calls[0][1]).toMatchObject({ bookingId: 'bk1', errorMessage: 'carte refusée' });
   });
 
   it('réversal échoue (montant excédentaire) → client quand même remboursé, alerte admin dédiée', async () => {
@@ -247,6 +261,9 @@ describe('pro/refund-gesture — récupération du dépôt auprès du pro', () =
     expect(sentEmails).toHaveLength(1); // client remboursé, email parti quand même
     expect(notifyAdminOnFailure).toHaveBeenCalledTimes(1);
     expect(notifyAdminOnFailure.mock.calls[0][0]).toBe('pro/refund-gesture:reverse_transfer');
+
+    expect(insertRefundFailure).toHaveBeenCalledTimes(1);
+    expect(insertRefundFailure.mock.calls[0][1]).toMatchObject({ bookingId: 'bk1' });
   });
 });
 
@@ -326,5 +343,8 @@ describe('admin/freeze-business — récupération du dépôt auprès du pro', (
     expect(notifyAdminOnFailure.mock.calls[0][0]).toBe('admin/freeze-business:refunds');
     expect(notifyAdminOnFailure.mock.calls[0][1].failedDescriptions[0]).toContain('récupération du dépôt');
     expect(notifyAdminOnFailure.mock.calls[0][1].failedDescriptions[0]).not.toContain('solde insuffisant');
+
+    expect(insertRefundFailure).toHaveBeenCalledTimes(1);
+    expect(insertRefundFailure.mock.calls[0][1]).toMatchObject({ bookingId: 'bk1' });
   });
 });
