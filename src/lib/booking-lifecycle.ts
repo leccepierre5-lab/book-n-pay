@@ -33,3 +33,50 @@ export async function cancelBookingIfNoActiveMembers(
   await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
   return true;
 }
+
+// Trouvé le 15/08/2026 en testant le report de RDV en conditions réelles :
+// le webhook Stripe marquait bookings.status='completed' dès que tous les
+// membres actifs avaient status='paid' — c'est-à-dire dès le paiement
+// réussi, PAS quand le service a été rendu. Un RDV payé aujourd'hui pour
+// dans 5 jours se retrouvait "completed" avant même d'avoir eu lieu,
+// cassant tout ce qui suppose qu'une réservation 'active' est un RDV à
+// venir (report de RDV notamment). Introduit intentionnellement le
+// 26/06/2026 ("auto-complete booking"), jamais requestionné depuis.
+//
+// 'arrived' (posé par checkin-by-qr et cloturer-prestation quand le client
+// se présente réellement) est le seul signal fiable de "service rendu" qui
+// existe déjà dans le produit — ce helper reprend exactement le motif de
+// cancelBookingIfNoActiveMembers ci-dessus. `.eq('status', 'active')` en
+// garde-fou sur le update : ne jamais écraser une réservation déjà annulée
+// par ailleurs.
+//
+// Définition de "membre actif" pour CETTE complétion (précisée le 15/08
+// après relecture) : 'cancelled' est exclu par la requête elle-même (comme
+// pour cancelBookingIfNoActiveMembers) ; parmi le reste, 'arrived' ET
+// 'no_show' sont tous deux des états TERMINAUX — le sort du membre est
+// connu, rien d'autre ne va se passer pour lui. Seuls 'paid' (payé, pas
+// encore vu) et 'invite' (jamais payé) signifient que le RDV n'est pas
+// encore résolu et doivent bloquer la complétion. Un no-show ne doit jamais
+// laisser un booking bloqué 'active' pour toujours : le RDV a bien eu lieu
+// (à l'heure prévue), le client n'est simplement pas venu.
+export async function completeBookingIfAllArrived(
+  supabase: SupabaseClient,
+  bookingId: string
+): Promise<boolean> {
+  const { data: activeMembers } = await supabase
+    .from('booking_members')
+    .select('status')
+    .eq('booking_id', bookingId)
+    .neq('status', 'cancelled');
+
+  if (!activeMembers || activeMembers.length === 0) return false;
+  if (activeMembers.some((m) => m.status !== 'arrived' && m.status !== 'no_show')) return false;
+
+  const { error } = await supabase
+    .from('bookings')
+    .update({ status: 'completed' })
+    .eq('id', bookingId)
+    .eq('status', 'active');
+
+  return !error;
+}

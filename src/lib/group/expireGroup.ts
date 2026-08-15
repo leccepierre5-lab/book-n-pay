@@ -43,22 +43,16 @@ export async function expireGroupByRef(
   );
 
   if (!hasCancelledPaidMember && unpaidMembers.length === 0 && paidMembers.length > 0) {
-    // Filet de course — cette branche protège contre une lecture juste avant
-    // que le webhook checkout.session.completed (temps réel) n'ait fini de
-    // marquer tout le groupe 'completed' (section "Complétion de groupe",
-    // stripe/webhook/route.ts). Rarement atteinte en pratique : le webhook
-    // devance quasi toujours ce code (appelé par le cron quotidien
-    // expire-groups OU par le polling lazy group/pending-status), d'où 0
-    // ligne 'complete' observée en base au 17/07 malgré ce bug de frappe
-    // vieux de plusieurs sessions (commit 2dae9c4) — pas du code mort
-    // (chemin réellement atteignable), juste une fenêtre de course étroite.
-    // 'completed' est la seule valeur valide de l'enum (active/cancelled/
-    // completed) — 'complete' (sans d) échouait silencieusement ici.
-    await supabase
-      .from('bookings')
-      .update({ status: 'completed' })
-      .eq('group_ref', ref)
-      .neq('status', 'completed');
+    // Rien à expirer — tout le monde a payé, ce groupe n'est pas concerné
+    // par le délai. Corrigé le 15/08/2026 : cette branche marquait autrefois
+    // le groupe 'completed' ici (motif : "protéger contre une lecture juste
+    // avant que le webhook Stripe ne le fasse lui-même"), sur la même
+    // condition erronée que le webhook — dès le paiement, pas le service
+    // rendu. Depuis que le webhook ne pose plus jamais 'completed' (voir
+    // src/app/api/stripe/webhook/route.ts), cette branche n'a plus rien à
+    // "protéger" : le groupe reste simplement 'active', l'état correct pour
+    // un RDV à venir. 'completed' n'est posé QUE par
+    // completeBookingIfAllArrived (src/lib/booking-lifecycle.ts).
     return { expired: false };
   }
 

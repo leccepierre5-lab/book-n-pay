@@ -15,6 +15,7 @@ import { waitUntil } from '@vercel/functions';
 import { createClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
+import { completeBookingIfAllArrived } from '@/lib/booking-lifecycle';
 
 export async function POST(req: NextRequest) {
   try {
@@ -78,6 +79,11 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Le check-in est le signal réel de "service rendu" — voir
+    // completeBookingIfAllArrived (audit 15/08, remplace l'ancien
+    // déclenchement sur le paiement dans le webhook Stripe).
+    await completeBookingIfAllArrived(supabase, member.booking_id);
 
     if (member.phone) {
       waitUntil(

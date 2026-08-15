@@ -8,6 +8,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, escapeHtml } from '@/lib/email/send';
 import { formatTime, resolveMemberRecipientEmail } from '@/lib/booking-utils';
 import { logAndRespond } from '@/lib/api-error';
+import { completeBookingIfAllArrived } from '@/lib/booking-lifecycle';
 
 const MODE_LABEL: Record<string, string> = {
   app: "via l'application Book'nPay",
@@ -61,6 +62,10 @@ export async function POST(req: NextRequest) {
       booking_id: bookingId,
       message: `Prestation clôturée — paiement ${paymentMode}`,
     });
+
+    // Voir completeBookingIfAllArrived (audit 15/08) — la clôture pro est,
+    // avec le check-in QR, le signal réel de "service rendu".
+    await completeBookingIfAllArrived(serviceSupabase, bookingId);
 
     if (member.phone) {
       waitUntil(

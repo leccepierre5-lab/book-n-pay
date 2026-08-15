@@ -11,6 +11,7 @@ import { processBatch } from '@/lib/cron-batch';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 import { notifyProNoShow } from '@/lib/pro-notifications';
 import { sendEmail } from '@/lib/email/send';
+import { completeBookingIfAllArrived } from '@/lib/booking-lifecycle';
 
 export async function GET(req: NextRequest) {
   // Protection : seul Vercel Cron (avec le bon secret) peut déclencher ceci.
@@ -82,6 +83,15 @@ export async function GET(req: NextRequest) {
       for (const mb of paidMembers) {
         await supabase.from('booking_members').update({ status: 'no_show' }).eq('id', mb.id);
       }
+
+      // Trouvé le 15/08/2026 en réponse à une question de Pierre sur une
+      // autre fuite : c'est LE 4e chemin réel vers un état terminal de
+      // membre (avec checkin-by-qr, cloturer-prestation, update-member),
+      // le seul qui manquait encore l'appel à completeBookingIfAllArrived
+      // (src/lib/booking-lifecycle.ts). Sans ça, un client qui ne se
+      // présente pas laissait le booking 'active' indéfiniment — jamais
+      // 'completed', même si tous les autres membres étaient déjà arrivés.
+      await completeBookingIfAllArrived(supabase, booking.id);
 
       await supabase.from('booking_logs').insert({
         booking_id: booking.id,

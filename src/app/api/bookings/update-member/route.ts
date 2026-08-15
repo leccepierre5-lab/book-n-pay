@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { waitUntil } from '@vercel/functions';
 import { createClient } from '@/lib/supabase/server';
 import { logAndRespond } from '@/lib/api-error';
+import { completeBookingIfAllArrived } from '@/lib/booking-lifecycle';
 
 const PRO_ONLY_STATUSES = ['arrived', 'no_show'];
 const ALLOWED_FIELDS = ['status'] as const;
@@ -78,6 +79,16 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Aucun parcours front n'utilise cette route pour poser 'arrived'
+    // aujourd'hui (seul 'no_show' l'est, via markNoShow) — mais la
+    // whitelist ALLOWED_FIELDS l'autorise, donc c'est un chemin réel vers
+    // 'arrived', pas seulement théorique. Même filet que checkin-by-qr et
+    // cloturer-prestation (audit 15/08) : no-op si la condition n'est pas
+    // remplie (ex. status==='no_show').
+    if (safeUpdates.status === 'arrived') {
+      await completeBookingIfAllArrived(supabase, bookingId);
+    }
 
     if (safeUpdates.status === 'arrived' && previousMember?.status !== 'arrived' && previousMember?.phone) {
       waitUntil(

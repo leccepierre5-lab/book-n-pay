@@ -137,3 +137,35 @@ un fichier ciblé) avant de committer — pas seulement les tests du fichier
 qu'on vient de modifier. Un garde-fou ajouté à un seul endroit peut casser
 silencieusement des tests écrits pour vérifier autre chose sur la même
 route, s'ils ne fournissent pas le nouveau champ requis.
+
+# Parcours navigateur obligatoire — argent, statuts, autorisations
+
+Trouvé le 15/08/2026 en testant le report de RDV en conditions réelles :
+le webhook Stripe marquait `bookings.status='completed'` dès que tous les
+membres avaient payé — donc dès le paiement réussi, avant même que le RDV
+ait lieu. Un booking payé pour un créneau 5 jours plus tard se retrouvait
+déjà "completed". Introduit intentionnellement le 26/06/2026 ("auto-complete
+booking"), jamais requestionné depuis — 7 semaines sans être vu, alors que
+474 tests unitaires passaient tout du long et que plusieurs audits (LOTS 1
+à 7) avaient couvert ce repo. Aucun n'a pu le voir : un audit lit le code et
+vérifie sa cohérence interne, il ne peut pas voir qu'une condition est
+sémantiquement fausse quand elle est correctement écrite — `paid` au lieu
+de `arrived`, c'est du code parfaitement écrit qui fait la mauvaise chose.
+Trouvé par un parcours manuel de bout en bout, pas par une relecture.
+
+Ce n'est pas un cas isolé sur ce projet : les 3 bugs sérieux les plus
+récents (`reverse_transfer`, `phonesMatch()`, ce `completed` prématuré)
+viennent tous d'un parcours réel — annuler vraiment, s'inscrire vraiment,
+reporter vraiment — jamais d'un audit ou d'une relecture de code.
+
+**Règle** : toute fonctionnalité qui touche à l'argent, aux statuts de
+réservation ou aux autorisations doit être parcourue de bout en bout dans
+le navigateur avant d'être considérée comme livrée. Les tests unitaires
+prouvent que le code fait ce qu'on lui a demandé, pas qu'on lui a demandé
+la bonne chose.
+
+**Pour les audits futurs** : ajouter systématiquement une question de
+sémantique, pas seulement de cohérence. Pour chaque condition qui déclenche
+un changement d'état, se demander si la condition correspond vraiment à
+l'événement métier qu'elle prétend représenter — pas seulement si elle est
+cohérente avec le reste du code.

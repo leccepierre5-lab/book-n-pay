@@ -307,38 +307,29 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Auto-complete : si tous les membres non-annulés ont payé → booking complete
-      const { data: allMembers } = await supabase
-        .from('booking_members')
-        .select('id, status')
-        .eq('booking_id', bookingId);
-
+      // Bug corrigé le 15/08/2026 : ce bloc marquait bookings.status='completed'
+      // dès que tous les membres actifs avaient payé — donc dès le paiement
+      // réussi, avant même que le RDV ait lieu. Un RDV à venir se retrouvait
+      // "completed" (trouvé en testant le report de RDV en conditions
+      // réelles, sur un booking payé pour un créneau 5 jours plus tard).
+      // Après paiement, la réservation reste 'active' — c'est l'état correct
+      // pour un RDV à venir. 'completed' n'est désormais posé QUE quand le
+      // service est réellement rendu (voir completeBookingIfAllArrived,
+      // src/lib/booking-lifecycle.ts, appelé depuis checkin-by-qr,
+      // cloturer-prestation et update-member — les 3 chemins réels vers
+      // booking_members.status='arrived').
       const { data: bookingRow } = await supabase
         .from('bookings')
         .select('biz_id, status, group_ref, biz_name, service_name, date, time')
         .eq('id', bookingId)
         .maybeSingle();
 
-      const activeMembers = (allMembers ?? []).filter(m => m.status !== 'cancelled');
-      // ⚠️ 'completed' est la seule valeur valide de l'enum booking_status
-      // (active/cancelled/completed) — 'complete' (sans d) était utilisé ici
-      // par erreur, ce qui faisait échouer l'update silencieusement à chaque
-      // fois (aucune inspection de { error }).
-      if (activeMembers.length > 0 && activeMembers.every(m => m.status === 'paid')) {
-        const { error: completeError } = await supabase
-          .from('bookings')
-          .update({ status: 'completed' })
-          .eq('id', bookingId);
-        if (completeError) {
-          console.error(`[Webhook] ❌ Échec update status=completed — booking ${bookingId}:`, completeError.message);
-        } else {
-          console.log(`[Webhook] ✅ Booking ${bookingId} → completed (tous les membres ont payé)`);
-        }
-      }
-
-      // ── Complétion de groupe ─────────────────────────────────────────────
-      // Si ce booking appartient à un groupe, vérifier si TOUS les bookings
-      // du groupe sont maintenant complets → email de confirmation à tous
+      // ── Notification de groupe complet ───────────────────────────────────
+      // Si ce booking appartient à un groupe, vérifier si TOUS les membres du
+      // groupe ont payé → email "groupe complet" à tous. Ceci est une
+      // notification de paiement complet, PAS un changement de statut de
+      // réservation — ne doit plus jamais toucher bookings.status (voir
+      // commentaire ci-dessus).
       if (bookingRow?.group_ref) {
         const { data: groupBookings } = await supabase
           .from('bookings')
@@ -354,20 +345,6 @@ export async function POST(req: NextRequest) {
         );
 
         if (allGroupPaid) {
-          // Marquer tous les bookings du groupe comme completed
-          const incompleteIds = allGroupBookings
-            .filter((b: any) => b.status !== 'completed' && b.status !== 'cancelled')
-            .map((b: any) => b.id);
-          if (incompleteIds.length > 0) {
-            const { error: completeGroupError } = await supabase
-              .from('bookings')
-              .update({ status: 'completed' })
-              .in('id', incompleteIds);
-            if (completeGroupError) {
-              console.error(`[Webhook] ❌ Échec update status=completed — groupe ${bookingRow.group_ref}, ids ${incompleteIds.join(',')}:`, completeGroupError.message);
-            }
-          }
-
           // Email de confirmation à chaque participant (via booking_members.email ou booking.client_email)
           const dateFormatted = new Date(allGroupBookings[0].date + 'T12:00:00').toLocaleDateString('fr-FR', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
