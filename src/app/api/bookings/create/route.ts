@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { generateQrCode, isSlotPast, INVITE_EXPIRY_MS, isValidPhoneFormat, normalizePhone } from '@/lib/booking-utils';
+import { generateQrCode, isSlotPast, INVITE_EXPIRY_MS, isValidPhoneFormat, normalizePhone, logAppUsersUpsertError } from '@/lib/booking-utils';
 import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { createSoloBookingWithOverlapCheck } from '@/lib/booking-solo-overlap';
@@ -201,12 +201,13 @@ export async function POST(req: NextRequest) {
 
     // Upsert app_users pour les comptes existants créés avant le fix du trigger
     if (authData.user?.id) {
-      await supabaseService.from('app_users').upsert({
+      const { error: upsertError } = await supabaseService.from('app_users').upsert({
         id: authData.user.id,
         name: clientName,
         phone: clientPhone || null,
         role: 'client',
       }, { onConflict: 'id', ignoreDuplicates: true });
+      logAppUsersUpsertError('BookingsCreate', authData.user.id, upsertError);
     }
 
     let booking: Booking;

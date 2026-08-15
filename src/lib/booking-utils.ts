@@ -52,6 +52,27 @@ export function isValidPhoneFormat(raw: string): boolean {
 export const PHONE_INPUT_PATTERN = '(0|\\+(33|590|594|596|262|269))[ .]?[1-9]([ .]?[0-9]){8}';
 export const PHONE_INPUT_TITLE = 'Numéro français ou DOM-TOM, ex. 06 12 34 56 78';
 
+// Audit du 15/08 : l'upsert app_users pour un compte déjà authentifié
+// (bookings/create, bookings/create-group — "compte existant créé avant le
+// fix du trigger") n'était jamais vérifié : `await supabase.from(...).upsert(...)`
+// sans lire `.error`. Une collision sur la contrainte UNIQUE(app_users.phone)
+// (un autre compte a déjà ce numéro) échouait donc SILENCIEUSEMENT — motif
+// "erreur≠zéro" déjà rencontré ailleurs (voir CLAUDE.md). Ne bloque
+// volontairement jamais l'appelant (la réservation, dont le paiement est
+// déjà engagé côté client, ne doit pas échouer pour un champ de profil
+// secondaire) — sert uniquement à rendre l'échec visible plutôt que muet.
+export function logAppUsersUpsertError(
+  routeLabel: string,
+  userId: string,
+  error: { message: string } | null
+): void {
+  if (!error) return;
+  console.error(
+    `[${routeLabel}] Upsert app_users échoué, profil non mis à jour (userId=${userId}):`,
+    error.message
+  );
+}
+
 export function phonesMatch(
   a: string | null | undefined,
   b: string | null | undefined

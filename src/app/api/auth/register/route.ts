@@ -46,6 +46,31 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceRoleClient();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://book-n-pay-next.vercel.app';
 
+    // app_users.phone porte une contrainte UNIQUE (users_phone_key, héritée
+    // du schéma d'origine — pas ajoutée par nous, voir audit 15/08). Sans ce
+    // pré-check, une collision remonte comme exception NON gérée dans le
+    // trigger handle_new_user (AFTER INSERT ON auth.users, migration 0010,
+    // pas de bloc EXCEPTION) — ça avorte toute la transaction, GoTrue
+    // enveloppe ça en erreur générique, et logAndRespondAuthError retombe
+    // sur "Une erreur est survenue" en 500 : incompréhensible, et rien
+    // n'indique au client que c'est SON numéro qui pose problème (déjà
+    // utilisé par un autre compte) ni comment corriger. Un check explicite
+    // ici donne un message actionnable ; la contrainte reste le filet en cas
+    // de course (deux inscriptions simultanées sur le même numéro).
+    if (normalizedPhone) {
+      const { data: phoneOwner } = await supabase
+        .from('app_users')
+        .select('id')
+        .eq('phone', normalizedPhone)
+        .maybeSingle();
+      if (phoneOwner) {
+        return NextResponse.json(
+          { error: 'Ce numéro de téléphone est déjà associé à un compte. Connectez-vous ou utilisez un autre numéro.' },
+          { status: 409 }
+        );
+      }
+    }
+
     // Crée l'utilisateur et génère le token de confirmation en une seule requête.
     // Aucun email n'est envoyé par Supabase — on récupère hashed_token pour l'envoyer
     // nous-mêmes via Resend (domaine vérifié, pas de limite de débit).

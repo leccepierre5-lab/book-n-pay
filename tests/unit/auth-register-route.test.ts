@@ -4,6 +4,10 @@
 // 2. Téléphone invalide → 400, generateLink jamais appelé.
 // 3. Téléphone valide → normalisé avant d'être passé en metadata.
 // 4. Pas de téléphone → ok, chaîne vide en metadata (optionnel).
+// 5. Téléphone déjà associé à un AUTRE compte (contrainte UNIQUE
+//    app_users.phone) → 409 avec message actionnable, generateLink jamais
+//    appelé — au lieu de laisser le trigger handle_new_user avorter en
+//    exception non gérée puis retomber sur le générique 500.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockCheckRateLimit = vi.fn(async (..._args: any[]) => ({ allowed: true, currentCount: 1 }));
@@ -63,6 +67,10 @@ beforeEach(() => {
     data: { properties: { hashed_token: 'tok_abc' }, user: { id: 'user-1' } },
     error: null,
   });
+  // Par défaut : un seul appel .maybeSingle() attendu (lookup existingUser
+  // pour le code de parrainage), cas "pas de téléphone" où le pré-check de
+  // collision est sauté. Les tests avec téléphone écrasent ce mock pour
+  // séquencer 2 appels (pré-check collision PUIS lookup existingUser).
   appUsersChain = makeChain({ id: 'user-1', referral_code: 'BNP-CLIENT1234' });
 });
 
@@ -87,6 +95,10 @@ describe('POST /api/auth/register', () => {
   });
 
   it('téléphone valide avec séparateurs → normalisé avant metadata', async () => {
+    appUsersChain.maybeSingle = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: null }) // pré-check collision : aucun autre compte
+      .mockResolvedValueOnce({ data: { id: 'user-1', referral_code: 'BNP-CLIENT1234' }, error: null });
     const { POST } = await import('@/app/api/auth/register/route');
     const res = await POST(buildRequest({ ...VALID_BODY, phone: '06 12 34 56 78' }) as any);
     expect(res.status).toBe(200);
@@ -110,5 +122,15 @@ describe('POST /api/auth/register', () => {
         }),
       })
     );
+  });
+
+  it('téléphone déjà associé à un autre compte → 409, message actionnable, generateLink jamais appelé', async () => {
+    appUsersChain.maybeSingle = vi.fn().mockResolvedValueOnce({ data: { id: 'other-user' }, error: null });
+    const { POST } = await import('@/app/api/auth/register/route');
+    const res = await POST(buildRequest({ ...VALID_BODY, phone: '0612345678' }) as any);
+    const json = await res.json();
+    expect(res.status).toBe(409);
+    expect(json.error).toContain('déjà associé à un compte');
+    expect(mockGenerateLink).not.toHaveBeenCalled();
   });
 });

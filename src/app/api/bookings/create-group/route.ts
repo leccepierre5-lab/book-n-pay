@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { generateQrCode, generateGroupRef, normalizePhone, isSlotPast, isValidPhoneFormat } from '@/lib/booking-utils';
+import { generateQrCode, generateGroupRef, normalizePhone, isSlotPast, isValidPhoneFormat, logAppUsersUpsertError } from '@/lib/booking-utils';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { createSoloBookingWithOverlapCheck } from '@/lib/booking-solo-overlap';
 import { assignStaffAndCreateBooking } from '@/lib/staff-assignment';
@@ -145,14 +145,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Upsert organizer profile
+    // Upsert organizer profile — même motif que bookings/create/route.ts,
+    // voir logAppUsersUpsertError (src/lib/booking-utils.ts).
     if (authData.user?.id) {
-      await supabaseService.from('app_users').upsert({
+      const { error: upsertError } = await supabaseService.from('app_users').upsert({
         id: authData.user.id,
         name: clientName,
         phone: clientPhone || null,
         role: 'client',
       }, { onConflict: 'id', ignoreDuplicates: true });
+      logAppUsersUpsertError('BookingsCreateGroup', authData.user.id, upsertError);
     }
 
     // Referrer name for organizer (denormalized for pro dashboard)
