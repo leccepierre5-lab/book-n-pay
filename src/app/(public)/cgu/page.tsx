@@ -6,6 +6,14 @@
 // (react-router-dom → next/link).
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { calcFraisGestion } from '@/lib/booking-utils';
+
+// Audit du 15/08 : le barème ci-dessous était recopié en dur, une deuxième
+// source de vérité qui pouvait diverger silencieusement de calcFraisGestion()
+// (déjà utilisée pour l'affichage réel du prix sur /tarifs et au paiement).
+// Un montant par palier suffit à obtenir chaque valeur, les bornes du
+// barème étant celles de la fonction elle-même — voir booking-utils.ts.
+const feeFmt = (price: number) => calcFraisGestion(price).toFixed(2).replace('.', ',');
 
 export const metadata: Metadata = {
   title: "Conditions Générales d'Utilisation et de Vente",
@@ -65,19 +73,19 @@ export default function CGUPage() {
                 <ul className="space-y-1.5 text-xs">
                   <li className="flex justify-between">
                     <span>Prestation ≤ 50 €</span>
-                    <span className="font-semibold text-white">1,99 € TTC</span>
+                    <span className="font-semibold text-white">{feeFmt(50)} € TTC</span>
                   </li>
                   <li className="flex justify-between">
                     <span>Prestation de 50,01 € à 80 €</span>
-                    <span className="font-semibold text-white">2,10 € TTC</span>
+                    <span className="font-semibold text-white">{feeFmt(80)} € TTC</span>
                   </li>
                   <li className="flex justify-between">
                     <span>Prestation de 80,01 € à 100 €</span>
-                    <span className="font-semibold text-white">2,30 € TTC</span>
+                    <span className="font-semibold text-white">{feeFmt(100)} € TTC</span>
                   </li>
                   <li className="flex justify-between">
                     <span>Prestation &gt; 100 € (plafond)</span>
-                    <span className="font-semibold text-white">2,50 € TTC</span>
+                    <span className="font-semibold text-white">{feeFmt(101)} € TTC</span>
                   </li>
                 </ul>
               </div>

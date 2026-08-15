@@ -7,6 +7,8 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import type { Business, BusinessLocation, BusinessPhoto, FlashSlot, Service, Staff } from '@/lib/database.types';
 import { SHOWCASE_SLUGS } from '@/lib/business-helpers';
 import { getParisDateOffsetStr } from '@/lib/booking-utils';
+import { CATEGORIES } from '@/lib/categories';
+export { CATEGORIES };
 
 export interface BusinessWithDetails extends Business {
   services: Service[];
@@ -250,22 +252,6 @@ export const getBusinessBySlug = cache(async (slug: string): Promise<BusinessWit
     staff: (biz.staff ?? []).filter((s) => s.is_active !== false),
   };
 });
-
-export const CATEGORIES = [
-  { id: 'all', label: 'Tout' },
-  { id: 'beaute', label: 'Beauté' },
-  { id: 'bien-etre', label: 'Bien Être' },
-  { id: 'sport', label: 'Sport' },
-  { id: 'sante', label: 'Santé' },
-  { id: 'soins-corps', label: 'Soins du corps' },
-  { id: 'coiffure-barber', label: 'Coiffure & Barber' },
-  { id: 'tatouage-piercing', label: 'Tatouage & Piercing' },
-  { id: 'coaching', label: 'Coaching' },
-  { id: 'animaux', label: 'Animaux' },
-  { id: 'beaute-domicile', label: 'Beauté à domicile' },
-  { id: 'photographie', label: 'Photographie' },
-  { id: 'autre', label: 'Autre' },
-];
 
 // Distingue un vrai business (jamais indexable ni listé dans le sitemap si faux).
 // Critère : owner_id — posé de façon non conditionnelle par le SEUL point de

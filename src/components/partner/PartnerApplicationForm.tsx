@@ -6,25 +6,38 @@ import { CGU_VERSION } from '@/lib/legal';
 import { getPlanConfig } from '@/lib/plans-config';
 import { PRACTITIONERS_COUNT_OPTIONS, BOOKINGS_ESTIMATE_OPTIONS } from '@/lib/partner-plan-suggestion';
 import { PHONE_INPUT_PATTERN, PHONE_INPUT_TITLE } from '@/lib/booking-utils';
+import { CATEGORIES as CANONICAL_CATEGORIES } from '@/lib/categories';
 
-const CATEGORIES = [
-  { value: 'beaute', label: 'Beauté', sub: 'Coiffure, esthétique, barber, onglerie…' },
-  { value: 'bien-etre', label: 'Bien-être', sub: 'Massage, yoga, ostéo, méditation…' },
-  { value: 'sport', label: 'Sport & fitness', sub: 'Coaching, gym, natation, arts martiaux…' },
-  { value: 'sante', label: 'Santé & médecines douces', sub: 'Ostéopathe, naturopathe, kinésiologue, réflexologue…' },
-  { value: 'soins-corps', label: 'Soins du corps', sub: 'Spa, hammam, épilation, UV, balnéo…' },
-  { value: 'coiffure-barber', label: 'Coiffure & Barber', sub: 'Coiffeur·se, barbier, afro, extensions…' },
-  { value: 'tatouage-piercing', label: 'Tatouage & Piercing', sub: 'Tatoueur, perceur, maquillage permanent…' },
-  { value: 'coaching', label: 'Coaching & développement personnel', sub: 'Coach de vie, hypnothérapeute, sophrologue…' },
-  { value: 'animaux', label: 'Animaux', sub: 'Toiletteur, pet-sitter, éducateur canin…' },
-  { value: 'beaute-domicile', label: 'Beauté à domicile', sub: 'Coiffure, esthétique, manucure à domicile…' },
-  { value: 'photographie', label: 'Photographie', sub: 'Portrait, mariage, nouveau-né, entreprise…' },
-  { value: 'autre', label: 'Autre', sub: 'Un secteur qui ne correspond à aucune catégorie ci-dessus…' },
-] as const;
+// Référentiel des catégories : source unique dans src/lib/categories.ts
+// (partagée avec /recherche via catalog.ts) — audit du 15/08, ce fichier
+// avait sa propre copie avec des libellés divergents ("Bien-être" vs "Bien
+// Être", "Sport & fitness" vs "Sport", "Coaching & développement personnel"
+// vs "Coaching") et une description qui mentionnait "barber" sous "Beauté"
+// alors que "Coiffure & Barber" existe déjà comme catégorie séparée
+// (retiré ci-dessous). "all" exclu : ce n'est pas une catégorie qu'un pro
+// peut choisir, seulement un filtre "tout" côté /recherche. Les
+// descriptions (`sub`) restent propres à ce formulaire d'onboarding — pas
+// affichées ailleurs, pas dupliquées.
+const CATEGORIES = CANONICAL_CATEGORIES.filter((c) => c.id !== 'all');
+
+const CATEGORY_DESCRIPTIONS: Partial<Record<(typeof CATEGORIES)[number]['id'], string>> = {
+  beaute: 'Coiffure, esthétique, onglerie…',
+  'bien-etre': 'Massage, yoga, ostéo, méditation…',
+  sport: 'Coaching, gym, natation, arts martiaux…',
+  sante: 'Ostéopathe, naturopathe, kinésiologue, réflexologue…',
+  'soins-corps': 'Spa, hammam, épilation, UV, balnéo…',
+  'coiffure-barber': 'Coiffeur·se, barbier, afro, extensions…',
+  'tatouage-piercing': 'Tatoueur, perceur, maquillage permanent…',
+  coaching: 'Coach de vie, hypnothérapeute, sophrologue…',
+  animaux: 'Toiletteur, pet-sitter, éducateur canin…',
+  'beaute-domicile': 'Coiffure, esthétique, manucure à domicile…',
+  photographie: 'Portrait, mariage, nouveau-né, entreprise…',
+  autre: 'Un secteur qui ne correspond à aucune catégorie ci-dessus…',
+};
 
 // Suggestions affichées comme exemple dans le champ "type d'établissement"
 // une fois la catégorie sélectionnée.
-const TYPE_PLACEHOLDERS: Partial<Record<(typeof CATEGORIES)[number]['value'], string>> = {
+const TYPE_PLACEHOLDERS: Partial<Record<(typeof CATEGORIES)[number]['id'], string>> = {
   sante: 'ex : Ostéopathe, Naturopathe, Réflexologue, Énergéticien/Reiki, Kinésiologue, Magnétiseur, Acupressure/Shiatsu/Médecine chinoise, Ayurveda, Aromathérapie…',
   'soins-corps': 'ex : Spa/Institut, Hammam/Sauna, Épilation, UV/Bronzage, Balnéo/Bains, Masseur bien-être, Drainage lymphatique…',
   'coiffure-barber': 'ex : Coiffeur·se, Barbier, Coiffeur afro, Extensions/Tresses…',
@@ -45,7 +58,7 @@ export default function PartnerApplicationForm() {
     instagram: '',
     website: '',
   });
-  const [category, setCategory] = useState<(typeof CATEGORIES)[number]['value'] | ''>('');
+  const [category, setCategory] = useState<(typeof CATEGORIES)[number]['id'] | ''>('');
   const [categoryLabel, setCategoryLabel] = useState('');
   const [bizType, setBizType] = useState('');
   const [bookingsEstimate, setBookingsEstimate] = useState<'0-80' | '81-300' | '300+' | ''>('');
@@ -157,11 +170,11 @@ export default function PartnerApplicationForm() {
           Votre activité <span className="text-red-400">*</span>
         </h2>
         <div className="space-y-2">
-          {CATEGORIES.map(({ value, label, sub }) => (
+          {CATEGORIES.map(({ id, label }) => (
             <label
-              key={value}
+              key={id}
               className={`flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all ${
-                category === value
+                category === id
                   ? 'border-mint-500/50 bg-mint-500/10'
                   : 'border-white/[0.08] bg-white/[0.02] hover:border-white/15'
               }`}
@@ -169,14 +182,14 @@ export default function PartnerApplicationForm() {
               <input
                 type="radio"
                 name="category"
-                value={value}
-                checked={category === value}
-                onChange={() => setCategory(value)}
+                value={id}
+                checked={category === id}
+                onChange={() => setCategory(id)}
                 className="mt-0.5 accent-mint-500"
               />
               <div>
                 <p className="text-sm font-medium text-white">{label}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">{sub}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">{CATEGORY_DESCRIPTIONS[id]}</p>
               </div>
             </label>
           ))}
