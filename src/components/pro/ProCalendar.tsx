@@ -47,9 +47,17 @@ interface BookingRow {
   time: string;
   service_name: string;
   staff_name: string | null;
+  staff_id: string | null;
+  group_ref: string | null;
   booking_members: BookingMemberRow[];
   services?: { price: number } | null;
 }
+
+// Doit rester synchro avec RESCHEDULE_MIN_MARGIN_HOURS (src/lib/reschedule.ts)
+// — dupliqué ici plutôt qu'importé pour ne pas tirer `crypto`/le module
+// serveur dans le bundle client. Le serveur reste seul juge (route
+// pro/reschedule-propose) : cette valeur ne sert qu'à l'affichage.
+const RESCHEDULE_MIN_MARGIN_HOURS = 2;
 
 function exportDayToICS(date: string, dayBookings: BookingRow[]) {
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BooknPay//Pro//FR'];
@@ -92,6 +100,60 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
   const [cancelTarget, setCancelTarget] = useState<{ booking: BookingRow; member: BookingMemberRow } | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+
+  // Report de RDV (migration 0055, pro/reschedule-propose/route.ts) — le pro
+  // propose seulement, le client doit accepter via le lien reçu par email.
+  const [rescheduleTarget, setRescheduleTarget] = useState<BookingRow | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [proposing, setProposing] = useState(false);
+  const [proposeError, setProposeError] = useState<string | null>(null);
+  const [proposeSuccess, setProposeSuccess] = useState(false);
+  const [proposedBookingIds, setProposedBookingIds] = useState<Set<string>>(new Set());
+
+  const openReschedule = useCallback((booking: BookingRow) => {
+    setRescheduleTarget(booking);
+    setRescheduleDate('');
+    setRescheduleTime('');
+    setRescheduleReason('');
+    setProposeError(null);
+    setProposeSuccess(false);
+  }, []);
+
+  const closeReschedule = useCallback(() => {
+    if (proposing) return;
+    setRescheduleTarget(null);
+  }, [proposing]);
+
+  const submitReschedule = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!rescheduleTarget) return;
+      setProposing(true);
+      setProposeError(null);
+      fetch('/api/pro/reschedule-propose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId: rescheduleTarget.id,
+          proposedDate: rescheduleDate,
+          proposedTime: rescheduleTime,
+          staffId: rescheduleTarget.staff_id ?? null,
+          reason: rescheduleReason.trim() || undefined,
+        }),
+      })
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "L'envoi de la proposition a échoué.");
+          setProposeSuccess(true);
+          setProposedBookingIds((prev) => new Set(prev).add(rescheduleTarget.id));
+        })
+        .catch((err: Error) => setProposeError(err.message))
+        .finally(() => setProposing(false));
+    },
+    [rescheduleTarget, rescheduleDate, rescheduleTime, rescheduleReason]
+  );
 
   const confirmCancelBooking = useCallback(() => {
     if (!cancelTarget) return;
@@ -324,7 +386,13 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
             <div className="max-h-72 divide-y divide-white/10 overflow-y-auto">
               {selectedDayBookings.map((b) => {
                 const activeMembers = b.booking_members?.filter((m) => m.status !== 'cancelled') || [];
-                const isFutureRdv = parseParisDatetime(b.date, b.time).getTime() > Date.now();
+                const rdvMs = parseParisDatetime(b.date, b.time).getTime();
+                const isFutureRdv = rdvMs > Date.now();
+                const marginHours = (rdvMs - Date.now()) / (1000 * 60 * 60);
+                // Portée décision 15/08 : réservations individuelles uniquement.
+                const canReschedule = isFutureRdv && !b.group_ref;
+                const rescheduleTooSoon = canReschedule && marginHours < RESCHEDULE_MIN_MARGIN_HOURS;
+                const alreadyProposed = proposedBookingIds.has(b.id);
                 return (
                   <div key={b.id} className="px-4 py-3">
                     <div className="mb-2 flex items-start gap-3">
@@ -368,6 +436,19 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
                                       Annuler
                                     </button>
                                   )}
+                                  {canReschedule && !rescheduleTooSoon && !alreadyProposed && (
+                                    <button
+                                      onClick={() => openReschedule(b)}
+                                      className="rounded-full border border-sky-500/40 px-2.5 py-0.5 text-[10px] font-semibold text-sky-400 hover:bg-sky-500/10"
+                                    >
+                                      Reporter
+                                    </button>
+                                  )}
+                                  {canReschedule && alreadyProposed && (
+                                    <span className="rounded-full border border-sky-500/20 px-2.5 py-0.5 text-[10px] font-semibold text-sky-400/60">
+                                      Report envoyé
+                                    </span>
+                                  )}
                                 </>
                               ) : (
                                 <span
@@ -382,6 +463,11 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
                         );
                       })}
                     </div>
+                    {rescheduleTooSoon && (
+                      <p className="mt-1.5 pl-[60px] text-[10px] text-white/40">
+                        Report impossible à moins de 2h du RDV — utilise l&apos;annulation directe.
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -477,6 +563,102 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
               {cancelling ? 'Annulation...' : 'Confirmer l\'annulation'}
             </button>
           </div>
+        </Modal>
+      )}
+
+      {rescheduleTarget && (
+        <Modal
+          onClose={closeReschedule}
+          overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
+          panelClassName="w-full max-w-sm rounded-2xl border border-white/10 bg-navy-900 p-5"
+          ariaLabel="Proposer un nouveau créneau"
+          closeOnBackdrop={!proposing}
+        >
+          {proposeSuccess ? (
+            <>
+              <h3 className="text-sm font-semibold text-white">Proposition envoyée</h3>
+              <p className="mt-2 text-xs text-white/60">
+                Le client a reçu un email avec le nouveau créneau. Le RDV reste sur{' '}
+                <span className="font-semibold text-white">
+                  {rescheduleTarget.date} à {formatTime(rescheduleTarget.time)}
+                </span>{' '}
+                tant qu&apos;il n&apos;a pas répondu — rien ne change de ton côté avant son acceptation.
+              </p>
+              <button
+                onClick={closeReschedule}
+                className="mt-4 w-full rounded-xl bg-navy-800 border border-white/[0.08] py-2.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors"
+              >
+                Fermer
+              </button>
+            </>
+          ) : (
+            <form onSubmit={submitReschedule}>
+              <h3 className="text-sm font-semibold text-white">Proposer un nouveau créneau</h3>
+              <p className="mt-2 text-xs text-white/60">
+                RDV actuel :{' '}
+                <span className="font-semibold text-white">
+                  {rescheduleTarget.date} à {formatTime(rescheduleTarget.time)}
+                </span>{' '}
+                — {rescheduleTarget.service_name}
+              </p>
+              <p className="mt-2 rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-[11px] font-medium text-sky-300">
+                Ceci n&apos;est qu&apos;une proposition : le client doit l&apos;accepter en ligne. Le RDV reste
+                inchangé tant qu&apos;il n&apos;a pas répondu ou après un refus/expiration.
+              </p>
+
+              <label className="mt-3 block text-[11px] font-medium text-white/50">Nouvelle date</label>
+              <input
+                type="date"
+                required
+                min={new Date().toISOString().slice(0, 10)}
+                value={rescheduleDate}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-sky-500"
+              />
+
+              <label className="mt-3 block text-[11px] font-medium text-white/50">Nouvelle heure</label>
+              <input
+                type="time"
+                required
+                value={rescheduleTime}
+                onChange={(e) => setRescheduleTime(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-sky-500"
+              />
+
+              <label className="mt-3 block text-[11px] font-medium text-white/50">Motif (optionnel, visible par le client)</label>
+              <textarea
+                rows={2}
+                value={rescheduleReason}
+                onChange={(e) => setRescheduleReason(e.target.value)}
+                placeholder="Ex. absence imprévue"
+                className="mt-1 w-full resize-none rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-sky-500"
+              />
+
+              {proposeError && (
+                <p role="alert" className="mt-2 text-[11px] font-medium text-rose-400">
+                  {proposeError}
+                </p>
+              )}
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeReschedule}
+                  disabled={proposing}
+                  className="flex-1 rounded-xl border border-white/[0.08] bg-navy-800 py-2.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Retour
+                </button>
+                <button
+                  type="submit"
+                  disabled={proposing}
+                  className="flex-1 rounded-xl bg-sky-600 py-2.5 text-xs font-semibold text-white hover:bg-sky-500 transition-colors disabled:opacity-50"
+                >
+                  {proposing ? 'Envoi...' : 'Envoyer la proposition'}
+                </button>
+              </div>
+            </form>
+          )}
         </Modal>
       )}
     </div>

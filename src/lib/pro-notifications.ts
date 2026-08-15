@@ -130,6 +130,53 @@ export async function notifyProBookingCancelled(
 // distinct de `noShowAuto` (AlertsPanel.tsx, alerte PRÉDICTIVE "5 min de
 // retard", temps réel) : celui-ci confirme un no-show déjà acté par le cron
 // (15 min après l'heure du RDV), un événement différent malgré le nom voisin.
+// Déclenché sur les 3 issues d'une proposition de report où LE PRO doit agir
+// (bookings/reschedule/decline, bookings/reschedule/accept si le créneau
+// n'est plus libre, cron/reschedule-expire) — jamais sur la proposition
+// elle-même (c'est le pro qui l'a créée) ni sur une acceptation réussie
+// (rien à faire côté pro, le client a juste son nouveau créneau). Toggle
+// dédié 'rescheduleResponse', même convention `!== false` que les autres —
+// pas encore surfacé dans NotificationsConfig.tsx (même statut que
+// paymentReceived/groupPending avant elles : la clé existe et fonctionne,
+// l'UI de réglage est un suivi séparé).
+export async function notifyProRescheduleOutcome(
+  supabase: SupabaseClient,
+  bookingId: string,
+  opts: {
+    outcome: 'declined' | 'slot_taken' | 'expired';
+    proposedDate: string;
+    proposedTime: string;
+  }
+): Promise<void> {
+  try {
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('biz_id, biz_name, service_name, staff_name, date, time')
+      .eq('id', bookingId)
+      .maybeSingle<NotifBookingInfo>();
+    if (!booking) return;
+
+    const ownerEmail = await resolveNotifiableOwnerEmail(supabase, booking.biz_id, 'rescheduleResponse');
+    if (!ownerEmail) return;
+
+    const proposedLine = `📅 Créneau proposé : ${formatDateFr(opts.proposedDate)} à ${formatTime(opts.proposedTime)}`;
+    const outcomeLine =
+      opts.outcome === 'declined'
+        ? "Le client a refusé le report. La réservation reste sur son créneau d'origine."
+        : opts.outcome === 'slot_taken'
+          ? 'Le client a accepté, mais ce créneau vient juste d\'être pris entre-temps. La réservation reste sur son créneau d\'origine — reproposez un autre créneau ou annulez.'
+          : "Le client n'a pas répondu dans le délai imparti. La réservation reste sur son créneau d'origine.";
+
+    await sendEmail({
+      to: ownerEmail,
+      subject: `📅 Report de RDV — ${opts.outcome === 'declined' ? 'refusé' : opts.outcome === 'slot_taken' ? 'créneau indisponible' : 'sans réponse'} — ${booking.service_name}`,
+      text: `Bonjour,\n\n${outcomeLine}\n\n💆 Prestation : ${booking.service_name}${booking.staff_name ? `\n👤 Praticien : ${booking.staff_name}` : ''}\n📅 Créneau d'origine : ${formatDateFr(booking.date)} à ${formatTime(booking.time)}\n${proposedLine}\n\nL'équipe Book'nPay`,
+    }).catch(() => {});
+  } catch (err: any) {
+    console.error('[ProNotif] notifyProRescheduleOutcome échouée:', err.message);
+  }
+}
+
 export async function notifyProNoShow(
   supabase: SupabaseClient,
   bookingId: string,
