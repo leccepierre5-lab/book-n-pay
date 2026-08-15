@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { PHONE_INPUT_PATTERN, PHONE_INPUT_TITLE } from '@/lib/booking-utils';
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -110,6 +111,8 @@ export default function RegisterForm() {
         placeholder="Téléphone"
         aria-label="Téléphone"
         autoComplete="tel"
+        pattern={PHONE_INPUT_PATTERN}
+        title={PHONE_INPUT_TITLE}
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
         className={inputClass}

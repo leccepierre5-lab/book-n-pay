@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { generateQrCode, generateGroupRef, normalizePhone, isSlotPast } from '@/lib/booking-utils';
+import { generateQrCode, generateGroupRef, normalizePhone, isSlotPast, isValidPhoneFormat } from '@/lib/booking-utils';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { createSoloBookingWithOverlapCheck } from '@/lib/booking-solo-overlap';
 import { assignStaffAndCreateBooking } from '@/lib/staff-assignment';
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       bizId, bizName, serviceId, serviceName, staffId, staffName,
-      date, slots, mode, clientName, clientPhone, clientEmail,
+      date, slots, mode, clientName, clientPhone: rawClientPhone, clientEmail,
       guestNames = [],   // Mode A: optional participant names
       guests = [],       // Mode B: [{ name?, phone }] for each invited guest
     } = body;
@@ -59,6 +59,19 @@ export async function POST(req: NextRequest) {
     }
     if (mode === 'b' && guests.length !== slots.length - 1) {
       return NextResponse.json({ error: 'Nombre d\'invités incorrect pour le mode B' }, { status: 400 });
+    }
+    // Téléphone organisateur optionnel mais formaté si fourni ; en mode B,
+    // le téléphone de chaque invité est requis par le front (StepPayment)
+    // donc validé strictement ici aussi — voir isValidPhoneFormat, audit 15/08.
+    if (rawClientPhone && !isValidPhoneFormat(rawClientPhone)) {
+      return NextResponse.json({ error: 'Numéro de téléphone invalide.' }, { status: 400 });
+    }
+    const clientPhone = rawClientPhone ? normalizePhone(rawClientPhone) : null;
+    if (mode === 'b') {
+      const invalidGuest = guests.find((g: { phone?: string }) => !g.phone || !isValidPhoneFormat(g.phone));
+      if (invalidGuest) {
+        return NextResponse.json({ error: 'Numéro de téléphone invalide pour un ou plusieurs invités.' }, { status: 400 });
+      }
     }
     // Même garde-fou que bookings/create/route.ts — un groupe peut couvrir
     // plusieurs créneaux consécutifs (ex. 09h30 → 11h00), il suffit qu'UN

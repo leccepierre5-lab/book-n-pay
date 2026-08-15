@@ -6,7 +6,7 @@
 // (un invité non connecté doit pouvoir rejoindre un groupe via un lien).
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { calcFraisGestion, generateQrCode, normalizePhone, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
+import { calcFraisGestion, generateQrCode, normalizePhone, isValidPhoneFormat, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import { constantTimeEqual } from '@/lib/constant-time';
@@ -26,10 +26,17 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { action, bookingId, memberId, memberData, token } = body;
 
-  // Normalise le téléphone dès la réception — voir normalizePhone() pour
-  // le détail du problème que ça résout (comparaisons phone === phone
-  // fragiles sans format unique en base).
-  if (memberData?.phone) {
+  // Valide puis normalise le téléphone dès la réception — voir
+  // normalizePhone() pour le détail du problème que la normalisation
+  // résout (comparaisons phone === phone fragiles sans format unique en
+  // base), et isValidPhoneFormat() pour le format rejeté (audit 15/08,
+  // "okokokok" accepté jusqu'ici sans aucun contrôle). Un membre de groupe
+  // saisit toujours un téléphone (champ requis côté front) — invalide ici
+  // veut dire vraiment invalide, jamais vide par omission légitime.
+  if (memberData?.phone !== undefined) {
+    if (!memberData.phone || !isValidPhoneFormat(memberData.phone)) {
+      return NextResponse.json({ error: 'Numéro de téléphone invalide.' }, { status: 400 });
+    }
     memberData.phone = normalizePhone(memberData.phone);
   }
 

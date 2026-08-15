@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { translateAuthError } from '@/lib/auth-errors';
+import { PHONE_INPUT_PATTERN, PHONE_INPUT_TITLE } from '@/lib/booking-utils';
 
 export default function AuthWall({ onAuth }: { onAuth: () => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -122,6 +123,8 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
             placeholder="Téléphone"
             aria-label="Téléphone"
             autoComplete="tel"
+            pattern={PHONE_INPUT_PATTERN}
+            title={PHONE_INPUT_TITLE}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className={inputClass}

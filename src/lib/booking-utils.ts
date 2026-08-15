@@ -26,12 +26,49 @@ export function normalizePhone(raw: string): string {
   return digits;
 }
 
+// Format FR + DOM-TOM accepté (fixe et mobile) : 0 ou +33 pour la
+// métropole, +590/+594/+596/+262/+269 pour Guadeloupe/Saint-Martin/
+// Saint-Barthélemy, Guyane, Martinique, Réunion et Mayotte — 9 chiffres
+// significatifs après l'indicatif, premier chiffre non nul. Espaces,
+// points et tirets tolérés en SAISIE (retirés avant le test) ; la forme
+// stockée, elle, doit toujours passer par normalizePhone() après validation
+// — jamais la saisie brute. Audit du 15/08 (bug "okokokok" accepté sans
+// validation à l'inscription) : c'est la seule barrière de FORMAT du repo,
+// distincte de phonesMatch() ci-dessous qui compare deux numéros déjà
+// stockés entre eux.
+const PHONE_FORMAT_RE = /^(?:0|\+(?:33|590|594|596|262|269))[1-9]\d{8}$/;
+
+export function isValidPhoneFormat(raw: string): boolean {
+  return PHONE_FORMAT_RE.test(raw.replace(/[\s.-]/g, ''));
+}
+
+// Pour l'attribut HTML `pattern` des champs `type="tel"` — confort UX
+// uniquement (évite un aller-retour serveur sur l'erreur la plus commune),
+// jamais la validation qui compte : le serveur (isValidPhoneFormat ci-
+// dessus) reste seul juge. Volontairement plus permissif que le regex
+// serveur strict (accepte espaces/points comme séparateurs entre CHAQUE
+// chiffre, pas seulement par groupes de deux) pour ne jamais rejeter un
+// numéro que le serveur accepterait.
+export const PHONE_INPUT_PATTERN = '(0|\\+(33|590|594|596|262|269))[ .]?[1-9]([ .]?[0-9]){8}';
+export const PHONE_INPUT_TITLE = 'Numéro français ou DOM-TOM, ex. 06 12 34 56 78';
+
 export function phonesMatch(
   a: string | null | undefined,
   b: string | null | undefined
 ): boolean {
   if (!a || !b) return false;
-  return normalizePhone(a) === normalizePhone(b);
+  const na = normalizePhone(a);
+  const nb = normalizePhone(b);
+  // Faille d'autorisation trouvée en audit le 15/08 : le garde-fou ci-dessus
+  // ne rejette que les chaînes vides D'ORIGINE, pas celles qui LE DEVIENNENT
+  // après normalisation. normalizePhone() sur une saisie sans aucun chiffre
+  // ("okokokok") renvoie '' — donc deux téléphones invalides DIFFÉRENTS
+  // matchaient entre eux ('' === ''), y compris dans des vérifications
+  // d'autorisation réelles (bookings/cancel, post-visit-status/ack : "ce
+  // client est-il bien le membre visé ?"). Un champ que l'utilisateur
+  // choisit lui-même ne doit jamais pouvoir produire un match par ce biais.
+  if (!na || !nb) return false;
+  return na === nb;
 }
 
 // `bookings.time`/`flash_slots.time` sont des colonnes Postgres de type `time`,

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
 import type { Service, Staff } from '@/lib/database.types';
-import { calcFraisGestion, normalizePhone, isSlotPast } from '@/lib/booking-utils';
+import { calcFraisGestion, normalizePhone, isSlotPast, isValidPhoneFormat, PHONE_INPUT_PATTERN, PHONE_INPUT_TITLE } from '@/lib/booking-utils';
 import { createClient } from '@/lib/supabase/client';
 import { isNonRealBusiness } from '@/lib/business-helpers';
 import { RETRACTION_CONSENT_TEXT } from '@/lib/legal';
@@ -502,7 +502,10 @@ function ModeBPayment({
 
   const fraisGestion = calcFraisGestion(service.price);
   const myTotal = service.deposit + fraisGestion;
-  const allPhonesSet = guests.every((g) => g.phone.trim().length >= 10);
+  // Longueur ≥10 laissait passer "okokokokok" (audit 15/08) — format réel
+  // désormais requis pour activer le bouton, cohérent avec la validation
+  // serveur (isValidPhoneFormat, seule qui compte réellement).
+  const allPhonesSet = guests.every((g) => isValidPhoneFormat(g.phone.trim()));
 
   const updateGuest = (idx: number, field: keyof GuestInfo, value: string) => {
     setGuests((prev) => {
@@ -673,6 +676,8 @@ function ModeBPayment({
             aria-label={`Téléphone de l'invité ${idx + 1}, obligatoire`}
             autoComplete="off"
             aria-describedby={!allPhonesSet ? 'guest-phone-warning' : undefined}
+            pattern={PHONE_INPUT_PATTERN}
+            title={PHONE_INPUT_TITLE}
             required
             value={guest.phone}
             onChange={(e) => updateGuest(idx, 'phone', e.target.value)}

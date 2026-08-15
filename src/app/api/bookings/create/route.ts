@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { generateQrCode, isSlotPast, INVITE_EXPIRY_MS } from '@/lib/booking-utils';
+import { generateQrCode, isSlotPast, INVITE_EXPIRY_MS, isValidPhoneFormat, normalizePhone } from '@/lib/booking-utils';
 import { computeStaffAvailabilityForDay, assignStaffAndCreateBooking } from '@/lib/staff-assignment';
 import { createBookingWithCapacityCheck } from '@/lib/booking-capacity';
 import { createSoloBookingWithOverlapCheck } from '@/lib/booking-solo-overlap';
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { bizId, bizName, serviceId, serviceName, staffId, staffName, date, time, clientPhone, clientEmail } = body;
+    const { bizId, bizName, serviceId, serviceName, staffId, staffName, date, time, clientPhone: rawClientPhone, clientEmail } = body;
     // Fallback serveur : user_metadata ou email si le profil app_users n'existe pas encore
     const clientName: string =
       body.clientName ||
@@ -38,6 +38,13 @@ export async function POST(req: NextRequest) {
     if (!bizId || !serviceId || !date || !time) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 });
     }
+    // Téléphone optionnel, mais s'il est fourni il doit avoir un format
+    // exploitable (voir isValidPhoneFormat, audit 15/08) — stocké normalisé,
+    // jamais la saisie brute.
+    if (rawClientPhone && !isValidPhoneFormat(rawClientPhone)) {
+      return NextResponse.json({ error: 'Numéro de téléphone invalide.' }, { status: 400 });
+    }
+    const clientPhone = rawClientPhone ? normalizePhone(rawClientPhone) : null;
 
     // Garde-fou serveur — le front désactive déjà les créneaux passés
     // (StepDateTime.tsx), mais un state figé (onglet resté ouvert, soumission

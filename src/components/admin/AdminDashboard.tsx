@@ -7,6 +7,7 @@ import { BNP_PLANS, getPlanConfig } from '@/lib/plans-config';
 import type { PlanKey } from '@/lib/plans-config';
 import { getSuggestedPlanFromPractitionersCount, getPractitionersCountLabel, getBookingsEstimateLabel } from '@/lib/partner-plan-suggestion';
 import { createClient } from '@/lib/supabase/client';
+import { isValidPhoneFormat } from '@/lib/booking-utils';
 
 interface BusinessRow {
   id: string;
@@ -218,6 +219,21 @@ export default function AdminDashboard({
                     {app.status}
                   </span>
                 </div>
+
+                {/* Audit du 15/08 : un téléphone invalide ("okokokok") saisi
+                    à la candidature n'est jamais copié sur la fiche pro
+                    (businesses.phone reste null plutôt qu'injoignable) —
+                    mais ça veut dire un pro approuvé SANS numéro de contact
+                    public, sans que personne ne le voie. Ce badge est calculé
+                    en direct depuis partner_applications.phone (jamais
+                    modifié, contrairement à businesses.phone) : visible que
+                    la candidature soit encore pending (l'admin peut demander
+                    la correction avant d'approuver) ou déjà approuvée. */}
+                {app.phone && !isValidPhoneFormat(app.phone) && (
+                  <p className="mb-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-medium text-amber-300">
+                    ⚠️ Téléphone invalide ({app.phone}) — écarté de la fiche pro si approuvée, aucun numéro de contact public.
+                  </p>
+                )}
 
                 {app.status === 'pending' && approvingId !== app.id && (
                   <div className="flex gap-2">

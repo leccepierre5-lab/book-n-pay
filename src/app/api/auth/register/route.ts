@@ -4,6 +4,7 @@ import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond, logAndRespondAuthError } from '@/lib/api-error';
 import { CGU_VERSION } from '@/lib/legal';
+import { isValidPhoneFormat, normalizePhone } from '@/lib/booking-utils';
 
 const COMBINING_MARKS = /[̀-ͯ]/g;
 
@@ -34,6 +35,13 @@ export async function POST(req: NextRequest) {
     if (cguAccepted !== true) {
       return NextResponse.json({ error: 'Vous devez accepter les CGU/CGV pour créer un compte.' }, { status: 400 });
     }
+    // Téléphone optionnel à l'inscription, mais s'il est fourni il doit avoir
+    // un format exploitable — voir isValidPhoneFormat() (audit 15/08, "okokokok"
+    // accepté jusqu'ici sans aucun contrôle).
+    if (phone && !isValidPhoneFormat(phone)) {
+      return NextResponse.json({ error: 'Numéro de téléphone invalide.' }, { status: 400 });
+    }
+    const normalizedPhone = phone ? normalizePhone(phone) : '';
 
     const supabase = createServiceRoleClient();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://book-n-pay-next.vercel.app';
@@ -48,7 +56,7 @@ export async function POST(req: NextRequest) {
       options: {
         data: {
           name: (name || '').trim(),
-          phone: phone || '',
+          phone: normalizedPhone,
           role: 'client',
           referrer_code: referralCode || undefined,
         },

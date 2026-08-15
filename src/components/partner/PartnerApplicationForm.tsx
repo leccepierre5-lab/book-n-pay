@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { CGU_VERSION } from '@/lib/legal';
 import { getPlanConfig } from '@/lib/plans-config';
 import { PRACTITIONERS_COUNT_OPTIONS, BOOKINGS_ESTIMATE_OPTIONS } from '@/lib/partner-plan-suggestion';
+import { PHONE_INPUT_PATTERN, PHONE_INPUT_TITLE } from '@/lib/booking-utils';
 
 const CATEGORIES = [
   { value: 'beaute', label: 'Beauté', sub: 'Coiffure, esthétique, barber, onglerie…' },
@@ -138,7 +139,16 @@ export default function PartnerApplicationForm() {
 
         <input placeholder="Nom du gérant *" value={form.gerant} onChange={(e) => setForm({ ...form, gerant: e.target.value })} required className={inputClass} />
         <input type="email" placeholder="Email professionnel *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required className={inputClass} />
-        <input type="tel" placeholder="Téléphone *" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required className={inputClass} />
+        <input
+          type="tel"
+          placeholder="Téléphone *"
+          pattern={PHONE_INPUT_PATTERN}
+          title={PHONE_INPUT_TITLE}
+          value={form.phone}
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          required
+          className={inputClass}
+        />
       </section>
 
       {/* Catégorie — obligatoire */}

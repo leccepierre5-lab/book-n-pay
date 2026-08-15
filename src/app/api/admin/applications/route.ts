@@ -8,7 +8,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail, emailTemplate, escapeHtml } from '@/lib/email/send';
 import { getPlanConfig, getEngagementEndDate } from '@/lib/plans-config';
 import { logAndRespond, logAndRespondAuthError } from '@/lib/api-error';
-import { toParisDateStr } from '@/lib/booking-utils';
+import { toParisDateStr, isValidPhoneFormat, normalizePhone } from '@/lib/booking-utils';
 
 function slugify(text: string): string {
   return (text || '')
@@ -162,6 +162,16 @@ export async function POST(req: NextRequest) {
       slug = `${baseSlug}-${i}`;
     }
 
+    // Visible aussi dans /admin (badge sur la candidature, calculé depuis
+    // partner_applications.phone qui n'est jamais modifié) — ce log est le
+    // filet côté serveur, pas la seule trace.
+    const phoneRejected = !!app.phone && !isValidPhoneFormat(app.phone);
+    if (phoneRejected) {
+      console.warn(
+        `[AdminApplications] Téléphone invalide écarté à l'approbation — candidature ${applicationId} (${app.etablissement}) : "${app.phone}"`
+      );
+    }
+
     // 3. Créer le business (non publié — le pro finalise via l'onboarding)
     const { data: biz, error: bizError } = await service
       .from('businesses')
@@ -177,7 +187,14 @@ export async function POST(req: NextRequest) {
         frozen: false,
         instagram: app.instagram ?? null,
         website: app.website ?? null,
-        phone: app.phone ?? null,
+        // partner_applications.phone est saisi via un insert direct côté
+        // client (PartnerApplicationForm.tsx, pas de route API entre les
+        // deux) — jamais validé côté serveur avant ce point. Un format
+        // invalide ("okokokok") deviendrait sinon le numéro de contact
+        // PUBLIC affiché sur la fiche pro (audit 15/08) : on ne bloque pas
+        // l'approbation pour ça (le candidat n'est pas là pour corriger),
+        // on n'affiche simplement rien plutôt qu'un numéro injoignable.
+        phone: phoneRejected ? null : (app.phone ? normalizePhone(app.phone) : null),
         google_place_url: app.google_maps_url ?? null,
         open_days: deriveOpenDays(app.creneaux as Creneau[] | null),
       })
@@ -282,7 +299,7 @@ export async function POST(req: NextRequest) {
     });
 
     console.log(`[AdminApplications] ${app.etablissement} approuvé — bizId=${biz.id} plan=${planKey}`);
-    return NextResponse.json({ ok: true, bizId: biz.id, proUserId });
+    return NextResponse.json({ ok: true, bizId: biz.id, proUserId, phoneRejected });
   } catch (err: any) {
     return logAndRespond('[AdminApplications]', err);
   }

@@ -8,7 +8,7 @@
 // animations avancées — l'original avait beaucoup plus de polish visuel.
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatTime } from '@/lib/booking-utils';
+import { formatTime, PHONE_INPUT_PATTERN, PHONE_INPUT_TITLE } from '@/lib/booking-utils';
 
 interface Member {
   id: string;
@@ -230,6 +230,8 @@ export default function JoinGroupClient({
             <input
               type="tel"
               placeholder="Ton téléphone"
+              pattern={PHONE_INPUT_PATTERN}
+              title={PHONE_INPUT_TITLE}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               required
