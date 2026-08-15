@@ -59,6 +59,16 @@ export async function cancelBookingIfNoActiveMembers(
 // encore résolu et doivent bloquer la complétion. Un no-show ne doit jamais
 // laisser un booking bloqué 'active' pour toujours : le RDV a bien eu lieu
 // (à l'heure prévue), le client n'est simplement pas venu.
+//
+// Hypothèse posée le 15/08, à REVÉRIFIER si elle change : à ce jour,
+// AUCUN code ne lit bookings.status==='completed' (vérifié par grep dans
+// tout le repo) — c'est ce qui rend inoffensif le cas "tous les membres en
+// no_show → completed quand même" ci-dessus (personne ne le compte
+// aujourd'hui comme une prestation réalisée). Le jour où un écran de stats
+// pro, une facturation, ou un export lit bookings.status, revérifier
+// spécifiquement ce cas — il faudra peut-être distinguer "complété avec au
+// moins un arrived" de "complété tout no_show" avant de l'utiliser comme
+// signal de revenu/activité réelle.
 export async function completeBookingIfAllArrived(
   supabase: SupabaseClient,
   bookingId: string
