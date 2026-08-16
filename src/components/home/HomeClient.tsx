@@ -104,11 +104,30 @@ function InlineLogo() {
   );
 }
 
+// z-20 ajouté le 16/08/2026 (Lot "bug tap mobile") : le bloc de contenu des
+// slides d'intro (ci-dessous, "Contenu central") porte `relative z-10` —
+// nécessaire pour qu'il peigne correctement au-dessus du dégradé décoratif
+// pendant l'animation slideFadeIn. Ce bloc est `w-full` : sur un viewport
+// desktop, il reste centré et étroit (`max-w-sm`), donc son rectangle ne
+// s'étend jamais jusqu'au coin haut-gauche où BackButton est positionné
+// (`absolute top-4 left-4`, z-index:auto) — les clics y passent sans
+// obstacle, d'où un bouton qui fonctionnait en souris/desktop. Sous 384px
+// de large (tous les téléphones), `max-w-sm` ne contraint plus rien : le
+// bloc devient aussi large que le viewport et son rectangle RECOUVRE le
+// coin où BackButton est peint — z-10 (contenu) > z-index:auto (bouton) le
+// fait gagner le hit-test, donc le bouton reste visible (rien ne le
+// recouvre visuellement, la zone qui capte le tap est transparente) mais
+// ne reçoit plus aucun clic/tap. Pas une régression du logo +25% (a384503,
+// n'a touché ni ce bloc ni son z-index) — bug préexistant, invisible à la
+// souris sur un écran large, qui n'apparaît qu'en dessous de ~384px de
+// largeur réelle. z-20 > 10 fait gagner BackButton dans tous les cas, quel
+// que soit le viewport, sans toucher au z-10 du contenu (toujours utile
+// pour l'animation).
 function BackButton({ onBack }: { onBack: () => void }) {
   return (
     <button
       onClick={onBack}
-      className="absolute top-4 left-4 flex items-center gap-1.5 rounded-full bg-white/[0.07] border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-200"
+      className="absolute top-4 left-4 z-20 flex items-center gap-1.5 rounded-full bg-white/[0.07] border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-200"
     >
       ← Retour
     </button>
