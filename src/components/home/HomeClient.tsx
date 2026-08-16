@@ -168,10 +168,10 @@ export default function HomeClient({
       <div className="flex flex-col min-h-dvh">
         <Navbar variant="minimal" />
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
-        <div className="relative flex flex-col items-center justify-center flex-1 px-4">
+        <div className="relative flex flex-col items-center flex-1 px-4 pt-20">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <div className="w-full max-w-sm space-y-3 mt-4">
+          <div className="w-full max-w-sm space-y-3">
             <button
               onClick={() => router.push('/inscription')}
               className="w-full rounded-2xl py-4 font-semibold text-[#0a1224] text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
@@ -204,10 +204,10 @@ export default function HomeClient({
       <div className="flex flex-col min-h-dvh">
         <Navbar variant="minimal" />
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
-        <div className="relative flex flex-col items-center justify-center flex-1 px-4">
+        <div className="relative flex flex-col items-center flex-1 px-4 pt-20">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <div className="w-full max-w-sm space-y-3 mt-4">
+          <div className="w-full max-w-sm space-y-3">
             <button
               onClick={() => router.push('/devenir-partenaire')}
               className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 py-4 font-semibold text-white text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
@@ -240,10 +240,10 @@ export default function HomeClient({
       <div className="flex flex-col min-h-dvh">
         <Navbar variant="minimal" />
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
-        <div className="relative flex flex-col items-center justify-center flex-1 px-4">
+        <div className="relative flex flex-col items-center flex-1 px-4 pt-20">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(2)} />
-          <p className="text-slate-500 text-xs mb-5 mt-6 tracking-widest uppercase font-semibold">Vous êtes…</p>
+          <p className="text-slate-500 text-xs mb-5 tracking-widest uppercase font-semibold">Vous êtes…</p>
           <div className="w-full max-w-sm space-y-3">
             <button
               onClick={() => setSlide(4)}
