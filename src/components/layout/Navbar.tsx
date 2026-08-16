@@ -14,12 +14,6 @@ const STATUT_STYLE: Record<LoyaltyStatus, { icon: string; color: string }> = {
   Gold:     { icon: '🏆', color: 'text-yellow-400' },
 };
 
-/* ── Logo, partagé entre les deux variantes ──
-   Une seule source pour le lien+image+halo hover : la variante minimale du
-   tunnel d'accueil doit rendre EXACTEMENT le même DOM/CSS que la variante
-   complète pour garantir un logo au même niveau vertical pixel près sur
-   toutes les pages (16/08/2026, cf. mémoire "logo décalé sur l'écran de
-   choix"). */
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 shrink-0 group">
@@ -39,18 +33,12 @@ function Logo() {
   );
 }
 
-export default function Navbar({ variant = 'full' }: { variant?: 'full' | 'minimal' } = {}) {
+export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [statut, setStatut] = useState<LoyaltyStatus | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
-    // Variante minimale (tunnel d'accueil) : ni lien actif ni statut à
-    // afficher, la session est déjà résolue côté serveur par page.tsx et
-    // passée à HomeClient — refaire une détection client ici ne servirait
-    // à rien et réintroduirait un round-trip évité le 16/08 (voir
-    // HomeClient.tsx).
-    if (variant === 'minimal') return;
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session);
@@ -66,27 +54,11 @@ export default function Navbar({ variant = 'full' }: { variant?: 'full' | 'minim
       }
     });
     return () => subscription.unsubscribe();
-  }, [variant]);
+  }, []);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
   const statutStyle = statut ? STATUT_STYLE[statut] : null;
-
-  if (variant === 'minimal') {
-    // Logo seul, aucun lien de nav ni bouton connexion/compte — un tunnel
-    // d'entrée (choix profil, auth) ne doit pas distraire. Le raccourci
-    // "Accéder à mon espace" pour un connecté reste porté par
-    // ConnectedBanner juste en dessous (HomeClient.tsx), pas dupliqué ici :
-    // le fusionner dans cette même ligne ferait dépasser la largeur cible
-    // <380px sur mobile (cf. mémoire).
-    return (
-      <nav className="sticky top-0 z-50 bg-navy-950/90 backdrop-blur-xl border-b border-white/[0.06]">
-        <div className="flex items-center px-4 h-14 max-w-5xl mx-auto">
-          <Logo />
-        </div>
-      </nav>
-    );
-  }
 
   return (
     <nav className="sticky top-0 z-50 bg-navy-950/90 backdrop-blur-xl border-b border-white/[0.06]">

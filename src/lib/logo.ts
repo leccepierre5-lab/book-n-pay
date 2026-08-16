@@ -2,18 +2,20 @@
 // Source unique des tailles de rendu du logo (même principe que
 // plans-config pour les formules) — un futur ajustement se fait ici, jamais
 // en dur dans chaque page qui affiche /logo.jpg (Navbar.tsx, connexion,
-// inscription).
+// inscription, HomeClient.tsx).
 //
-// +25% appliqué le 16/08 sur les tailles historiques : header 34→43,
-// hero de page (connexion/inscription) 56→70. `homeHero` (80→100, logo
-// géant centré du tunnel d'accueil) retiré le 16/08 (soir) : le tunnel
-// utilise désormais le Navbar partagé en variante minimale (taille
-// `header`) pour garantir un logo au même niveau vertical que le reste du
-// site, cf. HomeClient.tsx.
+// +25% appliqué le 16/08 sur les 3 tailles historiques : header 34→43,
+// hero de page (connexion/inscription) 56→70, hero accueil 80→100.
+// `homeHero` brièvement retiré le 16/08 (soir, commit 0de87dc) puis remis
+// le même jour : le tunnel d'accueil est finalement revenu au logo géant
+// centré (décision Pierre) plutôt qu'au Navbar partagé — voir HomeClient.tsx
+// pour l'ancrage à distance fixe qui corrige le saut entre slides sans
+// passer par le Navbar.
 // Fichier source public/logo.jpg : 389×379px natif — largement suffisant
-// même à la plus grande taille de rendu (70px × 3 pour du 3x retina =
-// 210px, sous les 389px source), aucun flou attendu.
+// même à la plus grande taille de rendu (100px × 3 pour du 3x retina =
+// 300px, sous les 389px source), aucun flou attendu à aucune des 3 tailles.
 export const LOGO_SIZES = {
   header: 43,
   pageHero: 70,
+  homeHero: 100,
 } as const;

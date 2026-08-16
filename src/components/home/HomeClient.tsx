@@ -5,9 +5,10 @@
 // par src/app/page.tsx et reçue ici en props — plus de round-trip client au
 // montage, plus de flash (voir SessionLoader, supprimé).
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Navbar from '@/components/layout/Navbar';
+import { LOGO_SIZES } from '@/lib/logo';
 
 /* ── Icônes slides ── */
 function GhostIcon() {
@@ -85,6 +86,35 @@ const SLIDES = [
     showPasser: false,
   },
 ];
+
+/* ── Logo géant, écran de choix + écrans auth uniquement ──
+   Revenu le 16/08/2026 (soir) au format géant (décision Pierre, après un
+   aller-retour par le Navbar partagé). Le carrousel d'intro (slides 0-2,
+   plus bas dans ce fichier) n'affiche PLUS AUCUN logo. Sur les 3 écrans qui
+   gardent InlineLogo, un premier essai avait restauré le `justify-center`
+   d'origine (contenu de hauteur fixe par écran, donc jamais de saut AU
+   SEIN d'un même écran) — mais 2 cartes (choix) vs 3 boutons (auth) donnent
+   une hauteur de bloc différente, donc un centrage différent : le logo
+   sautait quand même D'UN ÉCRAN À L'AUTRE (99px vs 130px, mesuré). Même
+   correctif que pour le carrousel avant lui : logo sorti du bloc centré,
+   ancré par un `pt-8` fixe sur le conteneur plutôt que par `justify-center`
+   — position identique au pixel près sur les 3 écrans, quel que soit leur
+   contenu. */
+function InlineLogo() {
+  return (
+    <div className="flex flex-col items-center gap-2.5 mb-2">
+      <Image
+        src="/logo.jpg"
+        alt="Book'nPay"
+        width={LOGO_SIZES.homeHero}
+        height={LOGO_SIZES.homeHero}
+        className="rounded-2xl ring-2 ring-mint-500/20 shadow-[0_0_32px_rgba(52,211,153,0.25)]"
+        priority
+      />
+      <span className="text-lg font-bold text-white tracking-tight">Book'nPay</span>
+    </div>
+  );
+}
 
 // z-20 ajouté le 16/08/2026 (Lot "bug tap mobile") : le bloc de contenu des
 // slides d'intro (ci-dessous, "Contenu central") porte `relative z-10` —
@@ -166,12 +196,12 @@ export default function HomeClient({
   if (slide === 4) {
     return (
       <div className="flex flex-col min-h-dvh">
-        <Navbar variant="minimal" />
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
-        <div className="relative flex flex-col items-center flex-1 px-4 pt-20">
+        <div className="relative flex flex-col items-center flex-1 px-4 pt-8">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <div className="w-full max-w-sm space-y-3">
+          <InlineLogo />
+          <div className="w-full max-w-sm space-y-3 mt-6">
             <button
               onClick={() => router.push('/inscription')}
               className="w-full rounded-2xl py-4 font-semibold text-[#0a1224] text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
@@ -202,12 +232,12 @@ export default function HomeClient({
   if (slide === 5) {
     return (
       <div className="flex flex-col min-h-dvh">
-        <Navbar variant="minimal" />
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
-        <div className="relative flex flex-col items-center flex-1 px-4 pt-20">
+        <div className="relative flex flex-col items-center flex-1 px-4 pt-8">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <div className="w-full max-w-sm space-y-3">
+          <InlineLogo />
+          <div className="w-full max-w-sm space-y-3 mt-6">
             <button
               onClick={() => router.push('/devenir-partenaire')}
               className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 py-4 font-semibold text-white text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
@@ -238,12 +268,12 @@ export default function HomeClient({
   if (slide === 3) {
     return (
       <div className="flex flex-col min-h-dvh">
-        <Navbar variant="minimal" />
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
-        <div className="relative flex flex-col items-center flex-1 px-4 pt-20">
+        <div className="relative flex flex-col items-center flex-1 px-4 pt-8">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(2)} />
-          <p className="text-slate-500 text-xs mb-5 tracking-widest uppercase font-semibold">Vous êtes…</p>
+          <InlineLogo />
+          <p className="text-slate-500 text-xs mb-5 mt-6 tracking-widest uppercase font-semibold">Vous êtes…</p>
           <div className="w-full max-w-sm space-y-3">
             <button
               onClick={() => setSlide(4)}
@@ -293,7 +323,6 @@ export default function HomeClient({
 
   return (
     <>
-      <Navbar variant="minimal" />
       {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
       <div className="relative flex flex-col min-h-dvh overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(52,211,153,0.07)_0%,transparent_65%)] pointer-events-none" />
