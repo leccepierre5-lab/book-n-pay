@@ -4,12 +4,23 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { BusinessWithDetails } from '@/lib/queries/catalog';
 
-type Suggestion =
+export type Suggestion =
   | { kind: 'business'; name: string; slug: string }
   | { kind: 'prestation'; name: string };
 
 const MIN_CHARS = 2;
 const MAX_PER_GROUP = 5;
+
+// Extrait de selectSuggestion (fonction pure, testable sans monter le
+// composant — ce repo n'a pas d'infra de rendu React en test). /business/
+// a été poussé ici pendant 39 jours (08/07 au 16/08/2026) sans qu'aucun
+// test ne le remonte : ce test couvre spécifiquement la route réelle
+// (/etablissement/[slug]), pas juste la cohérence interne du code.
+export function suggestionHref(s: Suggestion): string {
+  return s.kind === 'business'
+    ? `/etablissement/${s.slug}`
+    : `/recherche?q=${encodeURIComponent(s.name)}`;
+}
 
 export function BusinessNameAutocomplete({
   defaultValue,
@@ -62,11 +73,7 @@ export function BusinessNameAutocomplete({
   const selectSuggestion = (s: Suggestion) => {
     setOpen(false);
     setActiveIndex(-1);
-    if (s.kind === 'business') {
-      router.push(`/business/${s.slug}`);
-    } else {
-      router.push(`/recherche?q=${encodeURIComponent(s.name)}`);
-    }
+    router.push(suggestionHref(s));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
