@@ -5,10 +5,9 @@
 // par src/app/page.tsx et reçue ici en props — plus de round-trip client au
 // montage, plus de flash (voir SessionLoader, supprimé).
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LOGO_SIZES } from '@/lib/logo';
+import Navbar from '@/components/layout/Navbar';
 
 /* ── Icônes slides ── */
 function GhostIcon() {
@@ -86,23 +85,6 @@ const SLIDES = [
     showPasser: false,
   },
 ];
-
-/* ── Logo centré inline (au-dessus du contenu) ── */
-function InlineLogo() {
-  return (
-    <div className="flex flex-col items-center gap-2.5 mb-2">
-      <Image
-        src="/logo.jpg"
-        alt="Book'nPay"
-        width={LOGO_SIZES.homeHero}
-        height={LOGO_SIZES.homeHero}
-        className="rounded-2xl ring-2 ring-mint-500/20 shadow-[0_0_32px_rgba(52,211,153,0.25)]"
-        priority
-      />
-      <span className="text-lg font-bold text-white tracking-tight">Book'nPay</span>
-    </div>
-  );
-}
 
 // z-20 ajouté le 16/08/2026 (Lot "bug tap mobile") : le bloc de contenu des
 // slides d'intro (ci-dessous, "Contenu central") porte `relative z-10` —
@@ -184,11 +166,11 @@ export default function HomeClient({
   if (slide === 4) {
     return (
       <div className="flex flex-col min-h-dvh">
+        <Navbar variant="minimal" />
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <InlineLogo />
           <div className="w-full max-w-sm space-y-3 mt-4">
             <button
               onClick={() => router.push('/inscription')}
@@ -220,11 +202,11 @@ export default function HomeClient({
   if (slide === 5) {
     return (
       <div className="flex flex-col min-h-dvh">
+        <Navbar variant="minimal" />
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <InlineLogo />
           <div className="w-full max-w-sm space-y-3 mt-4">
             <button
               onClick={() => router.push('/devenir-partenaire')}
@@ -256,11 +238,11 @@ export default function HomeClient({
   if (slide === 3) {
     return (
       <div className="flex flex-col min-h-dvh">
+        <Navbar variant="minimal" />
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
         <div className="relative flex flex-col items-center justify-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(2)} />
-          <InlineLogo />
           <p className="text-slate-500 text-xs mb-5 mt-6 tracking-widest uppercase font-semibold">Vous êtes…</p>
           <div className="w-full max-w-sm space-y-3">
             <button
@@ -311,6 +293,7 @@ export default function HomeClient({
 
   return (
     <>
+      <Navbar variant="minimal" />
       {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
       <div className="relative flex flex-col min-h-dvh overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(52,211,153,0.07)_0%,transparent_65%)] pointer-events-none" />
@@ -320,7 +303,6 @@ export default function HomeClient({
 
         {/* Contenu central */}
         <div key={slide} className="animate-slide-in flex flex-col items-center text-center flex-1 justify-center gap-7 max-w-sm mx-auto w-full px-4 relative z-10">
-          <InlineLogo />
           {current.icon}
 
           <div className="space-y-3">
