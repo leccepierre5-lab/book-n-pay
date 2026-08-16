@@ -6,7 +6,7 @@ export default function NotFound() {
       <p className="text-4xl mb-4">🔍</p>
       <h1 className="text-lg font-semibold text-white mb-1.5">Page introuvable</h1>
       <p className="text-sm text-slate-400 max-w-xs mb-6">
-        Ce lien n'existe pas ou plus — l'établissement ou la page que tu cherches a peut-être été retiré(e).
+        Cette page n'existe pas ou l'adresse est incorrecte.
       </p>
       <Link
         href="/recherche"
