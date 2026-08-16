@@ -197,32 +197,34 @@ export default function HomeClient({
     return (
       <div className="flex flex-col min-h-dvh">
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
-        <div className="relative flex flex-col items-center flex-1 px-4 pt-8">
+        <div className="relative flex flex-col items-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <InlineLogo />
-          <div className="w-full max-w-sm space-y-3 mt-6">
-            <button
-              onClick={() => router.push('/inscription')}
-              className="w-full rounded-2xl py-4 font-semibold text-[#0a1224] text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
-              style={{ background: 'linear-gradient(135deg, #34d399, #6ee7b7)', boxShadow: '0 4px 24px rgba(52,211,153,0.4)' }}
-            >
-              Créer un compte
-            </button>
-            <button
-              onClick={() => router.push('/connexion?redirect=/recherche')}
-              className="w-full rounded-2xl border border-white/10 py-4 font-semibold text-white text-sm hover:bg-white/5 hover:border-white/20 transition-all duration-200"
-            >
-              Se connecter
-            </button>
-            <button
-              onClick={() => router.push('/recherche')}
-              className="w-full py-3 text-sm text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              Continuer sans compte →
-            </button>
+          <div className="pt-8 relative z-10"><InlineLogo /></div>
+          <div className="flex flex-col items-center justify-center flex-1 w-full">
+            <div className="w-full max-w-sm space-y-3">
+              <button
+                onClick={() => router.push('/inscription')}
+                className="w-full rounded-2xl py-4 font-semibold text-[#0a1224] text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                style={{ background: 'linear-gradient(135deg, #34d399, #6ee7b7)', boxShadow: '0 4px 24px rgba(52,211,153,0.4)' }}
+              >
+                Créer un compte
+              </button>
+              <button
+                onClick={() => router.push('/connexion?redirect=/recherche')}
+                className="w-full rounded-2xl border border-white/10 py-4 font-semibold text-white text-sm hover:bg-white/5 hover:border-white/20 transition-all duration-200"
+              >
+                Se connecter
+              </button>
+              <button
+                onClick={() => router.push('/recherche')}
+                className="w-full py-3 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Continuer sans compte →
+              </button>
+            </div>
+            <div className="mt-8"><CGULine /></div>
           </div>
-          <div className="mt-8"><CGULine /></div>
         </div>
       </div>
     );
@@ -233,32 +235,34 @@ export default function HomeClient({
     return (
       <div className="flex flex-col min-h-dvh">
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
-        <div className="relative flex flex-col items-center flex-1 px-4 pt-8">
+        <div className="relative flex flex-col items-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(3)} />
-          <InlineLogo />
-          <div className="w-full max-w-sm space-y-3 mt-6">
-            <button
-              onClick={() => router.push('/devenir-partenaire')}
-              className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 py-4 font-semibold text-white text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
-              style={{ boxShadow: '0 4px 24px rgba(37,99,235,0.35)' }}
-            >
-              Inscrire mon établissement
-            </button>
-            <button
-              onClick={() => router.push('/connexion?redirect=/pro')}
-              className="w-full rounded-2xl border border-white/10 py-4 font-semibold text-white text-sm hover:bg-white/5 hover:border-white/20 transition-all duration-200"
-            >
-              Mon espace professionnel
-            </button>
-            <button
-              onClick={() => router.push('/tarifs')}
-              className="w-full py-3 text-sm text-emerald-400/80 hover:text-emerald-400 transition-colors"
-            >
-              Voir les tarifs &amp; rentabilité →
-            </button>
+          <div className="pt-8 relative z-10"><InlineLogo /></div>
+          <div className="flex flex-col items-center justify-center flex-1 w-full">
+            <div className="w-full max-w-sm space-y-3">
+              <button
+                onClick={() => router.push('/devenir-partenaire')}
+                className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 py-4 font-semibold text-white text-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                style={{ boxShadow: '0 4px 24px rgba(37,99,235,0.35)' }}
+              >
+                Inscrire mon établissement
+              </button>
+              <button
+                onClick={() => router.push('/connexion?redirect=/pro')}
+                className="w-full rounded-2xl border border-white/10 py-4 font-semibold text-white text-sm hover:bg-white/5 hover:border-white/20 transition-all duration-200"
+              >
+                Mon espace professionnel
+              </button>
+              <button
+                onClick={() => router.push('/tarifs')}
+                className="w-full py-3 text-sm text-emerald-400/80 hover:text-emerald-400 transition-colors"
+              >
+                Voir les tarifs &amp; rentabilité →
+              </button>
+            </div>
+            <div className="mt-8"><CGULine /></div>
           </div>
-          <div className="mt-8"><CGULine /></div>
         </div>
       </div>
     );
@@ -269,50 +273,52 @@ export default function HomeClient({
     return (
       <div className="flex flex-col min-h-dvh">
         {connectedSpace && <ConnectedBanner href={connectedSpace} firstName={firstName} />}
-        <div className="relative flex flex-col items-center flex-1 px-4 pt-8">
+        <div className="relative flex flex-col items-center flex-1 px-4">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(52,211,153,0.06)_0%,transparent_70%)] pointer-events-none" />
           <BackButton onBack={() => setSlide(2)} />
-          <InlineLogo />
-          <p className="text-slate-500 text-xs mb-5 mt-6 tracking-widest uppercase font-semibold">Vous êtes…</p>
-          <div className="w-full max-w-sm space-y-3">
-            <button
-              onClick={() => setSlide(4)}
-              className="w-full flex items-center gap-4 rounded-2xl bg-navy-900 border border-white/[0.08] p-5 text-left hover:bg-navy-800/80 hover:border-white/15 transition-all duration-200 group"
-            >
-              <div className="w-11 h-11 rounded-xl bg-slate-700/50 border border-white/[0.06] flex items-center justify-center shrink-0 group-hover:bg-slate-700/70 transition-colors">
-                <svg className="w-5 h-5 text-slate-300" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+          <div className="pt-8 relative z-10"><InlineLogo /></div>
+          <div className="flex flex-col items-center justify-center flex-1 w-full">
+            <p className="text-slate-500 text-xs mb-5 tracking-widest uppercase font-semibold">Vous êtes…</p>
+            <div className="w-full max-w-sm space-y-3">
+              <button
+                onClick={() => setSlide(4)}
+                className="w-full flex items-center gap-4 rounded-2xl bg-navy-900 border border-white/[0.08] p-5 text-left hover:bg-navy-800/80 hover:border-white/15 transition-all duration-200 group"
+              >
+                <div className="w-11 h-11 rounded-xl bg-slate-700/50 border border-white/[0.06] flex items-center justify-center shrink-0 group-hover:bg-slate-700/70 transition-colors">
+                  <svg className="w-5 h-5 text-slate-300" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white text-sm">Particulier</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Réserver des prestations</p>
+                </div>
+                <svg className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6"/>
                 </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-white text-sm">Particulier</p>
-                <p className="text-xs text-slate-500 mt-0.5">Réserver des prestations</p>
-              </div>
-              <svg className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
-            </button>
+              </button>
 
-            <button
-              onClick={() => setSlide(5)}
-              className="w-full flex items-center gap-4 rounded-2xl bg-navy-900 border border-emerald-500/20 p-5 text-left hover:bg-navy-800/80 hover:border-emerald-500/35 transition-all duration-200 group"
-              style={{ boxShadow: '0 0 20px rgba(52,211,153,0.05)' }}
-            >
-              <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/15 transition-colors">
-                <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20 7h-4V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-8-2h4v2h-4V5zM4 20V9h16l.01 11H4z"/>
+              <button
+                onClick={() => setSlide(5)}
+                className="w-full flex items-center gap-4 rounded-2xl bg-navy-900 border border-emerald-500/20 p-5 text-left hover:bg-navy-800/80 hover:border-emerald-500/35 transition-all duration-200 group"
+                style={{ boxShadow: '0 0 20px rgba(52,211,153,0.05)' }}
+              >
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/15 transition-colors">
+                  <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 7h-4V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-8-2h4v2h-4V5zM4 20V9h16l.01 11H4z"/>
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white text-sm">Professionnel</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Gérer mon établissement</p>
+                </div>
+                <svg className="w-4 h-4 text-emerald-600 group-hover:text-emerald-400 transition-colors shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6"/>
                 </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-white text-sm">Professionnel</p>
-                <p className="text-xs text-slate-500 mt-0.5">Gérer mon établissement</p>
-              </div>
-              <svg className="w-4 h-4 text-emerald-600 group-hover:text-emerald-400 transition-colors shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
-            </button>
+              </button>
+            </div>
+            <div className="mt-10"><CGULine /></div>
           </div>
-          <div className="mt-10"><CGULine /></div>
         </div>
       </div>
     );
