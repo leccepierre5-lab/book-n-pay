@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import PartnerApplicationForm from '@/components/partner/PartnerApplicationForm';
 import { BNP_PLANS, getPlanConfig } from '@/lib/plans-config';
+import { PRACTITIONERS_COUNT_OPTIONS } from '@/lib/partner-plan-suggestion';
 
 export const metadata: Metadata = {
   title: 'Devenir partenaire — 0% de commission',
@@ -47,14 +48,53 @@ export default async function DevenirPartenairePage({
           Vos clients réservent en ligne 24h/24 et versent des frais de réservation au moment de
           réserver. Vous gardez l&apos;esprit libre pour exercer.
         </p>
-        <p className="text-sm text-slate-400">
-          {plan
-            ? `Formule ${plan.label} : ${plan.priceHT} € HT par mois, ${plan.engagementMonths === 0 ? 'sans engagement' : `engagement ${plan.engagementMonths} mois`}.`
-            : `À partir de ${BNP_PLANS[0].priceHT} € HT par mois, engagement selon la formule.`}{' '}
-          <Link href="/tarifs" className="text-mint-400 underline underline-offset-2 hover:text-mint-300">
-            {plan ? 'Voir toutes les formules →' : 'Voir les formules →'}
-          </Link>
-        </p>
+        {plan ? (
+          <p className="text-sm text-slate-400">
+            {`Formule ${plan.label} : ${plan.priceHT} € HT par mois, ${plan.engagementMonths === 0 ? 'sans engagement' : `engagement ${plan.engagementMonths} mois`}.`}{' '}
+            <Link href="/tarifs" className="text-mint-400 underline underline-offset-2 hover:text-mint-300">
+              Voir toutes les formules →
+            </Link>
+          </p>
+        ) : (
+          // Pas de ?plan= (accès direct, favori, param invalide — même
+          // traitement, voir getPlanConfig ci-dessus) : choix explicite
+          // plutôt qu'un texte générique "à partir de 49€". Chaque carte
+          // pointe vers ?plan=<clé> — sélectionner une formule RÉUTILISE le
+          // rendu déjà en place depuis 8dcab3a (titre/prix/engagement/champ
+          // collaborateurs pré-rempli), aucune logique dupliquée ici.
+          <div>
+            <h2 className="mb-3 text-sm font-semibold text-white">
+              Choisissez la formule adaptée à votre activité
+            </h2>
+            <div className="space-y-2">
+              {BNP_PLANS.map((p) => {
+                const collabLabel = PRACTITIONERS_COUNT_OPTIONS.find((o) => o.plan === p.key)?.label;
+                return (
+                  <Link
+                    key={p.key}
+                    href={`/devenir-partenaire?plan=${p.key}`}
+                    className="block rounded-xl border border-white/[0.08] bg-navy-900 px-4 py-3 hover:border-mint-500/40 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-semibold text-white">{p.label}</span>
+                      <span className="text-sm font-bold text-mint-400 whitespace-nowrap">{p.priceHT} € HT/mois</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {collabLabel}
+                      {' · '}
+                      {p.engagementMonths === 0 ? 'Sans engagement' : `Engagement ${p.engagementMonths} mois`}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              <Link href="/tarifs" className="text-mint-400 underline underline-offset-2 hover:text-mint-300">
+                Comparer le détail des formules →
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mb-10 space-y-4">

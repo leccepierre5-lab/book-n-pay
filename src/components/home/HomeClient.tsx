@@ -8,6 +8,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { LOGO_SIZES } from '@/lib/logo';
 
 /* ── Icônes slides ── */
 function GhostIcon() {
@@ -93,8 +94,8 @@ function InlineLogo() {
       <Image
         src="/logo.jpg"
         alt="Book'nPay"
-        width={80}
-        height={80}
+        width={LOGO_SIZES.homeHero}
+        height={LOGO_SIZES.homeHero}
         className="rounded-2xl ring-2 ring-mint-500/20 shadow-[0_0_32px_rgba(52,211,153,0.25)]"
         priority
       />

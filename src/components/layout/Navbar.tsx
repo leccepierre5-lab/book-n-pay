@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { LoyaltyStatus } from '@/lib/database.types';
+import { LOGO_SIZES } from '@/lib/logo';
 
 const STATUT_STYLE: Record<LoyaltyStatus, { icon: string; color: string }> = {
   Standard: { icon: '⚪', color: 'text-slate-400' },
@@ -45,10 +46,17 @@ export default function Navbar() {
       <div className="flex items-center justify-between px-4 h-14 max-w-5xl mx-auto">
         <Link href="/" className="flex items-center gap-2 shrink-0 group">
           <div className="relative">
-            <Image src="/logo.jpg" alt="Book'nPay" width={34} height={34} className="rounded-full ring-1 ring-white/10 group-hover:ring-mint-500/40 transition-all duration-200" priority />
+            <Image src="/logo.jpg" alt="Book'nPay" width={LOGO_SIZES.header} height={LOGO_SIZES.header} className="rounded-full ring-1 ring-white/10 group-hover:ring-mint-500/40 transition-all duration-200" priority />
             <div className="absolute inset-0 rounded-full bg-mint-500/0 group-hover:bg-mint-500/5 transition-all duration-200" />
           </div>
-          <span className="font-bold text-white text-sm tracking-tight">Book'nPay</span>
+          {/* Masqué sous `sm` (16/08) : mesuré à 392px de largeur minimale
+              nécessaire pour le header en dessous de cette limite (logo 43px
+              +25%, nav, bouton compte) contre une cible <380px sur mobile —
+              logo+nom seuls passaient déjà en overflow avant même le reste.
+              Retirer ce span économise ~75px (texte + gap), ramène le besoin
+              à ~317px, large marge même à 320px. Le logo seul reste une
+              image reconnaissable, même pattern que "Mon compte" ci-dessous. */}
+          <span className="hidden sm:inline font-bold text-white text-sm tracking-tight">Book'nPay</span>
         </Link>
 
         <div className="flex items-center gap-0.5">

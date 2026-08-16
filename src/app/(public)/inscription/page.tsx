@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import RegisterForm from '@/components/auth/RegisterForm';
+import { LOGO_SIZES } from '@/lib/logo';
 
 export default function InscriptionPage() {
   return (
@@ -13,7 +14,7 @@ export default function InscriptionPage() {
           Retour
         </Link>
         <div className="flex flex-col items-center mb-6">
-          <Image src="/logo.jpg" alt="Book'nPay" width={56} height={56} className="rounded-2xl ring-2 ring-mint-500/20 shadow-[0_0_24px_rgba(52,211,153,0.2)]" priority />
+          <Image src="/logo.jpg" alt="Book'nPay" width={LOGO_SIZES.pageHero} height={LOGO_SIZES.pageHero} className="rounded-2xl ring-2 ring-mint-500/20 shadow-[0_0_24px_rgba(52,211,153,0.2)]" priority />
         </div>
         <div className="rounded-2xl border border-white/[0.08] bg-navy-900/60 px-5 py-6">
           <h1 className="text-lg font-bold text-white mb-0.5">✨ Créer un compte</h1>
