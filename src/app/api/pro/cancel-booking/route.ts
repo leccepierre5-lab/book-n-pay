@@ -353,7 +353,7 @@ export async function POST(req: NextRequest) {
           summary: `RDV — ${booking.service_name}`,
           location: loc?.address,
           organizerName: booking.biz_name,
-          organizerEmail: 'noreply@book-n-pay.com',
+          organizerEmail: 'contact@book-n-pay.com',
           attendeeEmail: clientEmail,
           sequence: nextIcsSequence,
           method: 'CANCEL',

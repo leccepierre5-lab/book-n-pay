@@ -5,6 +5,9 @@
 // - stripe_account_id inconnu (pas de business_settings correspondante) →
 //   pas d'erreur, juste ignoré.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Import statique plutôt que `await import(...)` par test (16/08) : voir
+// webhook-dual-secret-signature.test.ts pour le raisonnement complet.
+import { POST } from '@/app/api/stripe/webhook/route';
 
 const mockConstructEventAsync = vi.fn(async () => eventFixture);
 let eventFixture: any = null;
@@ -89,7 +92,6 @@ describe('stripe/webhook — account.updated', () => {
       // pas de future_requirements
     });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -117,7 +119,6 @@ describe('stripe/webhook — account.updated', () => {
       },
     });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     await POST(buildRequest() as any);
 
     const updateCall = chains.business_settings.update.mock.calls[0][0];
@@ -130,7 +131,6 @@ describe('stripe/webhook — account.updated', () => {
     chains.business_settings = makeChain([], null);
     eventFixture = accountEvent({ id: 'acct_orphan' });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -141,7 +141,6 @@ describe('stripe/webhook — account.updated', () => {
     chains.business_settings = makeChain([], { biz_id: 'biz-42' });
     eventFixture = accountEvent({ id: 'acct_test_42' });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     await POST(buildRequest() as any);
 
     expect(chains.business_settings.eq).toHaveBeenCalledWith('stripe_account_id', 'acct_test_42');

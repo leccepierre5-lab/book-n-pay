@@ -12,6 +12,15 @@ export type IcsInput = {
   description?: string;
   location?: string;
   organizerName: string;
+  // Les 4 appelants passent `contact@book-n-pay.com` (16/08, était noreply@
+  // book-n-pay.com) — ATTENDEE porte RSVP=FALSE donc aucun client mail
+  // conforme RFC 5545 ne devrait solliciter de réponse, mais certains
+  // (Gmail Calendar notamment) affichent quand même Oui/Non/Peut-être pour
+  // METHOD:REQUEST sans respecter RSVP=FALSE — une réponse cliquée part
+  // alors en REPLY vers cette adresse. `contact@` est déjà la boîte support
+  // publique surveillée (mentions légales, CGU, footer, corps des emails
+  // d'annulation) : une réponse y atterrit au lieu de se perdre sur une
+  // adresse noreply@ inexistante.
   organizerEmail: string;
   attendeeEmail: string;
   url?: string;

@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/reschedule-expire",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/purge-search-misses-pii",
+      "schedule": "0 4 * * *"
     }
   ]
 }

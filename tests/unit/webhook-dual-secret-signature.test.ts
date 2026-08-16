@@ -14,6 +14,14 @@
 // - STRIPE_CONNECT_WEBHOOK_SECRET absent → un seul secret tenté,
 //   comportement identique à avant ce changement.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// Import statique plutôt que `await import(...)` par test (16/08) : la route
+// lit process.env UNIQUEMENT à l'intérieur de POST(), jamais au chargement
+// du module — un import dynamique par test n'apportait donc rien, sinon
+// faire payer le coût de transform/résolution du module (789 lignes, 12
+// imports transitifs) à l'intérieur du timeout de 5000ms d'un seul test, au
+// lieu de la phase de collecte globale. Cause racine du flake "timeout au
+// cold start" (voir [[project_bnp_dette_technique]]).
+import { POST } from '@/app/api/stripe/webhook/route';
 
 let eventFixture: any = null;
 // Simule le vrai SDK : un secret donné ne valide QUE l'événement signé avec
@@ -85,7 +93,6 @@ describe('stripe/webhook — double secret de signature', () => {
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_platform';
     process.env.STRIPE_CONNECT_WEBHOOK_SECRET = 'whsec_connect';
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -96,7 +103,6 @@ describe('stripe/webhook — double secret de signature', () => {
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_platform_WRONG'; // volontairement invalide
     process.env.STRIPE_CONNECT_WEBHOOK_SECRET = 'whsec_connect';
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -110,7 +116,6 @@ describe('stripe/webhook — double secret de signature', () => {
     process.env.STRIPE_CONNECT_WEBHOOK_SECRET = 'whsec_connect_WRONG';
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(400);
@@ -125,7 +130,6 @@ describe('stripe/webhook — double secret de signature', () => {
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_platform';
     delete process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -138,7 +142,6 @@ describe('stripe/webhook — double secret de signature', () => {
     delete process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     await POST(buildRequest('{"id":"evt_abc","type":"account.updated"}') as any);
 
     const loggedMessage = errSpy.mock.calls.map((c) => String(c[0])).find((m) => m.includes('SIGNATURE STRIPE REJETÉE'));

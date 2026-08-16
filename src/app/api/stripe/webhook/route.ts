@@ -424,7 +424,7 @@ export async function POST(req: NextRequest) {
             description: `${booking.biz_name}\nGérer / annuler : ${manageUrl}`,
             location: loc?.address,
             organizerName: booking.biz_name,
-            organizerEmail: 'noreply@book-n-pay.com',
+            organizerEmail: 'contact@book-n-pay.com',
             attendeeEmail: customerEmail,
             url: manageUrl,
             sequence: (booking as any).ics_sequence ?? 0,

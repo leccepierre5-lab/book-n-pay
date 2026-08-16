@@ -43,9 +43,17 @@ export async function searchBusinesses(
   // rien. Le filtre défensif `b.staff ?? []` plus bas gère l'absence proprement
   // (getBusinessBySlug, lui, garde le join — la fiche établissement en a besoin
   // pour le choix praticien).
+  // Colonnes explicites (16/08, dette sur-fetch notée le 14/08) — auditées
+  // contre TOUS les consommateurs réels : SearchResults.tsx, page.tsx,
+  // et minServicePrice()/le tri ci-dessous. `services(price)` seul : ni
+  // SearchResults ni ce fichier ne lisent autre chose qu'un prix par service
+  // ici (contrairement à getBusinessBySlug, qui alimente le vrai parcours de
+  // réservation et garde `services(*)`/`staff(*)` complets). owner_id/slug
+  // sont utilisés en FILTRE (.not() plus bas), jamais relus sur les lignes
+  // retournées ici — pas besoin de les sélectionner.
   let queryBuilder = supabase
     .from('businesses')
-    .select('*, services(*), business_reviews(rating, review_count)');
+    .select('id, slug, name, city, category, type, open_time, close_time, services(price), business_reviews(rating, review_count)');
 
   if (filters.category && filters.category !== 'all') {
     if (filters.category === 'autre') {
@@ -234,9 +242,19 @@ export async function getSitemapBusinesses(): Promise<{ slug: string; updated_at
 // (generateMetadata + page component) — même rendu, un seul hit DB.
 export const getBusinessBySlug = cache(async (slug: string): Promise<BusinessWithDetails | null> => {
   const supabase = await createClient();
+  // Colonnes explicites sur `businesses` (16/08, dette sur-fetch notée le
+  // 14/08) — auditées contre TOUS les consommateurs réels : la page fiche
+  // établissement, tout le BookingFlow (Step*.tsx), ET les helpers
+  // isNonRealBusiness/isExcludedFromPublicIndex/isTesterOnlyBusiness
+  // (business-helpers.ts) qui lisent owner_id/slug SANS accès `business.xxx`
+  // visible en grep direct sur la page — piège trouvé pendant cet audit,
+  // d'où le choix de garder `services(*)`/`staff(*)` intacts ci-dessous :
+  // cette fiche alimente le vrai parcours de réservation (prix/durée/
+  // acompte), pas le périmètre sûr pour deviner un sous-ensemble de colonnes
+  // sans auditer chaque composant qui les consomme.
   const { data, error } = await supabase
     .from('businesses')
-    .select('*, services(*), staff(*), business_reviews(rating, review_count), business_photos(id, url, sort_order, created_at, biz_id), business_locations(address, postal_code, lat, lng, address_public)')
+    .select('id, slug, name, city, category, type, phone, frozen, instagram, facebook_url, website, google_place_url, open_time, close_time, open_days, service_area_radius_km, owner_id, services(*), staff(*), business_reviews(rating, review_count), business_photos(id, url, sort_order, created_at, biz_id), business_locations(address, postal_code, lat, lng, address_public)')
     .eq('slug', slug)
     .eq('is_published', true)
     .maybeSingle();

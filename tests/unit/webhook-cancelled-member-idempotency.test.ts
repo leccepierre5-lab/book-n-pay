@@ -15,6 +15,9 @@
 // 3. Cas normal (membre pas encore payé) → comportement inchangé, membre
 //    marqué 'paid', aucun remboursement déclenché.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Import statique plutôt que `await import(...)` par test (16/08) : voir
+// webhook-dual-secret-signature.test.ts pour le raisonnement complet.
+import { POST } from '@/app/api/stripe/webhook/route';
 
 let eventFixture: any = null;
 const mockConstructEventAsync = vi.fn(async () => eventFixture);
@@ -91,7 +94,6 @@ describe('stripe/webhook — idempotence membre cancelled', () => {
       payment_intent: 'pi_123',
     });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -108,7 +110,6 @@ describe('stripe/webhook — idempotence membre cancelled', () => {
       payment_intent: 'pi_456',
     });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -128,7 +129,6 @@ describe('stripe/webhook — idempotence membre cancelled', () => {
       payment_intent: 'pi_789',
     });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);

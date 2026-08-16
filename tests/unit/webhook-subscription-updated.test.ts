@@ -3,6 +3,9 @@
 // un changement de formule ou un passage en impayé fait depuis le Dashboard
 // Stripe n'était jamais répercuté sur business_settings.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Import statique plutôt que `await import(...)` par test (16/08) : voir
+// webhook-dual-secret-signature.test.ts pour le raisonnement complet.
+import { POST } from '@/app/api/stripe/webhook/route';
 
 let eventFixture: any = null;
 const mockConstructEventAsync = vi.fn(async () => eventFixture);
@@ -75,7 +78,6 @@ describe('stripe/webhook — customer.subscription.updated', () => {
   it('upgrade de plan (business → scale) : business_settings mis à jour avec plan_key seul', async () => {
     eventFixture = subscriptionEvent({ items: { data: [{ price: { id: 'price_scale_test' } }] } });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -86,7 +88,6 @@ describe('stripe/webhook — customer.subscription.updated', () => {
   it('passage en impayé (status=past_due) : subscription_status synchronisé', async () => {
     eventFixture = subscriptionEvent({ status: 'past_due' });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     await POST(buildRequest() as any);
 
     expect(chains.business_settings.update).toHaveBeenCalledWith({ subscription_status: 'past_due' });
@@ -95,7 +96,6 @@ describe('stripe/webhook — customer.subscription.updated', () => {
   it('rien de changé (même plan, même statut) : aucun update émis', async () => {
     eventFixture = subscriptionEvent({});
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -106,7 +106,6 @@ describe('stripe/webhook — customer.subscription.updated', () => {
     chains.business_settings = makeChain([], null);
     eventFixture = subscriptionEvent({ id: 'sub_orphan' });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     const res = await POST(buildRequest() as any);
 
     expect(res.status).toBe(200);
@@ -116,7 +115,6 @@ describe('stripe/webhook — customer.subscription.updated', () => {
   it('lookup par stripe_subscription_id (pas par un autre champ)', async () => {
     eventFixture = subscriptionEvent({ id: 'sub_specific_42', status: 'past_due' });
 
-    const { POST } = await import('@/app/api/stripe/webhook/route');
     await POST(buildRequest() as any);
 
     expect(chains.business_settings.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_specific_42');
