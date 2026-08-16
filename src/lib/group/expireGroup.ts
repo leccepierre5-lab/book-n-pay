@@ -1,3 +1,19 @@
+// Deux contextes d'appel réels, testés séparément (Lot 2, 16/08) — même
+// fonction, même comportement attendu (idempotente : rejouable sans risque
+// sur un groupe déjà expiré, voir hasCancelledPaidMember plus bas), mais
+// des déclencheurs très différents :
+// 1. Cron nocturne (`api/cron/expire-groups/route.ts`, 1x/jour) — filet de
+//    sécurité qui balaie TOUS les groupes dont payment_deadline est dépassé
+//    en base, qu'un humain les ait revus ou non. Couvert par
+//    tests/unit/expire-groups-route.test.ts.
+// 2. Polling lazy (`api/group/pending-status/route.ts`, appelé à chaque
+//    chargement de page côté client tant qu'un groupe est en attente) —
+//    ne traite QUE le(s) groupe(s) où l'UTILISATEUR COURANT a lui-même un
+//    membre, déclenché en side-effect d'une simple lecture de statut. Peut
+//    donc expirer un groupe bien avant le passage du cron nocturne si l'un
+//    des participants revient sur le site après le délai — c'est le chemin
+//    normal en usage réel, le cron n'est qu'un filet pour ceux qui ne
+//    reviennent jamais. Couvert par tests/unit/group-pending-status-route.test.ts.
 import Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email/send';
