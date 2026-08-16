@@ -72,6 +72,30 @@ export async function POST(req: NextRequest) {
       if (invalidGuest) {
         return NextResponse.json({ error: 'Numéro de téléphone invalide pour un ou plusieurs invités.' }, { status: 400 });
       }
+      // Garde-fou ajouté le 16/08/2026 (Lot 3, audit test de route) :
+      // bookings/group (rejoindre via lien) rejette déjà un numéro déjà
+      // présent dans le groupe (existingByPhone) — create-group ne le
+      // faisait pas, alors que c'est le SEUL autre chemin de création de
+      // booking_members.phone. Deux participants au même numéro (ex.
+      // organisateur = invité par erreur, ou deux invités qui recopient le
+      // même numéro) deviennent indiscernables pour phonesMatch() ensuite
+      // (bookings/cancel, post-visit-status/ack...) — l'un peut alors agir
+      // sur le RDV de l'autre. Comparaison sur les numéros NORMALISÉS
+      // (deux saisies différentes du même numéro doivent collisionner).
+      const normalizedParticipantPhones = [
+        clientPhone,
+        ...guests.map((g: { phone: string }) => normalizePhone(g.phone)),
+      ].filter((p): p is string => !!p);
+      const seenPhones = new Set<string>();
+      for (const p of normalizedParticipantPhones) {
+        if (seenPhones.has(p)) {
+          return NextResponse.json(
+            { error: 'Deux participants ne peuvent pas avoir le même numéro de téléphone.' },
+            { status: 400 }
+          );
+        }
+        seenPhones.add(p);
+      }
     }
     // Même garde-fou que bookings/create/route.ts — un groupe peut couvrir
     // plusieurs créneaux consécutifs (ex. 09h30 → 11h00), il suffit qu'UN

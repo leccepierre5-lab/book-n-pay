@@ -129,21 +129,35 @@ describe('POST /api/bookings/create-group — validation téléphone (mode B)', 
   });
 
   it(
-    "COMPORTEMENT ACTUEL À SIGNALER (pas corrigé silencieusement) : deux participants (organisateur + invité) avec le MÊME téléphone → aucune validation ne l'empêche, les deux réservations sont créées",
+    "FAILLE CORRIGÉE le 16/08 (Lot 3) : deux participants (organisateur + invité) avec le MÊME téléphone → 400, aucune réservation créée",
     async () => {
       const res = await POST(buildRequest(baseBody({
         slots: ['10:00', '10:30'],
         clientPhone: '0612345678',
         guests: [{ name: 'Invité 1', phone: '0612345678' }], // même numéro que l'organisateur
       })) as any);
-      // Contrairement à bookings/group (addMemberAndGetCheckout), qui rejette
-      // un doublon de téléphone DÉJÀ dans le groupe via `existingByPhone`,
-      // create-group ne fait cette vérification NULLE PART entre les
-      // participants d'une même requête — chacun est créé indépendamment.
-      expect(res.status).toBe(200);
       const json = await res.json();
-      expect(json.allMemberIds).toHaveLength(2);
-      expect(mockCreateCapacityBooking).toHaveBeenCalledTimes(2);
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('même numéro');
+      expect(mockCreateCapacityBooking).not.toHaveBeenCalled();
+    }
+  );
+
+  it(
+    'deux invités entre eux au même numéro (organisateur distinct) → 400 aussi, pas seulement organisateur vs invité',
+    async () => {
+      const res = await POST(buildRequest(baseBody({
+        slots: ['10:00', '10:30', '11:00'],
+        clientPhone: '0612345678',
+        guests: [
+          { name: 'Invité 1', phone: '0611111111' },
+          { name: 'Invité 2', phone: '06 11 11 11 11' }, // même numéro que Invité 1, saisi différemment
+        ],
+      })) as any);
+      const json = await res.json();
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('même numéro');
+      expect(mockCreateCapacityBooking).not.toHaveBeenCalled();
     }
   );
 

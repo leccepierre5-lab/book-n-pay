@@ -31,9 +31,20 @@ export async function POST(req: NextRequest) {
   // résout (comparaisons phone === phone fragiles sans format unique en
   // base), et isValidPhoneFormat() pour le format rejeté (audit 15/08,
   // "okokokok" accepté jusqu'ici sans aucun contrôle). Un membre de groupe
-  // saisit toujours un téléphone (champ requis côté front) — invalide ici
+  // saisit toujours un téléphone (champ requis côté front, seul appelant
+  // réel : JoinGroupClient.tsx, qui envoie toujours la clé) — invalide ici
   // veut dire vraiment invalide, jamais vide par omission légitime.
-  if (memberData?.phone !== undefined) {
+  // ⚠️ Faille corrigée le 16/08/2026 (Lot 3, audit test de route) : la garde
+  // portait avant sur `memberData?.phone !== undefined`, donc se
+  // court-circuitait si la clé `phone` était absente du JSON (différent
+  // d'un envoi `phone: ''`) — contournable par un appel direct à l'API sans
+  // passer par le front. Elle porte maintenant sur la présence de
+  // `memberData` seul, jamais sur la présence de la clé qu'il contient —
+  // même motif que phonesMatch() (0056) : un champ que l'appelant contrôle
+  // ne doit jamais pouvoir désactiver sa propre validation. Les policies
+  // RLS comparent booking_members.phone = app_users.phone ; un membre sans
+  // téléphone est un état hors du modèle d'autorisation prévu.
+  if (memberData) {
     if (!memberData.phone || !isValidPhoneFormat(memberData.phone)) {
       return NextResponse.json({ error: 'Numéro de téléphone invalide.' }, { status: 400 });
     }

@@ -74,20 +74,20 @@ describe('POST /api/bookings/group — addMemberAndGetCheckout — validation t�
   });
 
   it(
-    "COMPORTEMENT ACTUEL À SIGNALER (pas corrigé silencieusement) : clé phone OMISE (pas envoyée) → validation court-circuitée, membre inséré SANS téléphone",
+    "FAILLE CORRIGÉE le 16/08 (Lot 3) : clé phone OMISE (pas envoyée, différent d'un envoi vide) → 400, plus de contournement possible",
     async () => {
       const res = await POST(buildRequest({
         action: 'addMemberAndGetCheckout',
         bookingId: 'booking-1',
         memberData: { name: 'Alice' }, // pas de clé "phone" du tout
       }) as any);
-      // `memberData?.phone !== undefined` est FALSE quand la clé est absente
-      // (contrairement à phone:'' où la clé existe) — la garde ne s'applique
-      // donc pas ici. Documenté tel quel, pas corrigé : le front (StepPayment)
-      // envoie toujours un téléphone, mais un appel direct à l'API contourne
-      // la validation en omettant simplement la clé plutôt qu'en l'envoyant vide.
-      expect(res.status).toBe(200);
-      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ phone: undefined }));
+      // Avant le correctif, `memberData?.phone !== undefined` était FALSE
+      // quand la clé était absente (contrairement à phone:'' où la clé
+      // existe) — la garde ne s'appliquait pas. La garde porte maintenant
+      // sur la présence de `memberData` seul, jamais sur la présence de la
+      // clé qu'il contient.
+      expect(res.status).toBe(400);
+      expect(mockInsert).not.toHaveBeenCalled();
     }
   );
 
