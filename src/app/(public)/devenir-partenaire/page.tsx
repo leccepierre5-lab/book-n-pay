@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import PartnerApplicationForm from '@/components/partner/PartnerApplicationForm';
-import { BNP_PLANS } from '@/lib/plans-config';
+import { BNP_PLANS, getPlanConfig } from '@/lib/plans-config';
 
 export const metadata: Metadata = {
   title: 'Devenir partenaire — 0% de commission',
@@ -10,7 +10,18 @@ export const metadata: Metadata = {
   alternates: { canonical: '/devenir-partenaire' },
 };
 
-export default function DevenirPartenairePage() {
+// Arrivée depuis /tarifs?plan=xxx (lien de chaque carte, voir tarifs/page.tsx).
+// Param absent ou invalide (lien direct, ancien favori, faute de frappe) →
+// fallback générique inchangé, jamais d'erreur ni de plan par défaut choisi
+// à la place du pro.
+export default async function DevenirPartenairePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string }>;
+}) {
+  const { plan: planParam } = await searchParams;
+  const plan = planParam ? getPlanConfig(planParam) : undefined;
+
   return (
     <div className="min-h-dvh mx-auto max-w-lg px-4 py-10">
       <Link
@@ -25,7 +36,9 @@ export default function DevenirPartenairePage() {
 
       <div className="mb-10">
         <p className="text-[10px] font-bold tracking-[0.2em] text-mint-500/70 uppercase mb-2">PARTENARIAT</p>
-        <h1 className="text-2xl font-bold text-white mb-2">Devenir partenaire</h1>
+        <h1 className="text-2xl font-bold text-white mb-2">
+          {plan ? `Devenir partenaire — Formule ${plan.label}` : 'Devenir partenaire'}
+        </h1>
         <p className="text-base font-medium text-white/90 mb-4">
           Des réservations confirmées, sans passer votre journée au téléphone.
         </p>
@@ -35,9 +48,11 @@ export default function DevenirPartenairePage() {
           réserver. Vous gardez l&apos;esprit libre pour exercer.
         </p>
         <p className="text-sm text-slate-400">
-          À partir de {BNP_PLANS[0].priceHT}&nbsp;€ HT par mois, engagement selon la formule.{' '}
+          {plan
+            ? `Formule ${plan.label} : ${plan.priceHT} € HT par mois, ${plan.engagementMonths === 0 ? 'sans engagement' : `engagement ${plan.engagementMonths} mois`}.`
+            : `À partir de ${BNP_PLANS[0].priceHT} € HT par mois, engagement selon la formule.`}{' '}
           <Link href="/tarifs" className="text-mint-400 underline underline-offset-2 hover:text-mint-300">
-            Voir les formules →
+            {plan ? 'Voir toutes les formules →' : 'Voir les formules →'}
           </Link>
         </p>
       </div>
@@ -120,7 +135,7 @@ export default function DevenirPartenairePage() {
         </ol>
       </div>
 
-      <PartnerApplicationForm />
+      <PartnerApplicationForm initialPlan={plan?.key} />
     </div>
   );
 }

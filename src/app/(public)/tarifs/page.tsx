@@ -188,7 +188,7 @@ export default function TarifsPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/devenir-partenaire"
+                  href={`/devenir-partenaire?plan=${plan.key}`}
                   className={`mt-5 inline-flex items-center justify-center rounded-xl py-2.5 px-4 text-xs font-semibold transition-all hover:scale-[1.01] ${
                     plan.highlighted
                       ? 'text-navy-950'

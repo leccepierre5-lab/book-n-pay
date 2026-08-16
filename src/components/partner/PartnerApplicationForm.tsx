@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { CGU_VERSION } from '@/lib/legal';
-import { getPlanConfig } from '@/lib/plans-config';
+import { getPlanConfig, type PlanKey } from '@/lib/plans-config';
 import { PRACTITIONERS_COUNT_OPTIONS, BOOKINGS_ESTIMATE_OPTIONS } from '@/lib/partner-plan-suggestion';
 import { PHONE_INPUT_PATTERN, PHONE_INPUT_TITLE } from '@/lib/booking-utils';
 import { CATEGORIES as CANONICAL_CATEGORIES } from '@/lib/categories';
@@ -48,7 +48,10 @@ const TYPE_PLACEHOLDERS: Partial<Record<(typeof CATEGORIES)[number]['id'], strin
   photographie: 'ex : Portrait, Mariage, Nouveau-né/Bébé, Famille, Entreprise/Corporate…',
 };
 
-export default function PartnerApplicationForm() {
+// initialPlan : arrivée depuis /tarifs?plan=xxx (voir devenir-partenaire/page.tsx).
+// Pré-sélectionne le bucket de collaborateurs correspondant, sans jamais
+// forcer la main — le pro reste libre de choisir une autre option.
+export default function PartnerApplicationForm({ initialPlan }: { initialPlan?: PlanKey }) {
   const [form, setForm] = useState({
     etablissement: '',
     gerant: '',
@@ -62,7 +65,9 @@ export default function PartnerApplicationForm() {
   const [categoryLabel, setCategoryLabel] = useState('');
   const [bizType, setBizType] = useState('');
   const [bookingsEstimate, setBookingsEstimate] = useState<'0-80' | '81-300' | '300+' | ''>('');
-  const [practitionersCount, setPractitionersCount] = useState('');
+  const [practitionersCount, setPractitionersCount] = useState(
+    () => PRACTITIONERS_COUNT_OPTIONS.find((o) => o.plan === initialPlan)?.value ?? ''
+  );
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

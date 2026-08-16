@@ -22,29 +22,39 @@ export interface PractitionersCountOption {
   plan: PlanKey;
 }
 
-// Un bucket par plan, borné par son nombre total de collaborateurs
-// (getPraticiensLimit — LA MÊME source que la limite serveur posée en
-// 6be5bc8, voir plans-config.ts) : si BNP_PLANS.maxStaff change, les
-// libellés ET la logique de suggestion (PRACTITIONERS_COUNT_OPTIONS[i].plan)
-// suivent automatiquement.
-// ⚠️ Ce qui NE suit PAS automatiquement : la contrainte CHECK SQL de la
-// migration, statique par nature. Si les seuils changent au point de
-// modifier la FORME des buckets (ex. Business passe à 3 collaborateurs,
-// donc "2 à 4" au lieu de "2 à 3"), il faudra une migration dédiée pour
-// élargir la contrainte — et gérer les valeurs déjà stockées avec l'ancienne
-// forme. Ce n'est pas un piège caché : c'est une limite inhérente à un enum
-// bucketisé en base, documentée ici pour qu'elle ne surprenne personne.
+// Un bucket par plan. Deux dérivations distinctes de BNP_PLANS, à ne pas
+// confondre :
+// - `value` (clé stockée en base) : bornée par l'EFFECTIF TOTAL du plan
+//   (getPraticiensLimit, pro inclus) — c'est la forme figée par la
+//   contrainte CHECK chk_pa_practitioners_count (migration 0042,
+//   valeurs '1'/'2-3'/'4+'). Si les seuils changent au point de modifier la
+//   FORME des buckets, il faudra une migration dédiée pour élargir la
+//   contrainte et gérer les valeurs déjà stockées — limite inhérente à un
+//   enum bucketisé en base, pas un piège caché.
+// - `label` (texte affiché) : bornée par maxStaff SEUL (collaborateurs hors
+//   pro), même convention que /tarifs (`teamSizeLabel`, "Vous + N
+//   collaborateurs"). Bug trouvé le 16/08/2026 : la version précédente
+//   dérivait aussi le libellé de l'effectif total, ce qui affichait
+//   "2 à 3 collaborateurs" pour Business (maxStaff=2) — en contradiction
+//   avec /tarifs qui promet "Vous + 2 collaborateurs" pour ce même plan.
+//   Un pro avec 3 collaborateurs (hors lui-même) aurait alors coché ce
+//   bucket en pensant tenir dans Business, alors que ça dépasse maxStaff=2.
 export const PRACTITIONERS_COUNT_OPTIONS: PractitionersCountOption[] = BNP_PLANS.map((plan, i) => {
   const prevLimit = i === 0 ? 0 : (getPraticiensLimit(BNP_PLANS[i - 1].key) ?? 0);
   const limit = getPraticiensLimit(plan.key);
   const min = prevLimit + 1;
-  if (limit === null) {
-    return { value: `${min}+`, label: `${min} collaborateurs ou plus`, plan: plan.key };
-  }
-  if (min === limit) {
-    return { value: `${min}`, label: `${min} collaborateur (solo)`, plan: plan.key };
-  }
-  return { value: `${min}-${limit}`, label: `${min} à ${limit} collaborateurs`, plan: plan.key };
+  const value = limit === null ? `${min}+` : min === limit ? `${min}` : `${min}-${limit}`;
+
+  const prevMaxStaff = i === 0 ? -1 : (BNP_PLANS[i - 1].maxStaff ?? -1);
+  const staffMin = prevMaxStaff + 1;
+  const staffMax = plan.maxStaff;
+  const label =
+    staffMax === 0 ? 'Solo (aucun collaborateur)'
+    : staffMax === null ? `${staffMin} collaborateurs ou plus`
+    : staffMin === staffMax ? `${staffMin} collaborateur`
+    : `${staffMin} à ${staffMax} collaborateurs`;
+
+  return { value, label, plan: plan.key };
 });
 
 // undefined = pas de suggestion (valeur absente/inconnue — ancienne
