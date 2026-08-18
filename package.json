@@ -19,7 +19,7 @@
     "@vercel/functions": "^3.9.3",
     "date-fns": "^4.1.0",
     "html5-qrcode": "^2.3.8",
-    "next": "^16.2.9",
+    "next": "^16.3.1",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
