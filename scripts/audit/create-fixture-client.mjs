@@ -11,6 +11,12 @@
 // Numéro de téléphone 0699999999 : format valide (voir isValidPhoneFormat),
 // motif volontairement reconnaissable (répétition de 9), vérifié absent de
 // la base au moment de l'écriture de ce script (0 ligne app_users.phone).
+// Stocké normalisé (+33...) — voir docs/plan-normalisation-telephone.md
+// point 5 : le trigger handle_new_user (migration 0010) insère
+// raw_user_meta_data->>'phone' TEL QUEL, sans normaliser. La première
+// version de ce script passait '0699999999' brut et l'a appris à ses
+// dépens (corrigé le 18/08 après coup) — normaliser ICI, jamais compter
+// sur le trigger pour le faire.
 //
 // Usage : node --env-file=.env.local scripts/audit/create-fixture-client.mjs
 
@@ -23,6 +29,16 @@ import { randomUUID } from 'node:crypto';
 // toujours synchro avec src/lib/legal.ts avant de creuser ailleurs.
 const CGU_VERSION = '2026-08-2';
 
+// Recopié depuis src/lib/booking-utils.ts::normalizePhone — même raison que
+// CGU_VERSION ci-dessus (pas d'import cross TS/mjs dans ce repo).
+function normalizePhone(raw) {
+  const digits = raw.replace(/[^\d+]/g, '');
+  if (digits.startsWith('+')) return digits;
+  if (digits.startsWith('0')) return '+33' + digits.slice(1);
+  if (digits.startsWith('33')) return '+' + digits;
+  return digits;
+}
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !SERVICE_KEY) {
@@ -31,7 +47,7 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 }
 
 const EMAIL = 'fixture-client-audit@book-n-pay.invalid';
-const PHONE = '0699999999';
+const PHONE = normalizePhone('0699999999');
 const NAME = '[FIXTURE PERMANENTE] Client Audit';
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
