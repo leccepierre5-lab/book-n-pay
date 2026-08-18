@@ -52,7 +52,12 @@ export default function RegisterForm() {
       if (res.status === 409) {
         setError(data.error || 'Ce compte existe déjà. Connectez-vous ou utilisez un autre email.');
         setLoading(false);
-        setTimeout(() => router.push(`/connexion?email=${encodeURIComponent(email)}`), 1800);
+        // Une collision téléphone n'a aucun rapport avec l'email saisi ici —
+        // rediriger vers /connexion avec CET email échouerait (aucun compte
+        // sous cet email). Seule une collision email justifie la redirection.
+        if (data.field !== 'phone') {
+          setTimeout(() => router.push(`/connexion?email=${encodeURIComponent(email)}`), 1800);
+        }
         return;
       }
       setError(data.error || "Une erreur est survenue. Réessaie.");

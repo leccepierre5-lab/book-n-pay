@@ -64,8 +64,13 @@ export async function POST(req: NextRequest) {
         .eq('phone', normalizedPhone)
         .maybeSingle();
       if (phoneOwner) {
+        // `field` distingue la collision téléphone de la collision email
+        // (ci-dessous) — le front ne doit PAS proposer les mêmes actions dans
+        // les deux cas : une collision téléphone n'a aucun rapport avec
+        // l'email que la personne vient de saisir, la rediriger vers
+        // /connexion avec CET email n'aboutirait qu'à un échec de connexion.
         return NextResponse.json(
-          { error: 'Ce numéro de téléphone est déjà associé à un compte. Connectez-vous ou utilisez un autre numéro.' },
+          { error: 'Ce numéro de téléphone est déjà associé à un compte. Connectez-vous ou utilisez un autre numéro.', field: 'phone' },
           { status: 409 }
         );
       }
@@ -102,7 +107,7 @@ export async function POST(req: NextRequest) {
         linkError.message?.toLowerCase().includes('already registered');
       if (isEmailExists) {
         return NextResponse.json(
-          { error: 'Ce compte existe déjà. Connectez-vous ou utilisez un autre email.' },
+          { error: 'Ce compte existe déjà. Connectez-vous ou utilisez un autre email.', field: 'email' },
           { status: 409 }
         );
       }

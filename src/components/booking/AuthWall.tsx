@@ -38,8 +38,13 @@ export default function AuthWall({ onAuth }: { onAuth: () => void }) {
         if (!res.ok) {
           if (res.status === 409) {
             setError(body.error || 'Ce compte existe déjà. Connectez-vous ou utilisez un autre email.');
-            setMode('login');
-            setPassword('');
+            // Collision téléphone : rien à voir avec l'email/mot de passe en
+            // cours de saisie, basculer en mode login n'aiderait pas — on
+            // laisse la personne corriger son numéro sur place.
+            if (body.field !== 'phone') {
+              setMode('login');
+              setPassword('');
+            }
           } else {
             setError(body.error || 'Une erreur est survenue.');
           }
