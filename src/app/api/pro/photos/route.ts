@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { randomUUID } from 'crypto';
 import { logAndRespond, withErrorHandling } from '@/lib/api-error';
+import { sniffImageType } from '@/lib/image-sniff';
 
 const MAX_PHOTOS = 5;
 
@@ -37,22 +38,28 @@ export const POST = withErrorHandling('[Photos]', async (req: NextRequest) => {
   const file = formData.get('file') as File | null;
   if (!file) return NextResponse.json({ error: 'Fichier manquant' }, { status: 400 });
 
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
-  const allowed = ['jpg', 'jpeg', 'png', 'webp'];
-  if (!allowed.includes(ext)) {
-    return NextResponse.json({ error: 'Format non supporté (jpg, png, webp)' }, { status: 400 });
-  }
-
   if (file.size > 5 * 1024 * 1024) {
     return NextResponse.json({ error: 'Fichier trop lourd (max 5 Mo)' }, { status: 400 });
   }
 
-  const path = `${profile.biz_id}/${randomUUID()}.${ext}`;
+  // Ni l'extension du nom de fichier ni file.type (Content-Type déclaré par
+  // le client) ne sont dignes de confiance — les deux sont falsifiables sans
+  // effort par un appel direct à l'API. Seuls les octets réels décident du
+  // format ET du Content-Type stocké (audit sécurité 18/08, voir
+  // src/lib/image-sniff.ts). Un fichier dont la signature binaire ne
+  // correspond à aucun format supporté est rejeté, quels que soient son nom
+  // ou son Content-Type déclaré.
   const bytes = await file.arrayBuffer();
+  const sniffed = sniffImageType(bytes);
+  if (!sniffed) {
+    return NextResponse.json({ error: 'Format non supporté (jpg, png, webp)' }, { status: 400 });
+  }
+
+  const path = `${profile.biz_id}/${randomUUID()}.${sniffed.ext}`;
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from('business-photos')
-    .upload(path, bytes, { contentType: file.type, upsert: false });
+    .upload(path, bytes, { contentType: sniffed.type, upsert: false });
 
   if (uploadError) return logAndRespond('[Photos] Erreur upload:', uploadError);
 
