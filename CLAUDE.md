@@ -169,3 +169,40 @@ sémantique, pas seulement de cohérence. Pour chaque condition qui déclenche
 un changement d'état, se demander si la condition correspond vraiment à
 l'événement métier qu'elle prétend représenter — pas seulement si elle est
 cohérente avec le reste du code.
+
+# Tester un parcours connecté sans mot de passe
+
+Posé le 18/08/2026 : le parcours navigateur obligatoire ci-dessus impose de
+se connecter pour tester les écrans authentifiés, mais Claude n'a et ne
+saisira jamais de mot de passe dans un champ — règle dure permanente, y
+compris pour un compte de test entièrement sous contrôle service_role
+(confirmée par Pierre le 14/08, ré-confirmée le 18/08 face à une demande
+explicite de contournement). Un bypass conditionné à une variable d'env
+(`NODE_ENV==='development'` ou équivalent) a été écarté : ça ajoute une
+porte dérobée permanente dans le code livré, dépendante d'une variable qui
+peut être mal positionnée (ex. preview Vercel, publiquement accessible).
+
+**Solution retenue : lien `recovery` généré par script, jamais de champ
+mot de passe touché.**
+- `scripts/audit/passwordless-login-link.mjs <email> [baseUrl]` appelle
+  `supabase.auth.admin.generateLink({ type: 'recovery', email })` avec la
+  clé `service_role` lue depuis l'environnement (jamais en dur, jamais
+  loggée). Réutilise `src/app/auth/verify/route.ts`, qui autorise déjà
+  `recovery` dans `ALLOWED_TYPES` — c'est le code qui gère en prod les
+  vrais emails "mot de passe oublié". **Zéro ligne de code nouvelle côté
+  app.** La clé service_role peut déjà tout faire en base (y compris
+  changer un mot de passe) : ceci n'ouvre aucune porte qui ne soit déjà
+  ouverte par cette clé.
+- Coller l'URL affichée dans l'onglet du dev local : une vraie session est
+  posée (cookies), redirection vers `/mon-compte?reset=1` — ignorer cet
+  écran et naviguer directement vers la page à tester, la session reste
+  valide. Lien à usage unique, expiration Supabase par défaut.
+- `scripts/audit/create-fixture-client.mjs` crée le fixture client
+  permanent `fixture-client-audit@book-n-pay.invalid` (phone
+  `0699999999`, `role='client'` via le trigger `handle_new_user`) —
+  aucun fixture client n'existait avant le 18/08, les 13 fixtures
+  précédentes sont toutes des comptes pro. **Ne jamais supprimer.**
+  Mot de passe généré aléatoirement à la création, jamais affiché ni
+  loggué — inutile, la connexion passe uniquement par le script ci-dessus.
+- Ces deux scripts vivent dans `scripts/`, jamais dans `src/` — rien de ce
+  mécanisme ne se retrouve dans le bundle applicatif livré.
