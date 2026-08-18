@@ -27,13 +27,22 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { bizId, bizName, serviceId, serviceName, staffId, staffName, date, time, clientPhone: rawClientPhone, clientEmail } = body;
+    const { bizId, serviceId, staffId, date, time, clientPhone: rawClientPhone } = body;
     // Fallback serveur : user_metadata ou email si le profil app_users n'existe pas encore
     const clientName: string =
       body.clientName ||
       (authData.user?.user_metadata as any)?.name ||
       authData.user?.email ||
       'Client';
+    // bizName/serviceName/staffName/clientEmail ne viennent JAMAIS du corps de
+    // la requête — audit sécurité 18/08 : un appel direct à l'API (hors UI,
+    // qui n'envoie que ses propres données) pouvait faire stocker n'importe
+    // quelle valeur, notamment un clientEmail arbitraire réutilisé par la
+    // suite pour l'email de confirmation réel (signé Book'nPay, DKIM/SPF
+    // valides) — vecteur de phishing crédible. Rechargées ci-dessous depuis
+    // bizId/serviceId/staffId (biz/service/staff) et depuis la session
+    // authentifiée (email) — jamais depuis le client.
+    const clientEmail: string | null = authData.user?.email || null;
 
     if (!bizId || !serviceId || !date || !time) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 });
@@ -58,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     const { data: business } = await supabase
       .from('businesses')
-      .select('frozen, owner_id, slug')
+      .select('name, frozen, owner_id, slug')
       .eq('id', bizId)
       .maybeSingle();
     if (business?.frozen) {
@@ -66,6 +75,39 @@ export async function POST(req: NextRequest) {
         { error: 'Cet établissement est temporairement indisponible.' },
         { status: 423 }
       );
+    }
+
+    const supabaseService = createServiceRoleClient();
+
+    // Chargé ici (pas au moment de l'assignation staff plus bas) pour être
+    // disponible aussi côté chemin démo juste après — voir le commentaire
+    // sur clientEmail plus haut, même raison : ne jamais faire confiance à
+    // serviceName/bizName transmis par le client.
+    const { data: service } = await supabaseService
+      .from('services')
+      .select('name, biz_id, allow_group, duration_minutes')
+      .eq('id', serviceId)
+      .maybeSingle();
+    if (!service || service.biz_id !== bizId) {
+      return NextResponse.json({ error: 'Service invalide pour cet établissement.' }, { status: 400 });
+    }
+    const bizName = business?.name || '';
+    const serviceName = service.name;
+    // Même raison que bizName/serviceName ci-dessus — ne jamais faire
+    // confiance à staffName transmis par le client. Vérifie aussi que le
+    // praticien appartient bien à CET établissement (aucun contrôle
+    // n'existait avant sur ce point).
+    let staffName: string | null = null;
+    if (staffId) {
+      const { data: staff } = await supabaseService
+        .from('staff')
+        .select('name, biz_id')
+        .eq('id', staffId)
+        .maybeSingle();
+      if (!staff || staff.biz_id !== bizId) {
+        return NextResponse.json({ error: 'Praticien invalide pour cet établissement.' }, { status: 400 });
+      }
+      staffName = staff.name;
     }
     // Garde-fou — 1124 fiches "démo" (isNonRealBusiness, voir
     // lib/queries/catalog.ts) sont publiées et recherchables (catalogue
@@ -89,7 +131,7 @@ export async function POST(req: NextRequest) {
       if (business && isNonRealBusiness(business) && isDemoTesterEmail(authData.user?.email)) {
         return NextResponse.json({
           demo: true,
-          booking: { biz_name: bizName, service_name: serviceName, staff_name: staffName || null, date, time },
+          booking: { biz_name: bizName, service_name: serviceName, staff_name: staffName, date, time },
         });
       }
       return NextResponse.json(
@@ -110,14 +152,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: bookingBlockedMessage(blockedRole), code }, { status: 403 });
       }
     }
-
-    const supabaseService = createServiceRoleClient();
-
-    const { data: service } = await supabaseService
-      .from('services')
-      .select('allow_group, duration_minutes')
-      .eq('id', serviceId)
-      .maybeSingle();
 
     // Assignation praticien — uniquement pour les services individuels
     // (allow_group === false) d'un business qui a des praticiens actifs.
@@ -250,7 +284,7 @@ export async function POST(req: NextRequest) {
         serviceId,
         serviceName,
         staffId: staffId || null,
-        staffName: staffName || null,
+        staffName,
         date,
         time,
         clientId: authData.user?.id || null,

@@ -29,10 +29,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createServiceRoleClient: vi.fn(() => ({
     from: (table: string) => {
       if (table === 'businesses') {
-        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { frozen: false, owner_id: 'pro-1', slug: 'biz-test' }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { name: 'Biz', frozen: false, owner_id: 'pro-1', slug: 'biz-test' }, error: null }) }) }) };
       }
       if (table === 'services') {
-        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { allow_group: true, duration_minutes: 60 }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { name: 'Svc', biz_id: 'biz-1', allow_group: true, duration_minutes: 60 }, error: null }) }) }) };
       }
       if (table === 'app_users') {
         return {

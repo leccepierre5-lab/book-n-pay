@@ -45,11 +45,18 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const {
-      bizId, bizName, serviceId, serviceName, staffId, staffName,
-      date, slots, mode, clientName, clientPhone: rawClientPhone, clientEmail,
+      bizId, serviceId, staffId,
+      date, slots, mode, clientName, clientPhone: rawClientPhone,
       guestNames = [],   // Mode A: optional participant names
       guests = [],       // Mode B: [{ name?, phone }] for each invited guest
     } = body;
+    // bizName/serviceName/staffName/clientEmail ne viennent JAMAIS du corps de
+    // la requête — même correctif que bookings/create/route.ts (audit
+    // sécurité 18/08) : un clientEmail arbitraire serait réutilisé pour
+    // l'email de confirmation réel (signé Book'nPay, DKIM/SPF valides),
+    // vecteur de phishing crédible. Rechargées plus bas depuis bizId/
+    // serviceId/staffId et depuis la session authentifiée.
+    const clientEmail: string | null = authData.user?.email || null;
 
     if (!bizId || !serviceId || !date || !Array.isArray(slots) || slots.length < 2) {
       return NextResponse.json({ error: 'Champs requis manquants (slots min 2)' }, { status: 400 });
@@ -121,11 +128,36 @@ export async function POST(req: NextRequest) {
     // Check biz not frozen
     const { data: biz } = await supabaseService
       .from('businesses')
-      .select('frozen, owner_id, slug')
+      .select('name, frozen, owner_id, slug')
       .eq('id', bizId)
       .maybeSingle();
     if (biz?.frozen) {
       return NextResponse.json({ error: 'Établissement temporairement indisponible.' }, { status: 423 });
+    }
+
+    // Chargé ici (avant le bloc démo qui les affiche) — jamais depuis le
+    // corps de la requête, voir commentaire clientEmail plus haut.
+    const { data: service } = await supabaseService
+      .from('services')
+      .select('name, biz_id, allow_group, duration_minutes')
+      .eq('id', serviceId)
+      .maybeSingle();
+    if (!service || service.biz_id !== bizId) {
+      return NextResponse.json({ error: 'Service invalide pour cet établissement.' }, { status: 400 });
+    }
+    const bizName = biz?.name || '';
+    const serviceName = service.name;
+    let staffName: string | null = null;
+    if (staffId) {
+      const { data: staff } = await supabaseService
+        .from('staff')
+        .select('name, biz_id')
+        .eq('id', staffId)
+        .maybeSingle();
+      if (!staff || staff.biz_id !== bizId) {
+        return NextResponse.json({ error: 'Praticien invalide pour cet établissement.' }, { status: 400 });
+      }
+      staffName = staff.name;
     }
     // Même garde-fou que bookings/create/route.ts (isNonRealBusiness, source
     // unique partagée avec le noindex SEO) — voir ce fichier pour le
@@ -232,12 +264,6 @@ export async function POST(req: NextRequest) {
         staffChoice: staffChoicesRaw[i] ?? null,
       };
     });
-
-    const { data: service } = await supabaseService
-      .from('services')
-      .select('allow_group, duration_minutes')
-      .eq('id', serviceId)
-      .maybeSingle();
 
     let staffRows: { id: string; name: string }[] = [];
     if (service && service.allow_group === false) {
@@ -416,7 +442,7 @@ export async function POST(req: NextRequest) {
             serviceId,
             serviceName,
             staffId: staffId || null,
-            staffName: staffName || null,
+            staffName,
             date,
             time: p.slot,
             clientId: p.isOrganizer ? (authData.user?.id || null) : null,

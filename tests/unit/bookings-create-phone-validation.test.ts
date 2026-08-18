@@ -54,7 +54,7 @@ vi.mock('@/lib/supabase/server', () => ({
         return {
           select: () => ({
             eq: () => ({
-              maybeSingle: async () => ({ data: { frozen: false, owner_id: 'pro-1', slug: 'biz-test' }, error: null }),
+              maybeSingle: async () => ({ data: { name: 'Biz', frozen: false, owner_id: 'pro-1', slug: 'biz-test' }, error: null }),
             }),
           }),
         };
@@ -68,7 +68,7 @@ vi.mock('@/lib/supabase/server', () => ({
         return {
           select: () => ({
             eq: () => ({
-              maybeSingle: async () => ({ data: { allow_group: true, duration_minutes: 60 }, error: null }),
+              maybeSingle: async () => ({ data: { name: 'Svc', biz_id: 'biz-1', allow_group: true, duration_minutes: 60 }, error: null }),
             }),
           }),
         };
