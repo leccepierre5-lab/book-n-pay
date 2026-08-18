@@ -21,7 +21,7 @@ export async function createClient() {
             );
           } catch {
             // setAll appelé depuis un Server Component : ignorable si le
-            // middleware rafraîchit déjà les sessions.
+            // proxy rafraîchit déjà les sessions.
           }
         },
       },

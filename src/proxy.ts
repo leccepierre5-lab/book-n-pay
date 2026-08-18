@@ -17,7 +17,7 @@ import { isTesterOnlyBusiness } from '@/lib/business-helpers';
 // décide de rendre ensuite, d'où le fix ici plutôt que dans page.tsx.
 const ETABLISSEMENT_SLUG_RE = /^\/etablissement\/([^/]+)\/?$/;
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
