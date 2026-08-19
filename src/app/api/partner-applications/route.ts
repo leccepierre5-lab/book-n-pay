@@ -17,6 +17,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { logAndRespond } from '@/lib/api-error';
 import { CGU_VERSION } from '@/lib/legal';
+import { isValidPhoneFormat, normalizePhone } from '@/lib/booking-utils';
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,13 +60,23 @@ export async function POST(req: NextRequest) {
     if (cguAccepted !== true) {
       return NextResponse.json({ error: 'Vous devez accepter les CGU/CGV pour envoyer votre candidature.' }, { status: 400 });
     }
+    // Validé côté serveur depuis que cette route existe (audit 19/08) — avant
+    // ça, partner_applications.phone venait d'un insert client direct, jamais
+    // vérifié (voir commentaire historique dans admin/applications/route.ts).
+    // Un format invalide devenait silencieusement le numéro de contact public
+    // affiché sur la fiche pro à l'approbation (audit 15/08). Stocké normalisé
+    // — même format que partout ailleurs (booking_members.phone, app_users.phone).
+    if (phone && !isValidPhoneFormat(phone)) {
+      return NextResponse.json({ error: 'Numéro de téléphone invalide.' }, { status: 400 });
+    }
+    const normalizedPhone = phone ? normalizePhone(phone) : null;
 
     const supabase = createServiceRoleClient();
     const { error: insertError } = await supabase.from('partner_applications').insert({
       etablissement,
       gerant,
       email,
-      phone: phone || null,
+      phone: normalizedPhone,
       google_maps_url: googleMapsUrl || null,
       instagram: instagram || null,
       website: website || null,

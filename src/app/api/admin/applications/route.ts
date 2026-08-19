@@ -187,13 +187,15 @@ export async function POST(req: NextRequest) {
         frozen: false,
         instagram: app.instagram ?? null,
         website: app.website ?? null,
-        // partner_applications.phone est saisi via un insert direct côté
-        // client (PartnerApplicationForm.tsx, pas de route API entre les
-        // deux) — jamais validé côté serveur avant ce point. Un format
-        // invalide ("okokokok") deviendrait sinon le numéro de contact
-        // PUBLIC affiché sur la fiche pro (audit 15/08) : on ne bloque pas
-        // l'approbation pour ça (le candidat n'est pas là pour corriger),
-        // on n'affiche simplement rien plutôt qu'un numéro injoignable.
+        // partner_applications.phone est validé et normalisé dès la
+        // soumission depuis le 19/08 (api/partner-applications/route.ts) —
+        // avant ça, un insert client direct sans route API le laissait
+        // passer sans aucun contrôle. `phoneRejected` reste un filet pour
+        // les candidatures antérieures à ce correctif : un format invalide
+        // ("okokokok") deviendrait sinon le numéro de contact PUBLIC affiché
+        // sur la fiche pro (audit 15/08) — on ne bloque pas l'approbation
+        // pour ça (le candidat n'est pas là pour corriger), on n'affiche
+        // simplement rien plutôt qu'un numéro injoignable.
         phone: phoneRejected ? null : (app.phone ? normalizePhone(app.phone) : null),
         google_place_url: app.google_maps_url ?? null,
         open_days: deriveOpenDays(app.creneaux as Creneau[] | null),
