@@ -29,16 +29,37 @@ const DAY_LABELS: Record<number, string> = { 0: 'Dim', 1: 'Lun', 2: 'Mar', 3: 'M
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const SCHEMA_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// Sous-type schema.org par catégorie métier (consigne SEO du 19/08) — mappé
+// sur CATEGORIES (lib/categories.ts), pas sur business.type (texte libre saisi
+// par le pro, pas un vocabulaire contrôlé, trop de valeurs possibles pour un
+// mapping fiable). 'sante' volontairement PAS MedicalBusiness : le schema.org
+// MedicalBusiness implique un cadre de soin médical réglementé (spécialité,
+// assurance...) alors que "santé" ici couvre du paramédical/bien-être
+// indépendant (Book'nPay est un site beauté & bien-être, pas un annuaire
+// médical) — un mauvais typage ici serait plus trompeur pour Google qu'un
+// type générique. Pas de type schema.org dédié pour animaux/photographie :
+// LocalBusiness générique par défaut, comme demandé dans la consigne.
+const CATEGORY_SCHEMA_TYPE: Record<string, string> = {
+  beaute: 'BeautySalon',
+  'bien-etre': 'HealthAndBeautyBusiness',
+  sport: 'SportsActivityLocation',
+  sante: 'HealthAndBeautyBusiness',
+  'soins-corps': 'HealthAndBeautyBusiness',
+  'coiffure-barber': 'HairSalon',
+  'tatouage-piercing': 'TattooParlor',
+  coaching: 'ProfessionalService',
+  'beaute-domicile': 'HealthAndBeautyBusiness',
+};
+
 // JSON-LD LocalBusiness — chantier SEO c. Deux branches adresse/geo, jamais
 // mélangées : address_public=true expose address+geo précis (business_locations,
 // déjà filtré par RLS en amont — voir migration 0037) ; sinon areaServed sur la
 // ville publique (businesses.city) + rayon (businesses.service_area_radius_km),
 // aucune coordonnée personnelle du pro dans ce second cas.
-function buildBusinessJsonLd(business: BusinessWithDetails, coverPhotoUrl: string | undefined) {
+export function buildBusinessJsonLd(business: BusinessWithDetails, coverPhotoUrl: string | undefined) {
   const location = business.business_locations;
   const jsonLd: Record<string, unknown> = {
-    '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
+    '@type': CATEGORY_SCHEMA_TYPE[business.category] || 'LocalBusiness',
     name: business.name,
     url: `${SITE_URL}/etablissement/${business.slug}`,
   };
@@ -89,9 +110,45 @@ function buildBusinessJsonLd(business: BusinessWithDetails, coverPhotoUrl: strin
       price: s.price,
       priceCurrency: 'EUR',
     }));
+
+    // Dérivé des prix de services réels (pas une donnée saisie séparément en
+    // base) — min=max affiché comme un prix unique plutôt qu'une plage
+    // dégénérée ("50–50 €").
+    const prices = offerServices.map((s) => s.price);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    jsonLd.priceRange = min === max ? `${min} €` : `${min}–${max} €`;
   }
 
+  // Pas d'aggregateRating malgré business_reviews.rating potentiellement
+  // renseigné : cf. commentaire au-dessus sur business_reviews (saisie
+  // manuelle, pas de business_review_items visible derrière) — même motif,
+  // décision maintenue à la demande explicite de la consigne du 19/08 (voir
+  // résumé de session).
+
   return jsonLd;
+}
+
+// BreadcrumbList Accueil > Catégorie > Établissement — catégorie omise si
+// business.category ne matche aucun label connu (CATEGORIES), jamais un
+// libellé inventé.
+export function buildBreadcrumbJsonLd(business: BusinessWithDetails) {
+  const categoryLabel = CATEGORIES.find((c) => c.id === business.category)?.label;
+  const items: { name: string; url: string }[] = [{ name: 'Accueil', url: SITE_URL }];
+  if (categoryLabel) {
+    items.push({ name: categoryLabel, url: `${SITE_URL}/recherche?category=${business.category}` });
+  }
+  items.push({ name: business.name, url: `${SITE_URL}/etablissement/${business.slug}` });
+
+  return {
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: item.name,
+      item: item.url,
+    })),
+  };
 }
 
 export async function generateMetadata({
@@ -217,10 +274,22 @@ export default async function EtablissementPage({
 
   return (
     <div className="relative">
-      {!isNonRealBusiness(business) && (
+      {/* isExcludedFromPublicIndex, pas isNonRealBusiness : les vitrines
+          commerciales (SHOWCASE_SLUGS, ex. demo-book-n-pay) restent
+          réservables (isNonRealBusiness=false) mais sont déjà en noindex
+          côté metadata (generateMetadata ci-dessus) — le JSON-LD doit suivre
+          la même règle, sinon Google reçoit des données structurées décrivant
+          un commerce réel sur une page qu'il lui est par ailleurs interdit
+          d'indexer. */}
+      {!isExcludedFromPublicIndex(business) && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(buildBusinessJsonLd(business, photos[0]?.url)) }}
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@graph': [buildBusinessJsonLd(business, photos[0]?.url), buildBreadcrumbJsonLd(business)],
+            }),
+          }}
         />
       )}
       <div className="px-4 pt-4">
