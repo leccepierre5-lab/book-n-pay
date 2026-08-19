@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 import PageTransition from '@/components/PageTransition';
 import CookieBanner from '@/components/layout/CookieBanner';
@@ -87,6 +89,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <PageTransition>{children}</PageTransition>
         <CookieBanner />
+        {/* Sans cookie (Vercel Web Analytics/Speed Insights, pas GA) — pas
+            soumis au consentement RGPD, contrairement à CookieBanner
+            ci-dessus. En dev, les deux composants chargent leur script debug
+            (log console) au lieu d'envoyer les vrais beacons de collecte —
+            comportement par défaut du package, rien à conditionner ici. */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
