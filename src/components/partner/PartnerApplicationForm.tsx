@@ -1,8 +1,6 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
-import { CGU_VERSION } from '@/lib/legal';
 import { getPlanConfig, type PlanKey } from '@/lib/plans-config';
 import { PRACTITIONERS_COUNT_OPTIONS, BOOKINGS_ESTIMATE_OPTIONS } from '@/lib/partner-plan-suggestion';
 import { PHONE_INPUT_PATTERN, PHONE_INPUT_TITLE } from '@/lib/booking-utils';
@@ -72,6 +70,10 @@ export default function PartnerApplicationForm({ initialPlan }: { initialPlan?: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [acceptedCgu, setAcceptedCgu] = useState(false);
+  // Honeypot anti-bot (audit 19/08) — champ hors-écran distinct de
+  // `form.website` (déjà un vrai champ métier, le site web du pro). Voir
+  // api/partner-applications/route.ts pour le check serveur.
+  const [company, setCompany] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,25 +86,30 @@ export default function PartnerApplicationForm({ initialPlan }: { initialPlan?: 
     if (!acceptedCgu) { setError('Vous devez accepter les CGU/CGV pour envoyer votre candidature.'); return; }
     setLoading(true);
     setError(null);
-    const supabase = createClient();
-    const { error: insertError } = await supabase.from('partner_applications').insert({
-      etablissement: form.etablissement,
-      gerant: form.gerant,
-      email: form.email,
-      phone: form.phone || null,
-      google_maps_url: form.googleMapsUrl || null,
-      instagram: form.instagram || null,
-      website: form.website || null,
-      category,
-      category_label: category === 'autre' ? (categoryLabel.trim() || null) : null,
-      type: bizType.trim() || null,
-      monthly_bookings_estimate: bookingsEstimate || null,
-      practitioners_count: practitionersCount,
-      cgu_accepted_at: new Date().toISOString(),
-      cgu_version: CGU_VERSION,
+
+    const res = await fetch('/api/partner-applications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        etablissement: form.etablissement,
+        gerant: form.gerant,
+        email: form.email,
+        phone: form.phone,
+        googleMapsUrl: form.googleMapsUrl,
+        instagram: form.instagram,
+        website: form.website,
+        category,
+        categoryLabel,
+        bizType,
+        bookingsEstimate,
+        practitionersCount,
+        cguAccepted: acceptedCgu,
+        company,
+      }),
     });
-    if (insertError) {
-      setError(insertError.message);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || 'Une erreur est survenue. Réessaie.');
       setLoading(false);
       return;
     }
@@ -129,6 +136,19 @@ export default function PartnerApplicationForm({ initialPlan }: { initialPlan?: 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Honeypot anti-bot — voir commentaire sur le state `company` ci-dessus */}
+      <div className="absolute -left-[9999px] w-px h-px overflow-hidden" aria-hidden="true">
+        <label htmlFor="company">Entreprise</label>
+        <input
+          type="text"
+          id="company"
+          name="company"
+          tabIndex={-1}
+          autoComplete="off"
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+        />
+      </div>
       <div>
         <p className="text-[10px] font-bold tracking-[0.2em] text-mint-500/70 uppercase mb-1">ÉTAPE 1 / 3</p>
         <div className="h-1 rounded-full bg-navy-900 overflow-hidden">
