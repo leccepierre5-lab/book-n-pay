@@ -19,6 +19,12 @@ export default function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
   const [acceptedCgu, setAcceptedCgu] = useState(false);
+  // Honeypot anti-bot (audit 19/08) — champ hors-écran (pas display:none, que
+  // les bots détectent), ignoré des lecteurs d'écran et jamais rempli par un
+  // gestionnaire de mots de passe (pas de type email/password, autocomplete
+  // off, nom générique). Un humain ne le voit ni ne le remplit jamais ; s'il
+  // arrive rempli au serveur, c'est un bot — voir api/auth/register/route.ts.
+  const [website, setWebsite] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +49,7 @@ export default function RegisterForm() {
         phone,
         referralCode: referralCode || null,
         cguAccepted: acceptedCgu,
+        website,
       }),
     });
 
@@ -93,6 +100,19 @@ export default function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      {/* Honeypot anti-bot — voir commentaire sur le state `website` ci-dessus */}
+      <div className="absolute -left-[9999px] w-px h-px overflow-hidden" aria-hidden="true">
+        <label htmlFor="website">Site web</label>
+        <input
+          type="text"
+          id="website"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+        />
+      </div>
       {referralCode && (
         <div className="rounded-2xl bg-amber-500/8 border border-amber-500/20 px-4 py-3 flex items-start gap-3">
           <span className="text-base shrink-0">🎁</span>

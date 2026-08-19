@@ -28,7 +28,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Trop de tentatives, réessaie dans quelques minutes.' }, { status: 429 });
     }
 
-    const { email, password, name, phone, referralCode, cguAccepted } = await req.json();
+    const { email, password, name, phone, referralCode, cguAccepted, website } = await req.json();
+
+    // Honeypot anti-bot (audit 19/08) — `website` est un champ hors-écran
+    // invisible pour un humain (voir RegisterForm.tsx), jamais rempli par un
+    // vrai visiteur. Un bot qui remplit tous les champs le remplit aussi.
+    // Réponse de succès factice IDENTIQUE à un vrai succès : un bot qui
+    // recevrait une erreur apprendrait qu'il a été détecté et s'adapterait.
+    // Aucune écriture, aucun email envoyé — juste un log pour mesurer le
+    // spam réel avant d'investir plus (ex. Turnstile).
+    if (website) {
+      console.warn(`[register] Honeypot déclenché — IP ${getClientIp(req)}, champ rempli: "${website}"`);
+      return NextResponse.json({ ok: true, emailSent: true });
+    }
+
     if (!email || !password) {
       return NextResponse.json({ error: 'email et password requis' }, { status: 400 });
     }
