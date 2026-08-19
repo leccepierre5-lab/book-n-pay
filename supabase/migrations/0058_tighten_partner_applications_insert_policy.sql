@@ -1,0 +1,24 @@
+-- 0058_tighten_partner_applications_insert_policy.sql
+--
+-- Ferme l'insert public direct sur partner_applications (audit 19/08). Depuis
+-- que PartnerApplicationForm.tsx passe par api/partner-applications/route.ts
+-- (service role, qui ignore RLS de toute façon), la policy
+-- partner_applications_insert_public (WITH CHECK true, 0022/0034/0043) ne
+-- protège plus aucun usage légitime — elle laisse seulement n'importe qui
+-- insérer directement via la clé anon publique (embarquée dans le bundle
+-- client par nature), contournant honeypot et rate limit de la route.
+--
+-- Vérifié avant ce commit : plus aucun insert client dans le repo sur cette
+-- table (grep exhaustif de `partner_applications` dans src/), seul le
+-- service role écrit désormais.
+--
+-- Après ce DROP, sans policy INSERT restante, RLS refuse par défaut tout
+-- insert anon/authenticated — le service role continue de fonctionner
+-- normalement (bypass RLS indépendant des policies). SELECT/UPDATE restent
+-- admin-only (partner_applications_select_admin/update_admin, inchangées).
+--
+-- DROP seul (pas de nouvelle CREATE POLICY) : aucun insert légitime à
+-- réautoriser pour anon/authenticated, le seul chemin d'écriture est la
+-- route serveur.
+
+DROP POLICY IF EXISTS "partner_applications_insert_public" ON "public"."partner_applications";
