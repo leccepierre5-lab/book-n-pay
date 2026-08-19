@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const serviceSupabase = createServiceRoleClient();
     const { data: settings } = await serviceSupabase
       .from('business_settings')
-      .select('*')
+      .select('stripe_account_id, stripe_onboarding_complete')
       .eq('biz_id', bizId)
       .maybeSingle();
 

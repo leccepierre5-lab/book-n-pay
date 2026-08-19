@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const serviceSupabase = createServiceRoleClient();
     const { data: booking } = await serviceSupabase
       .from('bookings')
-      .select('*')
+      .select('biz_id, service_name, biz_name, date, time, client_phone, client_email')
       .eq('id', bookingId)
       .maybeSingle();
     if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     const { data: member } = await serviceSupabase
       .from('booking_members')
-      .select('*')
+      .select('phone, name, email')
       .eq('id', memberId)
       .eq('booking_id', bookingId)
       .maybeSingle();

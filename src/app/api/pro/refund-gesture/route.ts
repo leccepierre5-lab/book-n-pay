@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     const { data: member } = await serviceSupabase
       .from('booking_members')
-      .select('*')
+      .select('status, deposit, email, name, stripe_checkout_session_id, stripe_payment_intent_id')
       .eq('id', memberId)
       .eq('booking_id', bookingId)
       .maybeSingle();

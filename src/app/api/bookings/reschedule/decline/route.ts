@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceRoleClient();
     const { data: proposal } = await supabase
       .from('reschedule_proposals')
-      .select('*')
+      .select('id, booking_id, status, proposed_date, proposed_time')
       .eq('token', token)
       .maybeSingle();
     if (!proposal) return NextResponse.json({ error: 'Lien invalide' }, { status: 404 });

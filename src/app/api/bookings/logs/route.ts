@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('booking_logs')
-    .select('*')
+    .select('id, booking_id, message, created_at')
     .eq('booking_id', bookingId)
     .order('created_at', { ascending: true });
 

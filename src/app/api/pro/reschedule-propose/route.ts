@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const serviceSupabase = createServiceRoleClient();
     const { data: booking } = await serviceSupabase
       .from('bookings')
-      .select('*')
+      .select('biz_id, status, group_ref, date, time, biz_name, service_name, client_email, client_name')
       .eq('id', bookingId)
       .maybeSingle();
 

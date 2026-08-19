@@ -45,14 +45,14 @@ export async function POST(req: NextRequest) {
 
     const { data: booking } = await serviceSupabase
       .from('bookings')
-      .select('*, services(duration_minutes), businesses(business_locations(address))')
+      .select('client_id, date, time, ics_sequence, biz_name, service_name, services(duration_minutes), businesses(business_locations(address))')
       .eq('id', bookingId)
       .maybeSingle();
     if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });
 
     const { data: member } = await serviceSupabase
       .from('booking_members')
-      .select('*')
+      .select('deposit, name, phone, status, stripe_checkout_session_id, stripe_payment_intent_id')
       .eq('id', memberId)
       .eq('booking_id', bookingId)
       .maybeSingle();

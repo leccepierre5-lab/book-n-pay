@@ -31,7 +31,7 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
 
   const { data: failure } = await serviceSupabase
     .from('refund_failures')
-    .select('*')
+    .select('booking_id, stripe_charge_id, amount_cents, attempts')
     .eq('id', id)
     .eq('status', 'open')
     .maybeSingle();

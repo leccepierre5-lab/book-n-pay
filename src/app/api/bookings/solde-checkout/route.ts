@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     const { data: member } = await serviceSupabase
       .from('booking_members')
-      .select('*')
+      .select('status, balance_payment_status, solde_checkout_session_id, email, deposit, referral_discount_pct')
       .eq('id', memberId)
       .eq('booking_id', bookingId)
       .maybeSingle();

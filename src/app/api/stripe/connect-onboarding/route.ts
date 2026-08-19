@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     const { data: existing } = await serviceSupabase
       .from('business_settings')
-      .select('*')
+      .select('stripe_account_id')
       .eq('biz_id', bizId)
       .maybeSingle();
 

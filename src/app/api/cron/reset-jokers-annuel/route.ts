@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceRoleClient();
   const oneYearAgo = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString().split('T')[0];
 
-  const { data: users } = await supabase.from('app_users').select('*');
+  const { data: users } = await supabase.from('app_users').select('id, name, phone, statut, derniere_activite');
 
   let reset = 0;
   let degraded = 0;

@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
 
     const { data: user } = await serviceSupabase
       .from('app_users')
-      .select('*')
+      .select('id, name, statut, jokers_disponibles, jokers_utilises')
       .eq('phone', phone)
       .maybeSingle();
 

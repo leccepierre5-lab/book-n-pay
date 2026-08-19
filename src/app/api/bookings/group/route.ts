@@ -91,12 +91,18 @@ export async function POST(req: NextRequest) {
 
       const { data: booking } = await supabase
         .from('bookings')
-        .select('*, booking_members(*), services(max_persons), businesses(phone)')
+        .select('booking_members(name, phone, status), services(max_persons), businesses(phone)')
         .eq('id', bookingId)
         .maybeSingle();
       if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });
 
       const members = booking.booking_members || [];
+      // services/businesses sont des relations un-à-un (un booking a un seul
+      // service/business), mais le typage généré par postgrest-js infère un
+      // tableau faute de métadonnées de cardinalité (database.types.ts est
+      // maintenu à la main) — même normalisation que cancel/reschedule-accept.
+      const bizRel = Array.isArray(booking.businesses) ? booking.businesses[0] : booking.businesses;
+      const serviceRel = Array.isArray(booking.services) ? booking.services[0] : booking.services;
 
       const existingByPhone = members.find(
         (m: any) => m.phone && m.phone === memberData.phone && m.status !== 'cancelled'
@@ -107,7 +113,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ alreadyJoined: true });
       }
 
-      if (memberData.phone && memberData.phone === booking.businesses?.phone) {
+      if (memberData.phone && memberData.phone === bizRel?.phone) {
         return NextResponse.json(
           { error: "Un établissement ne peut pas rejoindre sa propre réservation." },
           { status: 400 }
@@ -129,8 +135,8 @@ export async function POST(req: NextRequest) {
       }
 
       const activeMembers = members.filter((m: any) => m.status !== 'cancelled');
-      const hardLimit = booking.services?.max_persons
-        ? Math.min(booking.services.max_persons, MAX_GROUP_SIZE)
+      const hardLimit = serviceRel?.max_persons
+        ? Math.min(serviceRel.max_persons, MAX_GROUP_SIZE)
         : MAX_GROUP_SIZE;
       if (activeMembers.length >= hardLimit) {
         return NextResponse.json(
@@ -196,7 +202,7 @@ export async function POST(req: NextRequest) {
 
       const { data: member } = await supabase
         .from('booking_members')
-        .select('*')
+        .select('name, phone, status')
         .eq('id', memberId)
         .eq('booking_id', bookingId)
         .maybeSingle();
@@ -219,7 +225,7 @@ export async function POST(req: NextRequest) {
     if (action === 'cancelExpiredBooking') {
       const { data: booking } = await supabase
         .from('bookings')
-        .select('*, booking_members(*)')
+        .select('booking_members(id, status, invite_expiry)')
         .eq('id', bookingId)
         .maybeSingle();
       if (!booking) return NextResponse.json({ error: 'Réservation introuvable' }, { status: 404 });

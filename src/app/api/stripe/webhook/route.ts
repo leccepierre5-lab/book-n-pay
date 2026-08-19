@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     try {
       const { data: member } = await supabase
         .from('booking_members')
-        .select('*')
+        .select('status, member_ref, name, qr_code')
         .eq('id', memberId)
         .eq('booking_id', bookingId)
         .maybeSingle();
