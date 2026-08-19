@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logAndRespond } from '@/lib/api-error';
+import { normalizePhone } from '@/lib/booking-utils';
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,8 +16,13 @@ export async function GET(req: NextRequest) {
     if (!authData.user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const phone = searchParams.get('phone');
-    if (!phone) return NextResponse.json({ error: 'phone requis' }, { status: 400 });
+    const rawPhone = searchParams.get('phone');
+    if (!rawPhone) return NextResponse.json({ error: 'phone requis' }, { status: 400 });
+    // Aujourd'hui toujours une valeur déjà en base (member.phone, voir
+    // FicheClientIntelligente.tsx), donc déjà normalisée après 0059/0060 —
+    // normalisé quand même pour ne pas dépendre silencieusement de ça si un
+    // futur appelant passe un numéro saisi à la main.
+    const phone = normalizePhone(rawPhone);
 
     const { data: profile } = await supabase
       .from('app_users')

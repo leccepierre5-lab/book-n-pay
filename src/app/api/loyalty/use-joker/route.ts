@@ -18,6 +18,7 @@ import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
+import { normalizePhone } from '@/lib/booking-utils';
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,14 +31,21 @@ export async function POST(req: NextRequest) {
     // gonfler le montant remboursé ou cibler le PaymentIntent de quelqu'un
     // d'autre. Les deux sont maintenant recalculés depuis targetMember
     // ci-dessous, jamais depuis une valeur transmise par le client.
-    const { phone, bookingId, memberId } = await req.json();
+    const { phone: rawPhone, bookingId, memberId } = await req.json();
 
-    if (!phone || !bookingId || !memberId) {
+    if (!rawPhone || !bookingId || !memberId) {
       return NextResponse.json(
         { error: 'Paramètres manquants: phone, bookingId, memberId requis' },
         { status: 400 }
       );
     }
+
+    // Normalisation à la réception (chantier normalisation téléphone,
+    // docs/plan-normalisation-telephone.md) : sans ça, un client dont le
+    // numéro est stocké en +33 (base normalisée par migration 0059/0060)
+    // mais qui soumet "06..." se verrait refuser son propre Joker aux
+    // comparaisons ci-dessous — porte d'AUTORISATION, pas cosmétique.
+    const phone = normalizePhone(rawPhone);
 
     // Vérifie que l'appelant authentifié correspond bien au téléphone fourni
     // (ou est admin) — sans ça, n'importe qui pourrait rembourser le Joker
