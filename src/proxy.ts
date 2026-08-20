@@ -18,6 +18,37 @@ import { isTesterOnlyBusiness } from '@/lib/business-helpers';
 const ETABLISSEMENT_SLUG_RE = /^\/etablissement\/([^/]+)\/?$/;
 
 export async function proxy(request: NextRequest) {
+  // Trouvé le 20/08/2026 : ce proxy tournait sur CHAQUE requête, y compris
+  // les prefetch RSC déclenchés par Next.js dès qu'un <Link> entre dans le
+  // viewport (ex. une liste de fiches sur /recherche prefetch plusieurs
+  // fiches d'un coup) — chacun de ces prefetch appelait getUser() ci-dessous,
+  // donc un appel réseau à l'API Auth Supabase par lien affiché, cause des
+  // 503 constatés côté visiteurs. Dans cette version de Next.js, les headers
+  // Flight (rsc, next-router-prefetch...) sont strippés avant d'atteindre
+  // Proxy (doc officielle proxy.md, section "RSC requests and rewrites") —
+  // seul le paramètre `_rsc`, resté dans l'URL, permet de repérer une
+  // requête RSC (transition client-side ou prefetch, les deux invisibles par
+  // header ici). On peut sauter tout le corps de la fonction sur ces
+  // requêtes sans régression :
+  // - le rafraîchissement de session ne leur est pas nécessaire : le SDK
+  //   Supabase du navigateur (déjà chargé à ce stade, une requête RSC ne
+  //   peut survenir qu'après le premier rendu) maintient lui-même les
+  //   cookies à jour via son propre auto-refresh ;
+  // - la correction de status HTTP soft-404 sur /etablissement/[slug] (voir
+  //   plus bas) ne sert que le crawl SEO, qui ne fait jamais de requête RSC
+  //   — le contenu réellement affiché à un visiteur reste correct dans tous
+  //   les cas via le notFound() du composant de page, indépendant de Proxy.
+  //
+  // Fragilité connue (21/08/2026) : `_rsc` est un détail d'implémentation
+  // Next.js, pas une API stable — si une future version renomme/supprime ce
+  // paramètre, ce court-circuit cesse silencieusement de matcher et le
+  // proxy recommence à appeler getUser() sur chaque prefetch (retour au bug
+  // d'origine, pas de casse fonctionnelle). À revérifier à chaque montée de
+  // version majeure de Next.js.
+  if (request.nextUrl.searchParams.has('_rsc')) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

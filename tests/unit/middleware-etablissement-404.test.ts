@@ -103,4 +103,14 @@ describe('proxy — soft-404 /etablissement/[slug]', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('requête RSC (prefetch, param _rsc) → court-circuite avant getUser/business, aucun appel réseau', async () => {
+    businessRow = { slug: 'demo-xyz', owner_id: null }; // aurait donné 404 en requête normale
+    const { proxy } = await import('@/proxy');
+    const res = await proxy(buildRequest('/etablissement/demo-xyz?_rsc=abc123') as any);
+
+    expect(res.status).toBe(200);
+    expect(mockGetUser).not.toHaveBeenCalled();
+    expect(mockMaybeSingle).not.toHaveBeenCalled();
+  });
 });
