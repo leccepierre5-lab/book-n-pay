@@ -59,17 +59,19 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceRoleClient();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://book-n-pay-next.vercel.app';
 
-    // app_users.phone porte une contrainte UNIQUE (users_phone_key, héritée
-    // du schéma d'origine — pas ajoutée par nous, voir audit 15/08). Sans ce
-    // pré-check, une collision remonte comme exception NON gérée dans le
-    // trigger handle_new_user (AFTER INSERT ON auth.users, migration 0010,
-    // pas de bloc EXCEPTION) — ça avorte toute la transaction, GoTrue
-    // enveloppe ça en erreur générique, et logAndRespondAuthError retombe
-    // sur "Une erreur est survenue" en 500 : incompréhensible, et rien
-    // n'indique au client que c'est SON numéro qui pose problème (déjà
-    // utilisé par un autre compte) ni comment corriger. Un check explicite
-    // ici donne un message actionnable ; la contrainte reste le filet en cas
-    // de course (deux inscriptions simultanées sur le même numéro).
+    // ⚠️ Correction 19/08 : app_users.phone n'a AUCUNE contrainte UNIQUE
+    // (vérifié deux fois par requête pg_constraint filtrée sur conrelid =
+    // 'public.app_users', réponse vide les deux fois — voir
+    // docs/plan-normalisation-telephone.md). L'ancien commentaire ici
+    // affirmait le contraire en citant "users_phone_key" — cette contrainte
+    // existe bien, mais sur auth.users (colonne phone native de Supabase
+    // Auth, jamais utilisée par cette app en email/mot de passe), pas sur
+    // app_users : conclusion tirée d'une requête pg_constraint non filtrée
+    // par table, par ressemblance de nom. Le pré-check ci-dessous reste
+    // nécessaire malgré tout — sans lui, un doublon de numéro (autorisé par
+    // la base) ne serait détecté qu'au moment où RLS/check_booking_access
+    // matchent le mauvais compte, un signal bien plus tardif et confus
+    // qu'un message explicite ici.
     if (normalizedPhone) {
       const { data: phoneOwner } = await supabase
         .from('app_users')
