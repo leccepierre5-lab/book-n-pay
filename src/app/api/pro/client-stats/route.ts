@@ -44,16 +44,28 @@ export async function GET(req: NextRequest) {
 
     const { data: memberRows } = await query;
 
+    // `total` = tout statut sauf invite/cancelled — inclut les RDV `paid` pas
+    // encore passés, c'est un compteur d'engagement ("combien de fois ce
+    // client a réservé chez vous"), pas de fiabilité.
     const relevant = (memberRows || []).filter((m: any) => m.status !== 'invite' && m.status !== 'cancelled');
     const total = relevant.length;
     const noShow = relevant.filter((m: any) => m.status === 'no_show').length;
-    // null (pas 100) quand total===0 : "aucun historique" n'est pas "dossier
-    // parfait" — bug trouvé le 20/08 (Base44, jamais retouché depuis f8b3eca),
-    // voir FicheClientIntelligente.tsx pour le message neutre correspondant.
-    // Inatteignable aujourd'hui via la fiche no-show (le no-show en cours
-    // compte toujours dans `total`), mais ce fallback protège tout futur
-    // appelant de client-stats sur un client sans historique.
-    const score = total > 0 ? Math.round(((total - noShow) / total) * 100) : null;
+    const arrived = relevant.filter((m: any) => m.status === 'arrived').length;
+    // Bug trouvé le 20/08 : le score (et "Honorés" côté UI) se calculaient
+    // sur `total - noShow`, qui inclut les RDV `paid` encore à venir — un
+    // client avec 3 RDV futurs et 0 venue affichait déjà "3 Honorés" et un
+    // score de 100%, une confiance jamais méritée. La fiabilité ne peut se
+    // juger que sur les RDV RÉSOLUS (arrived ou no_show) — un `paid` à venir
+    // n'est ni une preuve positive ni négative, il n'a simplement pas encore
+    // eu lieu. `booking_members.status` n'a pas de valeur 'completed' (celle-
+    // ci n'existe que sur `bookings.status`) — seul 'arrived' représente une
+    // venue effective au niveau du membre.
+    const resolved = arrived + noShow;
+    // null (pas 100) quand resolved===0 : "aucun historique résolu" n'est
+    // pas "dossier parfait" — même bug, cause racine identique (Base44,
+    // jamais retouché depuis f8b3eca). Voir FicheClientIntelligente.tsx pour
+    // le message neutre correspondant.
+    const score = resolved > 0 ? Math.round((arrived / resolved) * 100) : null;
 
     // get_client_loyalty_for_pro (migration 0062) — SECURITY DEFINER, seule
     // façon dont un pro peut légitimement lire les 4 colonnes fidélité d'un
@@ -67,7 +79,7 @@ export async function GET(req: NextRequest) {
     const appUser = appUserRows && appUserRows.length > 0 ? appUserRows[0] : null;
 
     return NextResponse.json({
-      stats: { total, noShow, score },
+      stats: { total, noShow, arrived, score },
       appUser: appUser || null,
     });
   } catch (error: any) {

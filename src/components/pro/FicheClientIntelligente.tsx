@@ -30,9 +30,10 @@ export default function FicheClientIntelligente({
   // score: null tant qu'aucun historique n'a été chargé OU confirmé vide —
   // jamais une valeur numérique par défaut (voir le bug du 20/08 : `: 100`
   // faisait passer "aucune donnée" pour "dossier parfait").
-  const [stats, setStats] = useState<{ total: number; noShow: number; score: number | null }>({
+  const [stats, setStats] = useState<{ total: number; noShow: number; arrived: number; score: number | null }>({
     total: 0,
     noShow: 0,
+    arrived: 0,
     score: null,
   });
   const [appUser, setAppUser] = useState<{
@@ -76,7 +77,7 @@ export default function FicheClientIntelligente({
       })
       // Échec réseau : rester sur score=null (neutre), jamais retomber sur
       // un score par défaut qui laisserait croire à un historique connu.
-      .catch(() => setStats({ total: 0, noShow: 0, score: null }))
+      .catch(() => setStats({ total: 0, noShow: 0, arrived: 0, score: null }))
       .finally(() => setLoading(false));
   }, [member?.phone]);
 
@@ -180,7 +181,7 @@ export default function FicheClientIntelligente({
               <p className="text-[10px] text-white/40">No-show(s)</p>
             </div>
             <div className="flex-1 rounded-lg bg-emerald-950/40 py-2">
-              <p className="text-lg font-bold text-emerald-400">{stats.total - stats.noShow}</p>
+              <p className="text-lg font-bold text-emerald-400">{stats.arrived}</p>
               <p className="text-[10px] text-white/40">Honorés</p>
             </div>
           </div>
