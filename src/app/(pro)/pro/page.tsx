@@ -2,7 +2,7 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { getProBookings, getProStats } from '@/lib/queries/pro';
+import { getProBookings, getProStats, getRecentNoShows } from '@/lib/queries/pro';
 import ProDashboard from '@/components/pro/ProDashboard';
 import type { Business } from '@/lib/database.types';
 import { getParisDateOffsetStr } from '@/lib/booking-utils';
@@ -50,7 +50,7 @@ export default async function ProPage() {
   }
 
   const today = getParisDateOffsetStr(0);
-  const [todayBookings, stats, { count: activeStaffCount }] = await Promise.all([
+  const [todayBookings, stats, { count: activeStaffCount }, recentNoShows] = await Promise.all([
     getProBookings(profile.biz_id, { from: today, to: today }),
     getProStats(profile.biz_id, {
       open_time: biz?.open_time ?? null,
@@ -62,6 +62,8 @@ export default async function ProPage() {
     // réactivation normale (déjà gardées côté API).
     admin.from('staff').select('id', { count: 'exact', head: true })
       .eq('biz_id', profile.biz_id).eq('is_active', true),
+    // Bandeau "no-show en attente" (20/08) — voir getRecentNoShows.
+    getRecentNoShows(profile.biz_id, getParisDateOffsetStr(-7)),
   ]);
   const staffQuota = getStaffQuotaStatus(settings?.plan_key ?? 'starter', activeStaffCount ?? 0);
 
@@ -80,6 +82,7 @@ export default async function ProPage() {
         } : null}
         notificationPrefs={settings?.notification_prefs ?? null}
         staffQuota={staffQuota}
+        recentNoShows={recentNoShows}
       />
     </Suspense>
   );

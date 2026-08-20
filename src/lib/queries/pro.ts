@@ -45,6 +45,33 @@ export async function getProBookings(bizId: string, opts: { from?: string; to?: 
   return data || [];
 }
 
+// Alerte dashboard no-show (ProDashboard.tsx) — trouvé le 20/08/2026 :
+// le bouton "Voir la fiche"/geste commercial n'existait que dans l'onglet
+// "Aujourd'hui", jamais atteignable pour un no-show détecté par le cron
+// automatique (check-no-shows, quotidien 8h, ne peut structurellement
+// jamais flaguer le jour même). Fenêtre bornée à 7 jours — PAS un choix
+// arbitraire : `handleKeepFees` ne persiste aucune décision (ni statut ni
+// marqueur), donc un no_show reste `status='no_show'` que le pro l'ait déjà
+// traité ou jamais vu. Sans borne, cette liste ne se viderait jamais. Le
+// vrai fix serait un champ/statut de décision explicite — changement de
+// schéma, hors scope ici.
+export async function getRecentNoShows(bizId: string, sinceDate: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('id, service_name, date, time, booking_members!inner(id, name, phone, status, deposit, payment_mode)')
+    .eq('biz_id', bizId)
+    .eq('booking_members.status', 'no_show')
+    .gte('date', sinceDate)
+    .order('date', { ascending: false });
+
+  if (error) {
+    console.error('[getRecentNoShows]', error.message);
+    return [];
+  }
+  return data || [];
+}
+
 export async function getProProfile() {
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();

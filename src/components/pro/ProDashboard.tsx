@@ -34,6 +34,14 @@ interface BookingRow {
   services?: { price: number } | null;
 }
 
+interface RecentNoShowRow {
+  id: string;
+  service_name: string;
+  date: string;
+  time: string;
+  booking_members: BookingMemberRow[];
+}
+
 const MEMBER_STATUS: Record<string, { label: string; dot: string; badge: string }> = {
   invite: { label: 'En attente', dot: 'bg-amber-400', badge: 'text-amber-300 bg-amber-500/12 border-amber-500/20' },
   paid: { label: 'Confirmé', dot: 'bg-mint-400', badge: 'text-mint-400 bg-mint-500/12 border-mint-500/20' },
@@ -50,6 +58,7 @@ export default function ProDashboard({
   stripeRequirements,
   notificationPrefs,
   staffQuota,
+  recentNoShows,
 }: {
   business: Business;
   todayBookings: BookingRow[];
@@ -58,6 +67,7 @@ export default function ProDashboard({
   stripeRequirements?: StripeRequirementsBannerInput | null;
   notificationPrefs?: Record<string, boolean> | null;
   staffQuota?: StaffQuotaStatus | null;
+  recentNoShows?: RecentNoShowRow[];
 }) {
   const [bookings, setBookings] = useState(todayBookings);
   const [connectLoading, setConnectLoading] = useState(false);
@@ -67,6 +77,12 @@ export default function ProDashboard({
   const [stripeConnectedLocal, setStripeConnectedLocal] = useState(stripeConnected);
   const [view, setView] = useState<'today' | 'calendar'>('today');
   const [selectedNoShow, setSelectedNoShow] = useState<{ bookingId: string; member: BookingMemberRow } | null>(null);
+  // Alerte "no-show en attente" (20/08) — voir getRecentNoShows.ts pour le
+  // pourquoi de la fenêtre 7 jours. N'affiche que les no-shows PAS déjà
+  // remboursés dans cette session (retirés localement après un geste,
+  // même limite que handleKeepFees : rien ne persiste "traité" en base).
+  const [recentNoShowsLocal, setRecentNoShowsLocal] = useState(recentNoShows ?? []);
+  const [noShowListOpen, setNoShowListOpen] = useState(false);
   const [selectedCaisse, setSelectedCaisse] = useState<{ booking: BookingRow; member: BookingMemberRow } | null>(null);
   const [markingNoShow, setMarkingNoShow] = useState<string | null>(null);
   const router = useRouter();
@@ -95,10 +111,26 @@ export default function ProDashboard({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bookingId: selectedNoShow.bookingId, memberId: selectedNoShow.member.id }),
     });
+    setRecentNoShowsLocal((prev) => prev.filter((b) => b.booking_members[0]?.id !== selectedNoShow.member.id));
     setSelectedNoShow(null);
   };
 
-  const handleKeepFees = () => setSelectedNoShow(null);
+  // Dette connue (20/08/2026) : ne persiste RIEN en base — ni statut ni
+  // marqueur de décision. Un no_show reste `status='no_show'` que le pro
+  // l'ait tranché ou jamais vu, impossible de distinguer les deux depuis
+  // les données. Le retrait de `recentNoShowsLocal` ci-dessous n'est qu'un
+  // masquage local le temps de la session — au prochain chargement de page,
+  // ce no-show réapparaîtra dans l'alerte (borne 7 jours) puisque rien ne
+  // trace qu'une décision a été prise. Le vrai fix serait un champ/statut de
+  // décision explicite (ex. colonne `no_show_resolution`) — changement de
+  // schéma, hors scope de ce correctif de réaccessibilité. Voir la même
+  // note dans ProCalendar.tsx et getRecentNoShows (lib/queries/pro.ts).
+  const handleKeepFees = () => {
+    if (selectedNoShow) {
+      setRecentNoShowsLocal((prev) => prev.filter((b) => b.booking_members[0]?.id !== selectedNoShow.member.id));
+    }
+    setSelectedNoShow(null);
+  };
 
   const handleQrScan = async (qrCode: string) => {
     setScannerOpen(false);
@@ -380,6 +412,34 @@ export default function ProDashboard({
           </div>
         )}
 
+        {/* Alerte no-show en attente (20/08) — voir getRecentNoShows
+            (lib/queries/pro.ts) pour le pourquoi de la fenêtre 7 jours. */}
+        {recentNoShowsLocal.length > 0 && (
+          <div className="mb-5 rounded-2xl border border-rose-500/25 bg-rose-500/8 p-4">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-8 h-8 rounded-xl bg-rose-500/15 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-rose-300">
+                  {recentNoShowsLocal.length} no-show{recentNoShowsLocal.length === 1 ? '' : 's'} des 7 derniers jours en attente d&apos;une décision
+                </p>
+                <p className="text-xs text-rose-400/70 mt-0.5">
+                  Rembourser en geste commercial ou garder les frais de réservation.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setNoShowListOpen(true)}
+              className="block w-full text-center rounded-xl py-2.5 text-sm font-semibold text-navy-950 bg-rose-400 transition-all"
+            >
+              Voir les no-shows →
+            </button>
+          </div>
+        )}
+
         {/* Stats grid — état dédié si le pro démarre (0 réservation ce mois),
             évite le mur de zéros identifié en audit (19/07) sur le premier
             écran vu par un pro fraîchement inscrit. */}
@@ -510,6 +570,50 @@ export default function ProDashboard({
         )}
 
         {scannerOpen && <QRScanner onScan={handleQrScan} onClose={() => setScannerOpen(false)} />}
+
+        {/* Liste des no-shows en attente (20/08) — déclenchée par la bannière ci-dessus. */}
+        {noShowListOpen && (
+          <Modal
+            onClose={() => setNoShowListOpen(false)}
+            overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
+            panelClassName="w-full max-w-sm"
+            ariaLabel="No-shows en attente d'une décision"
+          >
+            <div className="rounded-2xl bg-navy-900 border border-white/[0.08] overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/[0.05]">
+                <p className="text-sm font-semibold text-white">No-shows en attente (7 derniers jours)</p>
+              </div>
+              <div className="divide-y divide-white/[0.04]">
+                {recentNoShowsLocal.map((b) => {
+                  const m = b.booking_members[0];
+                  if (!m) return null;
+                  return (
+                    <div key={m.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{m.name}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {b.service_name} · {new Date(b.date + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à {formatTime(b.time)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setNoShowListOpen(false);
+                          setSelectedNoShow({ bookingId: b.id, member: m });
+                        }}
+                        className="shrink-0 rounded-xl bg-navy-800 border border-white/[0.08] px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-navy-700 transition-all"
+                      >
+                        Voir la fiche
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <button onClick={() => setNoShowListOpen(false)} className="mt-2 w-full rounded-xl bg-navy-900 border border-white/[0.08] py-2.5 text-xs text-slate-400 hover:text-white transition-colors">
+              Fermer
+            </button>
+          </Modal>
+        )}
 
         {/* No-show modal */}
         {selectedNoShow && (
