@@ -215,18 +215,6 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
     setSelectedNoShow(null);
   }, [selectedNoShow]);
 
-  // Dette connue (20/08/2026) : "Garder les frais" ne persiste RIEN — ni
-  // statut ni marqueur de décision, ici comme dans ProDashboard.tsx. Un
-  // no-show reste `status='no_show'` que le pro ait déjà tranché ou n'ait
-  // jamais ouvert la fiche : impossible de distinguer les deux depuis les
-  // données. C'est pour ça que l'alerte dashboard (ProDashboard.tsx) reste
-  // bornée à une fenêtre de 7 jours plutôt que de lister tous les no-shows
-  // "non traités" — sans marqueur de décision, une liste non bornée ne se
-  // viderait jamais. Le vrai fix serait un champ/statut de décision
-  // explicite (ex. colonne `no_show_resolution`) — changement de schéma,
-  // hors scope de ce correctif de réaccessibilité.
-  const handleKeepFees = useCallback(() => setSelectedNoShow(null), []);
-
   const loadMonth = useCallback(
     (date: Date) => {
       setLoading(true);
@@ -576,7 +564,6 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
             <FicheClientIntelligente
               member={selectedNoShow.member}
               onRembourser={handleRefundGesture}
-              onGarder={handleKeepFees}
             />
             <button onClick={() => setSelectedNoShow(null)} className="mt-2 w-full rounded-xl bg-navy-900 border border-white/[0.08] py-2.5 text-xs text-slate-400 hover:text-white transition-colors">
               Fermer

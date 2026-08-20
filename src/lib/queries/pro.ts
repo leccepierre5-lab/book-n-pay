@@ -50,9 +50,9 @@ export async function getProBookings(bizId: string, opts: { from?: string; to?: 
 // "Aujourd'hui", jamais atteignable pour un no-show détecté par le cron
 // automatique (check-no-shows, quotidien 8h, ne peut structurellement
 // jamais flaguer le jour même). Fenêtre bornée à 7 jours — PAS un choix
-// arbitraire : `handleKeepFees` ne persiste aucune décision (ni statut ni
-// marqueur), donc un no_show reste `status='no_show'` que le pro l'ait déjà
-// traité ou jamais vu. Sans borne, cette liste ne se viderait jamais. Le
+// arbitraire : aucune décision du pro ne persiste en base (ni statut ni
+// marqueur dédié), donc un no_show reste `status='no_show'` qu'il ait déjà
+// été vu ou jamais ouvert. Sans borne, cette liste ne se viderait jamais. Le
 // vrai fix serait un champ/statut de décision explicite — changement de
 // schéma, hors scope ici.
 export async function getRecentNoShows(bizId: string, sinceDate: string) {

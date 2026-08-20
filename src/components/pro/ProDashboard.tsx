@@ -77,10 +77,11 @@ export default function ProDashboard({
   const [stripeConnectedLocal, setStripeConnectedLocal] = useState(stripeConnected);
   const [view, setView] = useState<'today' | 'calendar'>('today');
   const [selectedNoShow, setSelectedNoShow] = useState<{ bookingId: string; member: BookingMemberRow } | null>(null);
-  // Alerte "no-show en attente" (20/08) — voir getRecentNoShows.ts pour le
-  // pourquoi de la fenêtre 7 jours. N'affiche que les no-shows PAS déjà
-  // remboursés dans cette session (retirés localement après un geste,
-  // même limite que handleKeepFees : rien ne persiste "traité" en base).
+  // Alerte "no-show" (20/08) — voir getRecentNoShows.ts pour le pourquoi de
+  // la fenêtre 7 jours. N'affiche que les no-shows PAS déjà remboursés dans
+  // cette session (retirés localement après un geste) : rien ne persiste
+  // "traité" en base, donc un no-show simplement consulté sans geste
+  // réapparaît tant que la page n'est pas rechargée.
   const [recentNoShowsLocal, setRecentNoShowsLocal] = useState(recentNoShows ?? []);
   const [noShowListOpen, setNoShowListOpen] = useState(false);
   const [selectedCaisse, setSelectedCaisse] = useState<{ booking: BookingRow; member: BookingMemberRow } | null>(null);
@@ -112,23 +113,6 @@ export default function ProDashboard({
       body: JSON.stringify({ bookingId: selectedNoShow.bookingId, memberId: selectedNoShow.member.id }),
     });
     setRecentNoShowsLocal((prev) => prev.filter((b) => b.booking_members[0]?.id !== selectedNoShow.member.id));
-    setSelectedNoShow(null);
-  };
-
-  // Dette connue (20/08/2026) : ne persiste RIEN en base — ni statut ni
-  // marqueur de décision. Un no_show reste `status='no_show'` que le pro
-  // l'ait tranché ou jamais vu, impossible de distinguer les deux depuis
-  // les données. Le retrait de `recentNoShowsLocal` ci-dessous n'est qu'un
-  // masquage local le temps de la session — au prochain chargement de page,
-  // ce no-show réapparaîtra dans l'alerte (borne 7 jours) puisque rien ne
-  // trace qu'une décision a été prise. Le vrai fix serait un champ/statut de
-  // décision explicite (ex. colonne `no_show_resolution`) — changement de
-  // schéma, hors scope de ce correctif de réaccessibilité. Voir la même
-  // note dans ProCalendar.tsx et getRecentNoShows (lib/queries/pro.ts).
-  const handleKeepFees = () => {
-    if (selectedNoShow) {
-      setRecentNoShowsLocal((prev) => prev.filter((b) => b.booking_members[0]?.id !== selectedNoShow.member.id));
-    }
     setSelectedNoShow(null);
   };
 
@@ -412,30 +396,36 @@ export default function ProDashboard({
           </div>
         )}
 
-        {/* Alerte no-show en attente (20/08) — voir getRecentNoShows
-            (lib/queries/pro.ts) pour le pourquoi de la fenêtre 7 jours. */}
+        {/* Information no-show (20/08, reformulée le même jour) — voir
+            getRecentNoShows (lib/queries/pro.ts) pour le pourquoi de la
+            fenêtre 7 jours. Ton neutre volontaire : par défaut le pro n'a
+            RIEN à faire, les frais de réservation sont déjà acquis — ce
+            n'est pas une alerte, c'est une information + une option
+            facultative (le geste commercial). L'ancienne version (rouge,
+            triangle, "en attente d'une décision") laissait croire le
+            contraire. */}
         {recentNoShowsLocal.length > 0 && (
-          <div className="mb-5 rounded-2xl border border-rose-500/25 bg-rose-500/8 p-4">
+          <div className="mb-5 rounded-2xl border border-white/[0.08] bg-navy-900 p-4">
             <div className="flex items-start gap-3 mb-3">
-              <div className="w-8 h-8 rounded-xl bg-rose-500/15 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-semibold text-rose-300">
-                  {recentNoShowsLocal.length} no-show{recentNoShowsLocal.length === 1 ? '' : 's'} des 7 derniers jours en attente d&apos;une décision
+                <p className="text-sm font-semibold text-white">
+                  {recentNoShowsLocal.length} no-show{recentNoShowsLocal.length === 1 ? '' : 's'} ces 7 derniers jours
                 </p>
-                <p className="text-xs text-rose-400/70 mt-0.5">
-                  Rembourser en geste commercial ou garder les frais de réservation.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Les frais de réservation vous sont déjà acquis. Si vous le souhaitez, vous pouvez rembourser ce client en geste commercial.
                 </p>
               </div>
             </div>
             <button
               onClick={() => setNoShowListOpen(true)}
-              className="block w-full text-center rounded-xl py-2.5 text-sm font-semibold text-navy-950 bg-rose-400 transition-all"
+              className="block w-full text-center rounded-xl py-2.5 text-sm font-semibold text-white border border-white/15 hover:bg-white/5 transition-all"
             >
-              Voir les no-shows →
+              {recentNoShowsLocal.length === 1 ? 'Voir le client →' : 'Voir les clients →'}
             </button>
           </div>
         )}
@@ -627,7 +617,6 @@ export default function ProDashboard({
               <FicheClientIntelligente
                 member={selectedNoShow.member}
                 onRembourser={handleRefundGesture}
-                onGarder={handleKeepFees}
               />
               <button onClick={() => setSelectedNoShow(null)} className="mt-2 w-full rounded-xl bg-navy-900 border border-white/[0.08] py-2.5 text-xs text-slate-400 hover:text-white transition-colors">
                 Fermer
