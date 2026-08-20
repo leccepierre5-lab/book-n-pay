@@ -391,6 +391,25 @@ export function calcFraisGestion(servicePrice: number): number {
 // en euros (pas en centimes), ce plafond suit la même unité.
 export const MAX_DEPOSIT_EUROS = 50;
 
+// ── Suggestion de dépôt affichée au pro (indicative, jamais imposée) ────────
+// Trouvé le 20/08/2026 : le formulaire de prestation n'expliquait rien du
+// rôle du dépôt (seulement ses bornes), un pro pouvait poser 1€ sur une
+// prestation à 800€ et désactiver sans le savoir tout l'effet anti-no-show.
+// 10% du prix, plancher 5€, plafond MAX_DEPOSIT_EUROS, jamais au-dessus du
+// prix — pourcentage isolé dans une constante unique, ajustable après les
+// visites terrain sans toucher au calcul. Le minimum serveur réel reste 1€
+// (pro/services/route.ts) : cette fonction ne fait QUE suggérer, elle ne
+// remplace aucune validation.
+export const SUGGESTED_DEPOSIT_PCT = 0.10;
+export const SUGGESTED_DEPOSIT_FLOOR_EUROS = 5;
+
+export function suggestDeposit(servicePrice: number): number {
+  if (!(servicePrice > 0)) return SUGGESTED_DEPOSIT_FLOOR_EUROS;
+  const raw = Math.max(SUGGESTED_DEPOSIT_FLOOR_EUROS, servicePrice * SUGGESTED_DEPOSIT_PCT);
+  const capped = Math.min(raw, MAX_DEPOSIT_EUROS, servicePrice);
+  return Math.round(capped * 2) / 2; // arrondi au 0,50€ le plus proche, cohérent avec le step du champ
+}
+
 // ── Dépôt dynamique selon l'historique de fiabilité ──────────────────────────
 // ⚠️ Non appelée aujourd'hui — même statut d'ancrage que calcTrustScore/
 // TrustScore ci-dessus (dont calcDeposit consomme le type) : testée
