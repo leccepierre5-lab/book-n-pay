@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { calcFraisGestion } from '@/lib/booking-utils';
+import { calcFraisGestion, MAX_DEPOSIT_EUROS } from '@/lib/booking-utils';
 import { BNP_PLANS, getPraticiensLimit, type PlanKey } from '@/lib/plans-config';
 
 // "Collaborateur", pas "praticien" — vocabulaire aligné le 13/08/2026 :
@@ -24,12 +24,24 @@ function teamSizeLabel(planKey: PlanKey): string {
   return `Vous + ${limit - 1} collaborateurs`;
 }
 
+// Montants dérivés de calcFraisGestion() — source unique du barème réel
+// (booking-utils.ts:380, même fonction que stripe/checkout/route.ts), jamais
+// réécrits en dur ici. Même principe que BNP_PLANS pour les formules :
+// si le barème change, ce tableau suit automatiquement.
 const FEE_BRACKETS = [
-  { label: '≤ 50 €', fee: calcFraisGestion(30) },
-  { label: '50,01 € – 80 €', fee: calcFraisGestion(60) },
-  { label: '80,01 € – 100 €', fee: calcFraisGestion(90) },
-  { label: '> 100 €', fee: calcFraisGestion(150) },
+  { label: 'Jusqu\'à 50 €', fee: calcFraisGestion(30) },
+  { label: '50,01 € à 80 €', fee: calcFraisGestion(60) },
+  { label: '80,01 € à 100 €', fee: calcFraisGestion(90) },
+  { label: 'Plus de 100 €', fee: calcFraisGestion(150) },
 ];
+
+// Exemple chiffré — dépôt fixé à MAX_DEPOSIT_EUROS (jamais un montant que le
+// produit refuserait, voir pro/services/route.ts) et un prix au-delà de
+// 100 € pour illustrer le plafond réel des frais de gestion.
+const EXAMPLE_PRICE = 800;
+const EXAMPLE_DEPOSIT = MAX_DEPOSIT_EUROS;
+const EXAMPLE_FEE = calcFraisGestion(EXAMPLE_PRICE);
+const EXAMPLE_REMAINING = EXAMPLE_PRICE - EXAMPLE_DEPOSIT;
 
 // Même produit partout — seule la taille d'équipe change de plan à plan
 // (vérifié en code le 13/08/2026 : aucune fonctionnalité réelle n'est
@@ -48,7 +60,7 @@ const FEE_BRACKETS = [
 // rien inventer.
 const STARTER_FEATURES = [
   'Réservations illimitées',
-  'Protection anti-no-show & acomptes',
+  'Protection anti-no-show & frais de réservation',
   'Encaissement direct via Stripe Connect',
   'Check-in QR',
   'Apple Pay & Google Pay',
@@ -109,7 +121,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Que se passe-t-il en cas de no-show ?",
-    a: "En cas d'absence non annulée dans les délais, la garantie financière (frais de réservation et/ou acompte) est automatiquement conservée et versée sur votre compte Stripe. Aucune relance à effectuer.",
+    a: "En cas d'absence non annulée dans les délais, les frais de réservation sont automatiquement conservés et versés sur votre compte Stripe. Aucune relance à effectuer.",
   },
   {
     q: "En quoi est-ce différent des plateformes à commission ?",
@@ -209,36 +221,33 @@ export default function TarifsPage() {
         </p>
 
         <section className="border-t border-white/[0.07] pt-12">
-          <h2 className="mb-2 text-center text-xl font-bold text-white">Le mécanisme de compensation</h2>
+          <h2 className="mb-2 text-center text-xl font-bold text-white">
+            Des frais de gestion simples, plafonnés à {calcFraisGestion(150).toFixed(2).replace('.', ',')} €
+          </h2>
           <p className="mb-8 text-center text-sm text-slate-500">
-            Le modèle tourne en arrière-plan sans impacter votre trésorerie.
+            Le client règle les frais de gestion au moment de la réservation. Vous ne payez aucune commission sur vos prestations.
           </p>
-          <div className="max-w-md mx-auto">
-            {/* Carte Protection Stripe Connect */}
+          <div className="max-w-md mx-auto space-y-5">
             <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-6">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/12 border border-emerald-500/20 flex items-center justify-center mb-4">
                 <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>
                 </svg>
               </div>
-              <h3 className="mb-2 font-semibold text-white text-sm">Protection Stripe Connect</h3>
-              <p className="text-xs leading-relaxed text-slate-500 mb-3">
-                Le client règle les frais de gestion au moment de réserver. Vous ne payez aucune commission sur vos prestations — les frais de gestion sont réglés par le client, jamais vous.
-              </p>
               <div className="rounded-xl border border-white/[0.07] overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-white/[0.07]">
-                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Prix prestation</th>
-                      <th className="px-3 py-2 text-right text-slate-500 font-medium">Frais TTC</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Montant de la prestation</th>
+                      <th className="px-3 py-2 text-right text-slate-500 font-medium whitespace-nowrap">Frais de gestion TTC</th>
                     </tr>
                   </thead>
                   <tbody>
                     {FEE_BRACKETS.map((b, i) => (
                       <tr key={i} className={i < FEE_BRACKETS.length - 1 ? 'border-b border-white/[0.05]' : ''}>
                         <td className="px-3 py-2 text-slate-400">{b.label}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-emerald-400">
-                          {b.fee.toFixed(2).replace('.', ',')} €
+                        <td className="px-3 py-2 text-right font-semibold text-emerald-400 whitespace-nowrap">
+                          {b.fee.toFixed(2).replace('.', ',')} €{i === FEE_BRACKETS.length - 1 ? ' max.' : ''}
                         </td>
                       </tr>
                     ))}
@@ -246,6 +255,42 @@ export default function TarifsPage() {
                 </table>
               </div>
             </div>
+
+            {/* Exemple chiffré — montants dérivés (EXAMPLE_*), jamais écrits
+                en dur : si calcFraisGestion ou MAX_DEPOSIT_EUROS changent,
+                cet exemple reste exact. */}
+            <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-6">
+              <p className="mb-3 text-xs font-semibold text-white">Exemple</p>
+              <dl className="space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <dt className="text-slate-500">Prestation</dt>
+                  <dd className="text-slate-300">{EXAMPLE_PRICE} €</dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="text-slate-500">Frais de réservation, versés au professionnel et déduits du prix</dt>
+                  <dd className="text-slate-300 shrink-0 ml-3">{EXAMPLE_DEPOSIT} €</dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="text-slate-500">Frais de gestion, payés par le client</dt>
+                  <dd className="text-emerald-400 font-semibold shrink-0 ml-3">
+                    {EXAMPLE_FEE.toFixed(2).replace('.', ',')} €
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between border-t border-white/[0.07] pt-2 mt-2">
+                  <dt className="text-slate-400 font-medium">Reste à régler sur place</dt>
+                  <dd className="text-white font-semibold">{EXAMPLE_REMAINING} €</dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="text-slate-400 font-medium">Vous</dt>
+                  <dd className="text-emerald-400 font-semibold">Aucune commission sur les {EXAMPLE_PRICE} €</dd>
+                </div>
+              </dl>
+            </div>
+
+            <p className="text-center text-xs text-slate-500 leading-relaxed">
+              Quel que soit le montant de votre prestation, votre client ne paie jamais plus de{' '}
+              {calcFraisGestion(150).toFixed(2).replace('.', ',')} € de frais de gestion, et vous ne payez aucune commission.
+            </p>
           </div>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
