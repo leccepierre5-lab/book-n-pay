@@ -161,6 +161,29 @@ describe('buildAgendaColumns — RDV et colonne "Non assigné"', () => {
     expect(columns).toHaveLength(2); // pas de colonne "Non assigné"
   });
 
+  it('RDV allow_group=true AVEC staff_id → rangeé dans la colonne du praticien, pas exclu (bug 20/08/2026)', () => {
+    // Un service allow_group=true réservé en solo avec un praticien choisi
+    // est un cas réel (availability/route.ts indexe ses créneaux par
+    // (service_id, staff_id) précisément pour ça) — avant ce fix, le seul
+    // drapeau allow_group faisait sauter la réservation hors du planning,
+    // staff_id ignoré : un client payé, praticien assigné, disparaissait du
+    // planning du jour (visible seulement sur le calendrier mensuel).
+    const staff: AgendaStaffRow[] = [{ id: 'a', name: 'Julien', emoji: null, role: null }];
+    const bookings: AgendaBookingRow[] = [booking({ id: 'b1', staff_id: 'a', allow_group: true, service_name: 'Coupe homme' })];
+    const columns = buildAgendaColumns({
+      date: DATE,
+      businessOpenTime: '09:00',
+      businessCloseTime: '18:00',
+      staff,
+      schedules: [],
+      absences: [],
+      bookings,
+    });
+    expect(columns.find((c) => c.staffId === null)).toBeUndefined(); // pas dans "Non assigné"
+    expect(columns[0].bookings).toHaveLength(1);
+    expect(columns[0].bookings[0].id).toBe('b1');
+  });
+
   it('RDV service individuel SANS staff_id → colonne "Non assigné" créée (vraie anomalie)', () => {
     const staff: AgendaStaffRow[] = [{ id: 'a', name: 'Julien', emoji: null, role: null }];
     const bookings: AgendaBookingRow[] = [booking({ id: 'b1', staff_id: null, allow_group: false })];

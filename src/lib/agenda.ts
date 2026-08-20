@@ -19,10 +19,21 @@ export interface AgendaAbsenceRow {
   reason: string | null;
 }
 
-// allow_group distingue un cours (service collectif) d'un service individuel
-// — un cours n'a structurellement jamais de staff_id (voir
-// availability/route.ts) et n'a donc pas sa place dans "Non assigné", qui ne
-// doit repérer que de vraies anomalies (service individuel sans praticien).
+// allow_group distingue un service qui AUTORISE le mode groupe d'un service
+// strictement individuel — ça ne dit rien de CETTE réservation précise.
+// Bug trouvé le 20/08/2026 (parcours navigateur réel) : un service
+// allow_group=true réservé en solo avec un praticien choisi (staff_id posé)
+// est un cas réel et courant, pas une anomalie — availability/route.ts
+// indexe d'ailleurs ses créneaux par (service_id, staff_id) précisément
+// parce qu'un service collectif peut avoir un praticien assigné ou non.
+// Avant ce fix, `allow_group === true` seul faisait sauter la réservation
+// hors du planning par praticien (staff_id ignoré) : un client payé, avec
+// un vrai praticien assigné, disparaissait entièrement du planning du jour
+// (visible uniquement sur le calendrier mensuel, qui ne fait pas ce tri).
+// Seul un cours réellement sans praticien (staff_id NULL) n'a pas sa place
+// dans "Non assigné", qui ne doit repérer que de vraies anomalies (service
+// individuel sans praticien) — un cours collectif sans praticien n'est pas
+// une anomalie, il est structurellement prévu comme tel.
 export interface AgendaBookingRow {
   id: string;
   staff_id: string | null;
@@ -92,11 +103,14 @@ export function buildAgendaColumns(params: BuildAgendaColumnsParams): AgendaColu
   const bookingsByStaff = new Map<string, AgendaBookingRow[]>();
   const unassigned: AgendaBookingRow[] = [];
   for (const b of bookings) {
-    if (b.allow_group) continue; // cours/service collectif — hors scope du planning par praticien
     if (b.staff_id) {
+      // Praticien assigné : toujours affiché dans sa colonne, que le
+      // service autorise le mode groupe ou non — voir commentaire au-dessus.
       const list = bookingsByStaff.get(b.staff_id) ?? [];
       list.push(b);
       bookingsByStaff.set(b.staff_id, list);
+    } else if (b.allow_group) {
+      continue; // cours collectif réellement sans praticien — hors scope du planning par praticien, pas une anomalie
     } else {
       unassigned.push(b); // vraie anomalie : service individuel sans praticien
     }
