@@ -104,6 +104,35 @@ valeurs utilisateur interpolées dans un template HTML : `member.name` /
 les 8 routes `src/app/api/cron/*` (`CRON_SECRET`) + `loyalty/update-status`
 (`INTERNAL_API_SECRET`).
 
+## 7. EXECUTE public/anon par défaut sur les fonctions SECURITY DEFINER — ouvert (20/08/2026)
+
+Trouvé en préparant la migration 0062 (`get_client_loyalty_for_pro`) :
+PostgreSQL accorde `EXECUTE` à `public` par défaut sur toute nouvelle
+fonction. Combiné à `SECURITY DEFINER`, une fonction qui bypasse RLS reste
+donc appelable par un visiteur anonyme (clé `anon` seule, aucune session)
+sauf `revoke`/`grant` explicite — corrigé pour `get_client_loyalty_for_pro`
+(revoke de `public`/`anon`, grant à `authenticated` uniquement).
+
+**Vérifié par appel RPC anonyme réel (pas une lecture de code)** :
+- `check_booking_access` : appelable en anonyme, répond sans erreur
+  (`false`) — déjà noté en commentaire dans la migration 0057 elle-même,
+  jamais corrigé depuis.
+- `is_admin` : appelable en anonyme, répond sans erreur (`false`).
+- `owns_biz` : signature exacte non versionnée (nom du paramètre inconnu),
+  non testable via l'API REST — à vérifier directement en SQL Editor
+  (`select proacl from pg_proc where proname = 'owns_biz'`).
+
+**Risque** : aucun actif aujourd'hui — les 3 fonctions ont leur propre
+logique d'éligibilité interne (elles renvoient `false`/rien plutôt que de
+bypasser quoi que ce soit), donc un appel anonyme n'obtient jamais de
+donnée ni de droit qu'il n'aurait pas déjà. C'est un manque de défense en
+profondeur, pas une faille exploitable en l'état.
+
+**Piste** : `revoke execute ... from public, anon` + `grant ... to
+authenticated` (ou au rôle strictement nécessaire) sur les 3 fonctions,
+migration dédiée. Vérifier aussi si d'autres fonctions `SECURITY DEFINER`
+du projet ont le même défaut avant de considérer le chantier clos.
+
 ## 2026-07-16 — Rotation clé service_role (PRIORITÉ)
 - `SUPABASE_SERVICE_ROLE_KEY` (JWT legacy, bypasse RLS entièrement) a été
   utilisée en variable d'environnement (`--env-file`) pendant une session de

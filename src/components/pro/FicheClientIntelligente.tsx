@@ -86,13 +86,19 @@ export default function FicheClientIntelligente({
       <div className="flex items-center justify-between">
         <p className="text-[13px] font-semibold text-white">Fiche client intelligente</p>
         <div className="flex items-center gap-2">
-          {appUser && (
+          {appUser ? (
             <span
               className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold"
               style={{ background: sc.bg, color: sc.color }}
             >
               {sc.icon} {statut}
             </span>
+          ) : (
+            !loading && (
+              <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/40">
+                Historique indisponible
+              </span>
+            )
           )}
           <span
             className="rounded-full px-3 py-1 text-xs font-bold"

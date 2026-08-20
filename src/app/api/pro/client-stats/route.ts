@@ -49,11 +49,16 @@ export async function GET(req: NextRequest) {
     const noShow = relevant.filter((m: any) => m.status === 'no_show').length;
     const score = total > 0 ? Math.round(((total - noShow) / total) * 100) : 100;
 
-    const { data: appUser } = await supabase
-      .from('app_users')
-      .select('statut, jokers_disponibles, jokers_utilises, rdv_honores')
-      .eq('phone', phone)
-      .maybeSingle();
+    // get_client_loyalty_for_pro (migration 0062) — SECURITY DEFINER, seule
+    // façon dont un pro peut légitimement lire les 4 colonnes fidélité d'un
+    // client : app_users_select (policy RLS, migration 0022) ne l'autorise
+    // pas (id = auth.uid() OR is_admin() uniquement). Ne jamais revenir à un
+    // .from('app_users').select(...) direct ici, même en service role — ça
+    // exposerait toute la ligne au lieu des 4 champs nécessaires.
+    const { data: appUserRows } = await supabase.rpc('get_client_loyalty_for_pro', {
+      p_phone: phone,
+    });
+    const appUser = appUserRows && appUserRows.length > 0 ? appUserRows[0] : null;
 
     return NextResponse.json({
       stats: { total, noShow, score },
