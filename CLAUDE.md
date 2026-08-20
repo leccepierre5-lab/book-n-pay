@@ -207,6 +207,47 @@ mot de passe touché.**
 - Ces deux scripts vivent dans `scripts/`, jamais dans `src/` — rien de ce
   mécanisme ne se retrouve dans le bundle applicatif livré.
 
+# Comptes de démonstration commerciale (visites pro)
+
+Créés le 20/08/2026 pour les visites terrain (toilettage canin, tatouage) :
+montrer l'écran d'un pro avec un agenda rempli et des données crédibles
+plutôt qu'un compte vide. Appareil gardé en main par Pierre pendant la
+démo — jamais prêté sans supervision, donc pas de verrouillage particulier
+au-delà de la connexion sans mot de passe ci-dessus (audit d'accès fait le
+20/08 : un compte `role='pro'` est cloisonné à son propre `biz_id` — Stripe
+Connect, facturation, collaborateurs, fiche client — et l'espace admin est
+bloqué par un check de rôle explicite, voir `(admin)/admin/page.tsx`).
+
+- `demo-pro@book-n-pay.invalid` — professionnel, établissement
+  `fixture-pro-demo-visite` (slug fixe, identité changée selon `--metier`).
+- `demo-client@book-n-pay.invalid` — client fidèle (statut Bronze, 19 RDV
+  honorés, 1 joker déjà utilisé).
+- `demo-client-2@book-n-pay.invalid` — second client, statut Standard (3
+  RDV honorés), pour montrer le contraste fidèle/nouveau sur la même fiche
+  pro. Compte créé mais jamais utilisé pour se connecter en démo.
+
+Les trois doivent être dans `DEMO_TESTER_EMAILS` (Vercel Production +
+Preview, et `.env.local`) — sinon `/recherche` reste vide pour ces comptes
+(1000 fiches génériques masquées aux non-testeurs, voir `demo-mode.ts`).
+
+**Préparation / remise à zéro entre deux visites** (une seule commande,
+rejouable, purge et recrée la semaine de réservations) :
+```
+node --env-file=.env.local scripts/audit/prepare-demo-visite.mjs --metier=animaux
+node --env-file=.env.local scripts/audit/prepare-demo-visite.mjs --metier=tatouage-piercing
+```
+**Sortie définitive du dispositif** (supprime tout, comptes inclus) :
+```
+node --env-file=.env.local scripts/audit/cleanup-demo-visite.mjs
+```
+Connexion, comme pour les autres fixtures : `passwordless-login-link.mjs`.
+
+⚠️ Raccourcis assumés dans ces réservations (statuts payé/arrivé/no-show
+posés directement en base, compteur de fidélité pareil) — jamais passées
+par Stripe ni par les vrais chemins de changement de statut. Détail complet
+en en-tête de `prepare-demo-visite.mjs`. Les 1000 fiches génériques ne sont
+jamais touchées par ces deux scripts.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
