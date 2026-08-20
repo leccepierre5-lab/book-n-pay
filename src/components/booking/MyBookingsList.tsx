@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { AppUser, Booking, BookingMember, EnrichedReferralEvent } from '@/lib/database.types';
 import type { GroupMap } from '@/app/(public)/mes-reservations/page';
-import { phonesMatch, formatTime, isBookingDateUpcoming } from '@/lib/booking-utils';
+import { phonesMatch, formatTime, isBookingDateUpcoming, getParisDateOffsetStr } from '@/lib/booking-utils';
 import WeekCalendar from './WeekCalendar';
 import GroupTimer from './GroupTimer';
 import Modal from '@/components/ui/Modal';
@@ -34,14 +34,18 @@ const LOYALTY_CONFIG: Record<string, { emoji: string; color: string }> = {
   Gold: { emoji: '🏆', color: 'text-amber-400' },
 };
 
-function formatBookingDate(dateStr: string) {
+// Trouvé le 20/08/2026 (parcours navigateur réel) : l'ancien calcul
+// comparait des horodatages (date du RDV ancrée à midi moins l'instant
+// courant, divisé par 24h) — un RDV demain consulté l'après-midi affichait
+// "Aujourd'hui", l'écart tombant sous 24h dès qu'on regarde après midi la
+// veille. Comparaison de dates calendaires (Europe/Paris, même convention
+// que isToday dans AgendaView.tsx) au lieu d'un écart d'horodatages : plus
+// aucune sensibilité à l'heure du jour où le client consulte la page.
+export function formatBookingDate(dateStr: string) {
+  if (dateStr === getParisDateOffsetStr(0)) return "Aujourd'hui";
+  if (dateStr === getParisDateOffsetStr(1)) return 'Demain';
+  if (dateStr === getParisDateOffsetStr(-1)) return 'Hier';
   const d = new Date(dateStr + 'T12:00:00');
-  const now = new Date();
-  const diff = d.getTime() - now.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return "Aujourd'hui";
-  if (days === 1) return 'Demain';
-  if (days === -1) return 'Hier';
   return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
