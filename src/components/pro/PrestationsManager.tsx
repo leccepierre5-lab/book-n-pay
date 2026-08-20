@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { Service } from '@/lib/database.types';
-import { MAX_DEPOSIT_EUROS } from '@/lib/booking-utils';
+import { MAX_DEPOSIT_EUROS, suggestDeposit } from '@/lib/booking-utils';
 import { getServiceNameSuggestions, SERVICE_NAME_AUTRE, SERVICE_NAME_MAX_LENGTH } from '@/lib/service-name-suggestions';
 
 type GenreValue = '' | 'homme' | 'femme' | 'enfants' | 'garcon' | 'fille';
@@ -388,7 +388,19 @@ export default function PrestationsManager({
                   required
                   className={inputClass}
                 />
-                <p className="mt-1 text-[10px] text-slate-600">Entre 1€ et {MAX_DEPOSIT_EUROS}€, jamais au-dessus du prix de la prestation.</p>
+                <p className="mt-1 text-[10px] text-slate-600 leading-relaxed">
+                  Les frais de réservation sont versés par le client au moment de réserver. Ils vous reviennent intégralement et sont déduits du prix final. Plus le montant est significatif, plus votre client s&apos;engage à venir — et s&apos;il ne vient pas, vous conservez cette somme.
+                </p>
+                {Number(form.price) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, deposit: String(suggestDeposit(Number(f.price))) }))}
+                    className="mt-1.5 text-[10px] text-mint-400 hover:text-mint-300 transition-colors"
+                  >
+                    Recommandé pour cette prestation : {suggestDeposit(Number(form.price))}€
+                  </button>
+                )}
+                <p className="mt-1 text-[10px] text-slate-700">Entre 1€ et {MAX_DEPOSIT_EUROS}€, jamais au-dessus du prix de la prestation.</p>
               </div>
               <div>
                 <label className="block text-[10px] text-slate-500 uppercase tracking-widest mb-1.5">Max personnes</label>
