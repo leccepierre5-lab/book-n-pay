@@ -13,10 +13,6 @@
       "schedule": "0 7 * * *"
     },
     {
-      "path": "/api/cron/verifier-inactivite",
-      "schedule": "0 6 * * *"
-    },
-    {
       "path": "/api/cron/relance-onboarding-pro",
       "schedule": "0 8 * * *"
     },

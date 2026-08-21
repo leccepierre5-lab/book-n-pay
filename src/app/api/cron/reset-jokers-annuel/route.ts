@@ -1,8 +1,13 @@
 // src/app/api/cron/reset-jokers-annuel/route.ts
 // Port de base44/functions/resetJokersAnnuel/entry.ts
 // Cron 1er janvier (voir vercel.json) — réinitialise les Jokers selon le
-// statut, applique le déclassement par inactivité (60j) ou minimum annuel
-// (5 RDV/an) pour les statuts non-Standard.
+// statut, applique le déclassement minimum annuel (5 RDV/an) pour les
+// statuts non-Standard.
+//
+// ⚠️ La règle de déclassement par inactivité (60j) a été retirée le 21/08
+// (décision Pierre, CGU art. 4.4 supprimé) : un client inactif conserve
+// désormais son statut, ses Jokers et son historique — seule cette
+// réinitialisation annuelle (Jokers + règle des 5 RDV/an, art. 4.3) subsiste.
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { isValidBearerSecret } from '@/lib/constant-time';
@@ -32,17 +37,7 @@ export async function GET(req: NextRequest) {
     const derniereActivite = user.derniere_activite || '';
     let statutFinal = statut;
 
-    if (statut !== 'Standard' && derniereActivite) {
-      const dernier = new Date(derniereActivite);
-      const joursInactivite = Math.floor((Date.now() - dernier.getTime()) / (1000 * 60 * 60 * 24));
-      if (joursInactivite >= 60) {
-        statutFinal = 'Standard';
-        degraded++;
-        console.log(`[Reset 1er jan] Déclassement inactivité ${user.name}: ${statut} → Standard (${joursInactivite}j)`);
-      }
-    }
-
-    if (statutFinal !== 'Standard' && statut !== 'Standard' && derniereActivite < oneYearAgo) {
+    if (statut !== 'Standard' && derniereActivite < oneYearAgo) {
       // ⚠️ Une erreur de requête ne doit JAMAIS entraîner un déclassement —
       // trouvé le 13/08 (incident pro_charges/0041, même motif) : l'ancien
       // code faisait `count || 0`, indiscernable d'un vrai "0 RDV" sur un

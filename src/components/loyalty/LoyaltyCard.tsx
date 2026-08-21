@@ -94,16 +94,6 @@ function LoyaltyModal({ profile, onClose }: { profile: AppUser; onClose: () => v
             );
           })}
         </div>
-
-        {/* Inactivity warning */}
-        <div className="rounded-xl bg-red-950/40 border border-red-500/20 px-4 py-3 flex items-start gap-2">
-          <span className="text-red-400 mt-0.5 shrink-0 text-sm">🛡</span>
-          <p className="text-xs text-red-300 leading-relaxed">
-            <strong>Règle d'inactivité :</strong> En cas d'absence de réservation honorée pendant{' '}
-            <strong>2 mois consécutifs</strong>, votre statut sera automatiquement réinitialisé à Standard
-            et vos Jokers non utilisés seront perdus.
-          </p>
-        </div>
     </Modal>
   );
 }

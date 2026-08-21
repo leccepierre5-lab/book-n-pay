@@ -85,13 +85,10 @@ beforeEach(() => {
   currentPhone = '';
 });
 
-// derniere_activite VIDE, pas une vieille date : la branche "min RDV/an" ne
-// s'exécute en pratique QUE dans ce cas — une vieille date (ex. il y a 375j)
-// déclenche D'ABORD la branche inactivité 60j (375 > 60), qui passe déjà
-// statutFinal à 'Standard' avant même d'atteindre la branche RDV, la
-// rendant inatteignable. Trouvé en écrivant ces tests, pas supposé —
-// exactement le genre de détail qu'un test qui n'appelle pas le vrai
-// chemin aurait manqué.
+// derniere_activite VIDE : chaîne vide < toute date ISO réelle, donc satisfait
+// systématiquement `derniereActivite < oneYearAgo` et fait entrer dans la
+// branche "min RDV/an" — pratique pour isoler ce chemin dans les tests
+// nominaux ci-dessous, indépendamment de la vraie date d'activité.
 const EMPTY_ACTIVITY = '';
 
 describe('GET /api/cron/reset-jokers-annuel', () => {
@@ -151,11 +148,12 @@ describe('GET /api/cron/reset-jokers-annuel', () => {
     expect(failedDescriptions[0]).toContain('statut inchangé par prudence');
   });
 
-  it("le déclassement par INACTIVITÉ (60j) n'est jamais affecté par une erreur de comptage RDV — deux gardes indépendants", async () => {
-    // Inactif depuis > 60 jours mais < 1 an : ne passe même pas dans le
-    // bloc "comptage RDV" (condition derniereActivite < oneYearAgo), donc
-    // aucune requête booking_members n'est faite pour ce cas — le
-    // déclassement inactivité doit s'appliquer normalement.
+  it("règle d'inactivité (60j) SUPPRIMÉE le 21/08 : un client inactif depuis 70j (< 1 an) n'est plus déclassé, aucune requête RDV déclenchée", async () => {
+    // Avant le 21/08, ce cas déclenchait un déclassement immédiat à
+    // Standard sans même consulter booking_members. Décision produit : un
+    // client inactif conserve désormais statut/Jokers/historique — seule
+    // la règle des 5 RDV/an (< 1 an d'inactivité ne la déclenche pas non
+    // plus, `derniereActivite < oneYearAgo` reste faux à 70j) subsiste.
     const seventyDaysAgo = new Date(Date.now() - 70 * 24 * 3600 * 1000).toISOString();
     currentPhone = '0600000004';
     usersRow = [{ id: 'u4', name: 'Client Inactif', phone: currentPhone, statut: 'Bronze', derniere_activite: seventyDaysAgo }];
@@ -165,8 +163,26 @@ describe('GET /api/cron/reset-jokers-annuel', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.degraded).toBe(1);
-    expect(updateCalls[0].updates.statut).toBe('Standard');
+    expect(json.degraded).toBe(0);
+    expect(updateCalls[0].updates.statut).toBe('Bronze');
     expect(mockNotifyAdminOnFailure).not.toHaveBeenCalled();
+  });
+
+  it("règle des 5 RDV/an (art. 4.3, distincte de l'inactivité supprimée) continue de s'appliquer pour une inactivité > 1 an", async () => {
+    // derniereActivite < oneYearAgo redevient atteignable maintenant que la
+    // branche inactivité (qui interceptait tout ce qui dépassait 60j,
+    // masquant ce chemin pour toute vieille date) a disparu.
+    const overOneYearAgo = new Date(Date.now() - 400 * 24 * 3600 * 1000).toISOString();
+    currentPhone = '0600000005';
+    usersRow = [{ id: 'u5', name: 'Client Très Inactif', phone: currentPhone, statut: 'Bronze', derniere_activite: overOneYearAgo }];
+    bookingCountByPhone[currentPhone] = 1; // < MIN_RDV_ANNUEL (5)
+
+    const { GET } = await import('@/app/api/cron/reset-jokers-annuel/route');
+    const res = await GET(buildRequest() as any);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.degraded).toBe(1);
+    expect(updateCalls[0].updates.statut).toBe('Standard'); // DOWNGRADE['Bronze']
   });
 });

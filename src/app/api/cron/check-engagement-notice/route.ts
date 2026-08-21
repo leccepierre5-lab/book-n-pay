@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     // Fenetre "devrait deja avoir recu son preavis" : entre la fin
     // d'engagement (0) et le seuil ENGAGEMENT_NOTICE_DAYS (30). Volontairement
     // un intervalle plutot qu'une egalite stricte pour rester robuste si le
-    // cron rate un jour d'execution (meme logique que verifier-inactivite).
+    // cron rate un jour d'execution.
     if (daysRemaining < 0 || daysRemaining > ENGAGEMENT_NOTICE_DAYS) continue;
 
     const { data: business } = await supabase

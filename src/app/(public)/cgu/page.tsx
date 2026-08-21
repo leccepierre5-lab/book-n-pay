@@ -154,8 +154,9 @@ export default function CGUPage() {
                 conservé par l'Utilisateur, sous réserve d'effectuer un minimum de 5 rendez-vous par
                 année civile. À défaut, l'Utilisateur est déclassé d'un seul palier au 1er janvier
                 suivant (par exemple Gold vers Argent), sans perte des Jokers déjà attribués pour
-                l'année en cours ni du compteur de rendez-vous cumulés. Ce déclassement graduel est
-                distinct du déclassement total prévu à l'article 4.4 en cas d'inactivité prolongée.
+                l'année en cours ni du compteur de rendez-vous cumulés. En dehors de cette
+                réinitialisation annuelle, le statut, les Jokers et l'historique de rendez-vous de
+                l'Utilisateur restent acquis quelle que soit la fréquence de ses réservations.
               </li>
               <li>
                 <strong className="text-white/80">Frais exclus :</strong> Le "Joker" permet
@@ -164,16 +165,6 @@ export default function CGUPage() {
                 Le cas de l'annulation par le Professionnel est régi par l'article 3.
               </li>
             </ul>
-            <p>
-              <strong className="text-white">4.4. Maintien du statut et inactivité :</strong> Le
-              maintien du statut atteint (Bronze, Argent, Gold) est conditionné par une utilisation
-              régulière de la plateforme. En cas d'inactivité constatée sur une période de deux (2)
-              mois consécutifs (absence de réservation honorée sur la période), l'Utilisateur sera
-              automatiquement déclassé au statut Standard. En conséquence de ce déclassement,
-              l'Utilisateur perdra l'ensemble des avantages liés à son ancien statut, y compris le
-              solde des "Jokers" non consommés. Le compteur de rendez-vous cumulés sera également
-              réinitialisé à zéro pour repartir sur la base du palier Standard.
-            </p>
           </section>
 
           <section>

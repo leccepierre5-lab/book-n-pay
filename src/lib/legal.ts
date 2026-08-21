@@ -7,7 +7,10 @@
 // reste triable en comparaison de chaînes tant que N < 10 (pas encore
 // arrivé). Ici : ajout de l'article 15 (chat / intitulés de prestation —
 // interdiction des données de santé), voir docs/legal-archive/.
-export const CGU_VERSION = '2026-08-2';
+// 3e bump du mois (21/08) : suppression de l'article 4.4 (déclassement
+// fidélité par inactivité 2 mois, décision produit — un client inactif garde
+// désormais son statut/Jokers/historique), renvoi croisé ajusté dans 4.3.
+export const CGU_VERSION = '2026-08-3';
 
 // ⚠️ TEXTE PROVISOIRE — "draft-1", PAS le texte définitif. Rédigé pour que le
 // mécanisme (case à cocher + preuve serveur, migration 0045) soit testable
