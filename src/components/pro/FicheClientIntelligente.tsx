@@ -53,11 +53,21 @@ export default function FicheClientIntelligente({
   // contre un double-clic sur "Rembourser" déclenchant deux remboursements
   // Stripe.
   const [refunding, setRefunding] = useState(false);
+  // Argent réel, remboursement irréversible (aucun chemin d'annulation d'un
+  // refund Stripe côté code) — trouvé le 20/08 : le bouton déclenchait le
+  // remboursement au premier clic, sans confirmation. `confirming` affiche
+  // l'écran intermédiaire, `refunded` le retour après coup — sans lui, le
+  // parent ferme la modale dès que `onRembourser` résout et le pro n'a
+  // jamais la preuve visuelle que l'action est partie.
+  const [confirming, setConfirming] = useState(false);
+  const [refunded, setRefunded] = useState(false);
 
-  const handleRembourserClick = async () => {
+  const handleConfirmRefund = async () => {
     setRefunding(true);
     try {
       await onRembourser();
+      setConfirming(false);
+      setRefunded(true);
     } finally {
       setRefunding(false);
     }
@@ -200,16 +210,55 @@ export default function FicheClientIntelligente({
           geste commercial, facultatif. L'état par défaut (frais acquis) est
           dit explicitement plutôt que matérialisé par un bouton. */}
       {member.deposit && member.deposit > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs text-white/50">Les frais de réservation vous sont acquis.</p>
-          <button
-            onClick={handleRembourserClick}
-            disabled={refunding}
-            className="w-full rounded-lg border border-blue-500/40 py-2.5 text-xs font-semibold text-blue-400 hover:bg-blue-500/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {refunding ? 'Remboursement...' : 'Rembourser en geste commercial'}
-          </button>
-        </div>
+        refunded ? (
+          <div className="rounded-lg bg-emerald-950/40 border border-emerald-500/20 py-2.5 text-center text-xs font-semibold text-emerald-400">
+            ✓ Remboursement envoyé à {member.name}
+          </div>
+        ) : confirming ? (
+          // Pas de window.confirm() — gelait la session sur la suppression de
+          // prestation (20/08) et casse l'expérience sur mobile. Confirmation
+          // intégrée à la carte, montant lu depuis member.deposit (même
+          // source que refund-gesture/route.ts, jamais recalculé ici).
+          // "Annuler" en premier et en style plein — l'option par défaut
+          // visuellement — "Confirmer" reste secondaire (bordé), cohérent
+          // avec le reste de la fiche.
+          <div className="space-y-2 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
+            <p className="text-xs font-semibold text-white">Confirmer le remboursement</p>
+            <p className="text-xs text-white/60 leading-relaxed">
+              Vous allez rembourser {member.deposit.toFixed(2).replace('.', ',')} € à {member.name}.
+              <br />
+              Cette action est irréversible.
+              <br />
+              Les frais de gestion ne sont pas remboursés.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setConfirming(false)}
+                disabled={refunding}
+                className="flex-1 rounded-lg bg-white/10 py-2 text-xs font-semibold text-white hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmRefund}
+                disabled={refunding}
+                className="flex-1 rounded-lg border border-blue-500/40 py-2 text-xs font-semibold text-blue-400 hover:bg-blue-500/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {refunding ? 'Remboursement...' : 'Confirmer le remboursement'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-white/50">Les frais de réservation vous sont acquis.</p>
+            <button
+              onClick={() => setConfirming(true)}
+              className="w-full rounded-lg border border-blue-500/40 py-2.5 text-xs font-semibold text-blue-400 hover:bg-blue-500/10 transition-colors"
+            >
+              Rembourser en geste commercial
+            </button>
+          </div>
+        )
       )}
     </div>
   );

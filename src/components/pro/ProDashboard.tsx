@@ -113,7 +113,10 @@ export default function ProDashboard({
       body: JSON.stringify({ bookingId: selectedNoShow.bookingId, memberId: selectedNoShow.member.id }),
     });
     setRecentNoShowsLocal((prev) => prev.filter((b) => b.booking_members[0]?.id !== selectedNoShow.member.id));
-    setSelectedNoShow(null);
+    // Ne ferme plus la modale ici (trouvé le 20/08, chantier confirmation
+    // remboursement) : FicheClientIntelligente affiche désormais un retour
+    // "✓ Remboursement envoyé" après succès — fermer immédiatement
+    // l'empêchait de jamais s'afficher. Le pro ferme lui-même via "Fermer".
   };
 
   const handleQrScan = async (qrCode: string) => {

@@ -212,7 +212,10 @@ export default function ProCalendar({ bizId }: { bizId: string }) {
           : b
       )
     );
-    setSelectedNoShow(null);
+    // Ne ferme plus la modale ici (trouvé le 20/08, chantier confirmation
+    // remboursement) : FicheClientIntelligente affiche désormais un retour
+    // "✓ Remboursement envoyé" après succès — fermer immédiatement
+    // l'empêchait de jamais s'afficher. Le pro ferme lui-même via "Fermer".
   }, [selectedNoShow]);
 
   const loadMonth = useCallback(
