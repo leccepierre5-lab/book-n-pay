@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { logAndRespond, withErrorHandling } from '@/lib/api-error';
-import { MAX_DEPOSIT_EUROS } from '@/lib/booking-utils';
+import { MAX_DEPOSIT_EUROS, minDeposit } from '@/lib/booking-utils';
 import { SERVICE_NAME_MAX_LENGTH } from '@/lib/service-name-suggestions';
 
 async function getBizId(): Promise<string | null> {
@@ -53,15 +53,18 @@ export const POST = withErrorHandling('[Services]', async (req: NextRequest) => 
     );
   }
 
-  // ⚠️ CORRECTIF (LOT 2 #1, audit tarification 27/07) : un dépôt à 0€ (ou
-  // sous 1€) rendait le service structurellement inréservable en ligne —
+  // ⚠️ CORRECTIF (LOT 2 #1, audit tarification 27/07) : un dépôt à 0€
+  // rendait le service structurellement inréservable en ligne —
   // stripe/checkout/route.ts refuse tout paiement Stripe sous 1€, le client
   // tombait sur une erreur en toute fin de tunnel, après avoir déjà choisi
-  // son créneau. `deposit` défaultait silencieusement à 0 (`?? 0`) si omis —
-  // bloqué à la source, plus de service créable dans cet état.
-  if (deposit == null || Number(deposit) < 1) {
+  // son créneau. `deposit` défaultait silencieusement à 0 (`?? 0`) si omis.
+  // DURCI le 21/08 (décision Pierre) : le plancher n'est plus un flat 1€
+  // mais minDeposit(price) — 20% du prix, plancher 5€, jamais au-dessus du
+  // prix. Impose un vrai minimum anti-no-show, pas seulement un montant
+  // techniquement réservable par Stripe.
+  if (deposit == null || Number(deposit) < minDeposit(Number(price))) {
     return NextResponse.json(
-      { error: "Le dépôt (frais de réservation) doit être d'au moins 1€ — en dessous, la réservation ne peut pas être sécurisée en ligne." },
+      { error: `Le dépôt (frais de réservation) doit être d'au moins ${minDeposit(Number(price))}€ pour cette prestation (minimum 20% du prix, plancher 5€).` },
       { status: 400 }
     );
   }
@@ -131,15 +134,10 @@ export const PATCH = withErrorHandling('[Services]', async (req: NextRequest) =>
   }
 
   if (deposit !== undefined) {
-    // Même correctif que POST — voir commentaire ci-dessus.
-    if (Number(deposit) < 1) {
-      return NextResponse.json(
-        { error: "Le dépôt (frais de réservation) doit être d'au moins 1€ — en dessous, la réservation ne peut pas être sécurisée en ligne." },
-        { status: 400 }
-      );
-    }
     // Plafond dépôt — services déjà en base au-delà : non modifiés, seules
     // les éditions qui touchent explicitement le dépôt sont contraintes.
+    // (flat, indépendant du prix — reste vérifié uniquement quand deposit
+    // est explicitement envoyé, contrairement au minimum ci-dessous.)
     if (Number(deposit) > MAX_DEPOSIT_EUROS) {
       return NextResponse.json(
         { error: `Le dépôt (frais de réservation) ne peut pas dépasser ${MAX_DEPOSIT_EUROS}€.` },
@@ -148,12 +146,24 @@ export const PATCH = withErrorHandling('[Services]', async (req: NextRequest) =>
     }
   }
 
+  // ⚠️ Vérifié dès que price OU deposit change (pas seulement deposit) :
+  // le minimum dépend du prix — baisser SEULEMENT le prix peut faire passer
+  // un dépôt déjà en base sous le nouveau minimum de 20%, sans que le pro
+  // n'ait touché au champ dépôt. Même principe que le garde dépôt<=prix
+  // juste en dessous, calculé sur les mêmes finalPrice/finalDeposit.
   if (deposit !== undefined || price !== undefined) {
     const finalPrice = price !== undefined ? Number(price) : existing.price;
     const finalDeposit = deposit !== undefined ? Number(deposit) : existing.deposit;
     if (finalDeposit > finalPrice) {
       return NextResponse.json(
         { error: 'Le dépôt (frais de réservation) ne peut pas dépasser le prix de la prestation.' },
+        { status: 400 }
+      );
+    }
+    const min = minDeposit(finalPrice);
+    if (finalDeposit < min) {
+      return NextResponse.json(
+        { error: `Le dépôt (frais de réservation) doit être d'au moins ${min}€ pour cette prestation (minimum 20% du prix, plancher 5€).` },
         { status: 400 }
       );
     }
