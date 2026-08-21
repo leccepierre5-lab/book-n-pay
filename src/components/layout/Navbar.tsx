@@ -36,6 +36,14 @@ function Logo() {
 export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [statut, setStatut] = useState<LoyaltyStatus | null>(null);
+  // ⚠️ Trouvé le 24/07, corrigé le 21/08 : la nav n'était consciente d'aucun
+  // rôle — "Réserver" restait affiché à un pro/admin connecté, qui tombait
+  // systématiquement sur un mur (PRO_ACCOUNT_CANNOT_BOOK/
+  // ADMIN_ACCOUNT_CANNOT_BOOK, bookings/create/route.ts:151) une fois arrivé
+  // au paiement. Seul ce lien mène à un vrai mur — vérifié : "Mes RDV"
+  // (/mes-reservations) ne fait aucun check de rôle (liste juste vide pour
+  // un pro), "Mon compte" est volontairement partagé entre les 3 rôles.
+  const [role, setRole] = useState<string | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -45,12 +53,16 @@ export default function Navbar() {
       if (session?.user) {
         supabase
           .from('app_users')
-          .select('statut')
+          .select('statut, role')
           .eq('id', session.user.id)
           .maybeSingle()
-          .then(({ data }) => setStatut((data?.statut as LoyaltyStatus) || null));
+          .then(({ data }) => {
+            setStatut((data?.statut as LoyaltyStatus) || null);
+            setRole(data?.role || null);
+          });
       } else {
         setStatut(null);
+        setRole(null);
       }
     });
     return () => subscription.unsubscribe();
@@ -59,6 +71,7 @@ export default function Navbar() {
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
   const statutStyle = statut ? STATUT_STYLE[statut] : null;
+  const canBook = role !== 'pro' && role !== 'admin';
 
   return (
     <nav className="sticky top-0 z-50 bg-navy-950/90 backdrop-blur-xl border-b border-white/[0.06]">
@@ -66,21 +79,23 @@ export default function Navbar() {
         <Logo />
 
         <div className="flex items-center gap-0.5">
-          <Link
-            href="/recherche"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
-              isActive('/recherche')
-                ? 'text-mint-400 bg-mint-500/10'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            Réserver
-            {statutStyle && (
-              <span className={`text-xs ${statutStyle.color}`} title={`Statut ${statut}`}>
-                {statutStyle.icon}
-              </span>
-            )}
-          </Link>
+          {canBook && (
+            <Link
+              href="/recherche"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+                isActive('/recherche')
+                  ? 'text-mint-400 bg-mint-500/10'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              Réserver
+              {statutStyle && (
+                <span className={`text-xs ${statutStyle.color}`} title={`Statut ${statut}`}>
+                  {statutStyle.icon}
+                </span>
+              )}
+            </Link>
+          )}
           <Link
             href="/mes-reservations"
             className={`px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
