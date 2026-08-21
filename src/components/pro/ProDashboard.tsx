@@ -481,15 +481,22 @@ export default function ProDashboard({
               <p className="text-sm text-white">
                 <span className="font-bold text-mint-400">{stats.depositSecuredCount}</span> RDV sécurisé{stats.depositSecuredCount > 1 ? 's' : ''} par frais de réservation
                 <span className="text-slate-500"> · </span>
-                <span className="font-bold text-mint-400">{stats.depositSecuredAmount}€</span> couverts depuis votre inscription
+                <span className="font-bold text-mint-400">{stats.depositSecuredAmount.toFixed(2).replace('.', ',')}{' '}€</span> encaissés d'avance sur vos réservations — conservés si le client ne vient pas
               </p>
             </div>
-            <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
-              <p className="text-sm text-white">
-                <span className="font-bold text-blue-400">{stats.offHoursBookingsCount}</span> réservation{stats.offHoursBookingsCount > 1 ? 's' : ''} prise{stats.offHoursBookingsCount > 1 ? 's' : ''} ce mois-ci hors de vos horaires d'ouverture
-              </p>
-              <p className="text-xs text-slate-500 mt-1">Des clients que vous n'auriez pas pu décrocher au téléphone.</p>
-            </div>
+            {/* Gate propre à cette carte (pas seulement au bloc parent, ligne
+                477) : ce compteur peut être à 0 même quand depositSecuredCount
+                est positif — trouvé le 21/08, affichait "0 réservation...
+                hors de vos horaires" suivi d'une phrase vantant un bénéfice
+                inexistant. */}
+            {stats.offHoursBookingsCount > 0 && (
+              <div className="rounded-2xl bg-navy-900 border border-white/[0.08] p-4">
+                <p className="text-sm text-white">
+                  <span className="font-bold text-blue-400">{stats.offHoursBookingsCount}</span> réservation{stats.offHoursBookingsCount > 1 ? 's' : ''} prise{stats.offHoursBookingsCount > 1 ? 's' : ''} ce mois-ci hors de vos horaires d'ouverture
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Des clients que vous n'auriez pas pu décrocher au téléphone.</p>
+              </div>
+            )}
           </div>
         )}
 
