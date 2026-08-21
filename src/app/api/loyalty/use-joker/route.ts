@@ -13,7 +13,7 @@
 // au profil connecté (ou que l'appelant est admin).
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { JOKERS_LIMITES, JOKERS_PCT } from '@/lib/booking-utils';
+import { JOKERS_LIMITES, JOKERS_PCT, CANCEL_DEADLINE_HOURS, parseParisDatetime } from '@/lib/booking-utils';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { logAndRespond } from '@/lib/api-error';
@@ -83,6 +83,30 @@ export async function POST(req: NextRequest) {
         { error: "Ce membre n'est pas dans un état permettant un remboursement Joker" },
         { status: 400 }
       );
+    }
+
+    // ⚠️ CORRECTIF (trouvé le 21/08) : cette route ne vérifiait aucun délai —
+    // un Joker était consommé même quand l'annulation était déjà gratuite
+    // (>48h avant le RDV, cf. bookings/cancel). Le client perdait un Joker de
+    // son quota annuel sans qu'il ne lui apporte rien. Un Joker n'a de valeur
+    // QUE quand l'annulation serait sinon payante (<48h) — sinon on renvoie
+    // jokerApplique:false et le front (MyBookingsList.handleCancel) retombe
+    // automatiquement sur /api/bookings/cancel, qui rembourse gratuitement
+    // sans toucher au Joker.
+    const { data: booking } = await serviceSupabase
+      .from('bookings')
+      .select('date, time')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (booking) {
+      const hoursUntilRdv = (parseParisDatetime(booking.date, booking.time).getTime() - Date.now()) / (1000 * 60 * 60);
+      if (hoursUntilRdv >= CANCEL_DEADLINE_HOURS) {
+        return NextResponse.json({
+          jokerApplique: false,
+          raison: `Annulation déjà gratuite (plus de ${CANCEL_DEADLINE_HOURS}h avant le RDV) — aucun Joker consommé`,
+        });
+      }
     }
 
     const { data: user } = await serviceSupabase

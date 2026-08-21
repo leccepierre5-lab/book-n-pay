@@ -17,7 +17,7 @@
 // l'appartenance avant toute action.
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { parseParisDatetime, phonesMatch, formatTime } from '@/lib/booking-utils';
+import { parseParisDatetime, phonesMatch, formatTime, CANCEL_DEADLINE_HOURS } from '@/lib/booking-utils';
 import { buildIcs } from '@/lib/ics';
 import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
@@ -27,8 +27,6 @@ import { insertRefundFailure } from '@/lib/refund-failures';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
-
-const CANCEL_DEADLINE_HOURS = 48;
 
 export async function POST(req: NextRequest) {
   try {

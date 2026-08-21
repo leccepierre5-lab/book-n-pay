@@ -430,6 +430,14 @@ export function calcDeposit(baseDeposit: number, price: number, trustScore: Trus
   return { amount: baseDeposit, reason: null };
 }
 
+// ── Délai d'annulation gratuite ──────────────────────────────────────────────
+// Codé en dur, pas paramétrable par le pro (décision Pierre 11/08, voir
+// CLAUDE.md). Source unique — utilisée par bookings/cancel (pour décider si
+// l'annulation est gratuite) ET par loyalty/use-joker (pour ne consommer un
+// Joker QUE quand l'annulation serait sinon payante ; trouvé le 21/08 : sans
+// ce check, un Joker était brûlé même sur une annulation déjà gratuite).
+export const CANCEL_DEADLINE_HOURS = 48;
+
 // ── Fidélité "Sérénité" — paliers et jokers ──────────────────────────────────
 // Port de calculerStatutFidelite (Base44 Edge Function)
 // Source unique des paliers — JOKERS_LIMITES, JOKERS_PCT et computeStatut en
