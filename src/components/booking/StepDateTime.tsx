@@ -142,11 +142,24 @@ export default function StepDateTime({
   // serveur — voir create-group/route.ts). Ne change rien à la réservation
   // solo d'un service collectif (participants=1 passe déjà par le chemin
   // capacité de bookings/create/route.ts, indépendant de create-group).
-  const maxPersons = !GROUP_BOOKING_ENABLED
-    ? 1
-    : service.allow_group === true
+  // ⚠️ CORRECTIF (trouvé le 21/08) : `maxPersons` servait à la fois de
+  // plafond de SOUMISSION (combien de personnes CE client peut ajouter à sa
+  // propre réservation — légitimement bridé à 1 tant que le flag est off,
+  // voir commentaire ci-dessus) ET de seuil de PLEIN pour `isSlotFull`
+  // ci-dessous — les deux confondus dans une seule constante. Conséquence :
+  // pour un cours collectif réel (allow_group=true, max_persons=10), UNE
+  // seule inscription solo suffisait à afficher "Complet" à tous les
+  // clients suivants, alors qu'il restait 9 places — le flag bridait la
+  // capacité RÉELLE du cours, pas seulement le nombre de personnes qu'un
+  // client peut inscrire en une fois. `slotCapacity` porte maintenant la
+  // vraie capacité (jamais réduite par le flag), `maxPersons` reste le
+  // plafond de soumission flag-gated, inchangé pour le sélecteur de
+  // participants (toujours masqué tant que GROUP_BOOKING_ENABLED est off,
+  // voir `date && maxPersons > 1` plus bas — aucun changement de ce côté).
+  const slotCapacity = service.allow_group === true
     ? (service.max_persons ?? 23)
     : (staff === null && business.staff.length >= 2 ? business.staff.length : 1);
+  const maxPersons = !GROUP_BOOKING_ENABLED ? 1 : slotCapacity;
   const isCollective = service.allow_group === true;
 
   const now = new Date();
@@ -201,7 +214,7 @@ export default function StepDateTime({
     // praticien choisi (ou "" si aucun) pour ne pas se mélanger avec une
     // autre séance du même service donnée par un autre instructeur.
     const key = isCollective ? `${slot}::${staff?.id ?? ''}` : slot;
-    return (occupancy[key] || 0) >= maxPersons;
+    return (occupancy[key] || 0) >= slotCapacity;
   };
 
   const handleParticipantsChange = (n: number) => {

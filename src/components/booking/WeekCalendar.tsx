@@ -133,7 +133,15 @@ export default function WeekCalendar({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-blue-400" />
-          <span className="text-[10px] text-white/40">Invité</span>
+          {/* "Invité" → "En attente" (21/08) : ce statut ('invite' sur
+              booking_members) n'est pas exclusif au parcours groupe — posé
+              aussi sur toute réservation solo entre création et
+              confirmation Stripe (INVITE_EXPIRY_MS, 30 min). "Invité"
+              faisait penser à une invitation de groupe et ne correspondait
+              à rien pour un client hors groupe. Aligné sur le libellé déjà
+              utilisé pour ce même statut dans MyBookingsList.tsx et
+              ProDashboard.tsx. */}
+          <span className="text-[10px] text-white/40">En attente</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-white/30" />
@@ -169,7 +177,7 @@ export default function WeekCalendar({
                   : m?.status === 'cancelled'
                   ? 'Annulé'
                   : m?.status === 'invite'
-                  ? 'Invité'
+                  ? 'En attente'
                   : 'Confirmé';
 
               return (

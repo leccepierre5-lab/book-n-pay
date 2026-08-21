@@ -63,6 +63,37 @@ function colorForStaff(staffId: string | null): string {
   return PALETTE[hash % PALETTE.length];
 }
 
+// ⚠️ CORRECTIF (trouvé le 21/08) : un cours collectif avec plusieurs
+// participants au même horaire produisait une réservation par tête
+// (create_booking_with_capacity_check insère une ligne par personne, voir
+// CLAUDE.md "Invariants moteur"). Rendues telles quelles, ces réservations
+// se superposaient exactement (même top/height/largeur pleine colonne) —
+// le pro ne voyait que la dernière carte du DOM, les autres masquées
+// dessous, sans aucun indice qu'il y avait plusieurs inscrits. Regroupe ici
+// les réservations qui partagent le même horaire+service+durée en une
+// seule carte avec un compteur, au lieu de les empiler silencieusement.
+interface BookingGroup {
+  key: string;
+  time: string;
+  duration_minutes: number;
+  service_name: string;
+  members: AgendaBooking[];
+}
+
+function groupBookings(bookings: AgendaBooking[]): BookingGroup[] {
+  const map = new Map<string, BookingGroup>();
+  for (const b of bookings) {
+    const key = `${b.time}|${b.service_name}|${b.duration_minutes}`;
+    let g = map.get(key);
+    if (!g) {
+      g = { key, time: b.time, duration_minutes: b.duration_minutes, service_name: b.service_name, members: [] };
+      map.set(key, g);
+    }
+    g.members.push(b);
+  }
+  return Array.from(map.values());
+}
+
 // Minutes écoulées depuis minuit Paris de `date`, pour un instant absolu ISO
 // (absence, TIMESTAMPTZ) — même helper (parseParisDatetime) que le serveur,
 // pour positionner correctement sur une grille en minutes locales.
@@ -241,22 +272,31 @@ export default function AgendaView() {
                       );
                     })}
 
-                    {/* RDV réservés */}
-                    {col.bookings.map((b) => {
-                      const start = toMinutes(b.time);
-                      if (start + b.duration_minutes <= dayBounds.start || start >= dayBounds.end) return null;
+                    {/* RDV réservés — regroupés par créneau (voir groupBookings) pour
+                        ne jamais empiler plusieurs participants d'un même cours
+                        collectif invisiblement les uns sous les autres. */}
+                    {groupBookings(col.bookings).map((g) => {
+                      const start = toMinutes(g.time);
+                      if (start + g.duration_minutes <= dayBounds.start || start >= dayBounds.end) return null;
                       const top = ((start - dayBounds.start) / 30) * ROW_HEIGHT;
-                      const height = Math.max((b.duration_minutes / 30) * ROW_HEIGHT, 20);
+                      const height = Math.max((g.duration_minutes / 30) * ROW_HEIGHT, 20);
+                      const count = g.members.length;
+                      const names = g.members.map((m) => m.client_name || 'Client');
                       return (
                         <div
-                          key={b.id}
+                          key={g.key}
                           className="absolute left-0.5 right-0.5 overflow-hidden rounded-md px-1.5 py-0.5 text-navy-950"
                           style={{ top, height, backgroundColor: color }}
-                          title={`${b.time} · ${b.client_name ?? 'Client'} · ${b.service_name}`}
+                          title={`${g.time} · ${names.join(', ')} · ${g.service_name}`}
                         >
-                          <p className="truncate text-[10px] font-bold leading-tight">{b.time}</p>
-                          <p className="truncate text-[10px] font-semibold leading-tight">{b.client_name || 'Client'}</p>
-                          <p className="truncate text-[9px] leading-tight opacity-80">{b.service_name}</p>
+                          <p className="truncate text-[10px] font-bold leading-tight">
+                            {g.time}
+                            {count > 1 && <span className="ml-1 rounded bg-navy-950/25 px-1">{count} pers.</span>}
+                          </p>
+                          <p className="truncate text-[10px] font-semibold leading-tight">
+                            {count > 1 ? names.join(', ') : names[0]}
+                          </p>
+                          <p className="truncate text-[9px] leading-tight opacity-80">{g.service_name}</p>
                         </div>
                       );
                     })}
