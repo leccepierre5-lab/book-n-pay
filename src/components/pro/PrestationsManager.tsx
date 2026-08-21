@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { Service } from '@/lib/database.types';
 import { MAX_DEPOSIT_EUROS, MIN_DEPOSIT_FLOOR_EUROS, minDeposit } from '@/lib/booking-utils';
+import { GROUP_BOOKING_ENABLED } from '@/lib/feature-flags';
 import { getServiceNameSuggestions, SERVICE_NAME_AUTRE, SERVICE_NAME_MAX_LENGTH } from '@/lib/service-name-suggestions';
 
 type GenreValue = '' | 'homme' | 'femme' | 'enfants' | 'garcon' | 'fille';
@@ -44,7 +45,10 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   name: '',
   genre: '',
-  allow_group: true,
+  // ⚠️ Trouvé le 21/08 : `true` par défaut alors que GROUP_BOOKING_ENABLED
+  // est à false — un pro activait une fonctionnalité qui n'existe pas
+  // encore côté client, sans aucun garde-fou (voir feature-flags.ts).
+  allow_group: false,
   duration_minutes: '30',
   price: '',
   deposit: '',
@@ -105,6 +109,31 @@ export default function PrestationsManager({
     setNameIsAutre(!nameSuggestions.includes(s.name));
     setError(null);
     setShowForm(true);
+  };
+
+  // ⚠️ Trouvé le 21/08 : changer le prix ne touchait jamais le dépôt, qui
+  // pouvait rester vide ou visuellement incohérent avec le nouveau minimum
+  // (le champ affiche un placeholder, pas une vraie valeur — vérifié en
+  // conditions réelles, zéro requête réseau au clic si trop bas — mais
+  // laisser un champ qui semble accepter une valeur invalide est un vrai
+  // défaut d'UX). Deux ajustements automatiques, jamais un troisième cas :
+  // un dépôt DÉJÀ valide et volontairement plus haut n'est jamais touché.
+  const handlePriceChange = (rawPrice: string) => {
+    setForm((f) => {
+      const priceNum = Number(rawPrice);
+      if (!(priceNum > 0)) return { ...f, price: rawPrice };
+      const min = minDeposit(priceNum);
+      const depositNum = Number(f.deposit);
+      let deposit = f.deposit;
+      if (f.deposit === '' || depositNum < min) {
+        // Vide, ou sous le nouveau minimum → remonté au minimum.
+        deposit = String(min);
+      } else if (depositNum > priceNum) {
+        // Prix baissé sous un dépôt déjà valide → jamais au-dessus du prix.
+        deposit = String(priceNum);
+      }
+      return { ...f, price: rawPrice, deposit };
+    });
   };
 
   const closeForm = () => {
@@ -321,29 +350,39 @@ export default function PrestationsManager({
               </p>
             </div>
 
-            <div>
-              <button
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, allow_group: !f.allow_group }))}
-                className={`flex items-center gap-3 w-full rounded-xl border px-3 py-2.5 transition-all duration-150 ${
-                  form.allow_group
-                    ? 'border-mint-500/30 bg-mint-500/8'
-                    : 'border-white/[0.08] bg-navy-950'
-                }`}
-              >
-                <div className={`w-9 h-5 rounded-full relative transition-all duration-200 ${form.allow_group ? 'bg-mint-500' : 'bg-slate-700'}`}>
-                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${form.allow_group ? 'left-4' : 'left-0.5'}`} />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-medium text-white">Mode groupe autorisé</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    {form.allow_group
-                      ? 'Les clients peuvent réserver pour plusieurs personnes'
-                      : 'Réservation individuelle uniquement (soin en cabine, etc.)'}
-                  </p>
-                </div>
-              </button>
-            </div>
+            {/* Masqué tant que GROUP_BOOKING_ENABLED est false (trouvé le
+                21/08) : afficher ce toggle sans que la fonctionnalité
+                n'existe côté client trompait activement le pro — même
+                logique que GroupPendingBanner.tsx (return null si flag off).
+                Les prestations existantes avec allow_group=true (créées
+                avant ce correctif, valeur par défaut fautive) gardent leur
+                valeur telle quelle : le payload envoie toujours
+                form.allow_group, ce bloc masqué ne la réinitialise jamais. */}
+            {GROUP_BOOKING_ENABLED && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, allow_group: !f.allow_group }))}
+                  className={`flex items-center gap-3 w-full rounded-xl border px-3 py-2.5 transition-all duration-150 ${
+                    form.allow_group
+                      ? 'border-mint-500/30 bg-mint-500/8'
+                      : 'border-white/[0.08] bg-navy-950'
+                  }`}
+                >
+                  <div className={`w-9 h-5 rounded-full relative transition-all duration-200 ${form.allow_group ? 'bg-mint-500' : 'bg-slate-700'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${form.allow_group ? 'left-4' : 'left-0.5'}`} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-white">Mode groupe autorisé</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {form.allow_group
+                        ? 'Les clients peuvent réserver pour plusieurs personnes'
+                        : 'Réservation individuelle uniquement (soin en cabine, etc.)'}
+                    </p>
+                  </div>
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -367,7 +406,7 @@ export default function PrestationsManager({
                   step="0.5"
                   placeholder="0"
                   value={form.price}
-                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                  onChange={(e) => handlePriceChange(e.target.value)}
                   required
                   className={inputClass}
                 />
