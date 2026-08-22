@@ -22,6 +22,44 @@ export function suggestionHref(s: Suggestion): string {
     : `/recherche?q=${encodeURIComponent(s.name)}`;
 }
 
+// Type minimal (pas BusinessWithDetails complet) — ce que cette fonction lit
+// réellement, rien de plus. Extrait le 21/08 pour la même raison que
+// suggestionHref : testable sans monter le composant. Régression trouvée ce
+// jour-là (catalog.ts, commit e023844 du 16/08) : `services(price)` sans
+// `name` a laissé `s.name` undefined pour CHAQUE prestation, plantant cette
+// fonction (et donc tout le composant, faute d'error boundary sur
+// /recherche) dès 2 caractères tapés — 5 jours en production avant d'être
+// détecté, un simple test sur cette fonction l'aurait vu immédiatement.
+export type SuggestibleBusiness = {
+  name: string;
+  slug: string;
+  services?: { name: string }[] | null;
+};
+
+export function computeSuggestions(businesses: SuggestibleBusiness[], trimmedLower: string): Suggestion[] {
+  if (trimmedLower.length < MIN_CHARS) return [];
+
+  const businessMatches: Suggestion[] = businesses
+    .filter((b) => b.name.toLowerCase().startsWith(trimmedLower))
+    .slice(0, MAX_PER_GROUP)
+    .map((b) => ({ kind: 'business', name: b.name, slug: b.slug }));
+
+  const seen = new Set<string>();
+  const prestationMatches: Suggestion[] = [];
+  outer: for (const b of businesses) {
+    for (const s of b.services ?? []) {
+      const key = s.name.toLowerCase();
+      if (key.startsWith(trimmedLower) && !seen.has(key)) {
+        seen.add(key);
+        prestationMatches.push({ kind: 'prestation', name: s.name });
+        if (prestationMatches.length >= MAX_PER_GROUP) break outer;
+      }
+    }
+  }
+
+  return [...businessMatches, ...prestationMatches];
+}
+
 export function BusinessNameAutocomplete({
   defaultValue,
   businesses,
@@ -42,30 +80,12 @@ export function BusinessNameAutocomplete({
   // même `businesses` que SearchResults reçoit déjà — aucune requête réseau
   // supplémentaire ici, recalculé à chaque frappe via useMemo). Le scope suit
   // volontairement les filtres actifs (catégorie/ville/q déjà appliqués par
-  // searchBusinesses côté serveur) plutôt que tout le catalogue.
-  const suggestions = useMemo<Suggestion[]>(() => {
-    if (trimmedLower.length < MIN_CHARS) return [];
-
-    const businessMatches: Suggestion[] = businesses
-      .filter((b) => b.name.toLowerCase().startsWith(trimmedLower))
-      .slice(0, MAX_PER_GROUP)
-      .map((b) => ({ kind: 'business', name: b.name, slug: b.slug }));
-
-    const seen = new Set<string>();
-    const prestationMatches: Suggestion[] = [];
-    outer: for (const b of businesses) {
-      for (const s of b.services ?? []) {
-        const key = s.name.toLowerCase();
-        if (key.startsWith(trimmedLower) && !seen.has(key)) {
-          seen.add(key);
-          prestationMatches.push({ kind: 'prestation', name: s.name });
-          if (prestationMatches.length >= MAX_PER_GROUP) break outer;
-        }
-      }
-    }
-
-    return [...businessMatches, ...prestationMatches];
-  }, [businesses, trimmedLower]);
+  // searchBusinesses côté serveur) plutôt que tout le catalogue. Logique
+  // extraite dans computeSuggestions (testable sans monter le composant).
+  const suggestions = useMemo<Suggestion[]>(
+    () => computeSuggestions(businesses, trimmedLower),
+    [businesses, trimmedLower]
+  );
 
   const showNoResults = trimmedLower.length >= MIN_CHARS && suggestions.length === 0;
   const showPanel = open && trimmedLower.length >= MIN_CHARS && (suggestions.length > 0 || showNoResults);

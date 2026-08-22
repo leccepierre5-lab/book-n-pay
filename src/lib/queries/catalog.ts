@@ -43,17 +43,25 @@ export async function searchBusinesses(
   // rien. Le filtre défensif `b.staff ?? []` plus bas gère l'absence proprement
   // (getBusinessBySlug, lui, garde le join — la fiche établissement en a besoin
   // pour le choix praticien).
-  // Colonnes explicites (16/08, dette sur-fetch notée le 14/08) — auditées
-  // contre TOUS les consommateurs réels : SearchResults.tsx, page.tsx,
-  // et minServicePrice()/le tri ci-dessous. `services(price)` seul : ni
-  // SearchResults ni ce fichier ne lisent autre chose qu'un prix par service
-  // ici (contrairement à getBusinessBySlug, qui alimente le vrai parcours de
-  // réservation et garde `services(*)`/`staff(*)` complets). owner_id/slug
-  // sont utilisés en FILTRE (.not() plus bas), jamais relus sur les lignes
-  // retournées ici — pas besoin de les sélectionner.
+  // Colonnes explicites (16/08, dette sur-fetch notée le 14/08) — l'audit
+  // "contre TOUS les consommateurs réels" écrit ici le 16/08 avait en
+  // réalité oublié BusinessNameAutocomplete.tsx (composant purement client,
+  // absent du grep évident sur ce fichier) : `services(price)` seul a
+  // laissé `s.name` undefined pour chaque prestation, plantant l'autocomplétion
+  // en production dès 2 caractères tapés, 5 jours durant, sans qu'aucun test
+  // ni typecheck ne le voie (le cast `as unknown as BusinessWithDetails[]`
+  // plus bas désactive la vérification structurelle — voir dette notée dans
+  // sa propre note ci-dessous). `services(price, name)` corrige ça
+  // (21/08) — consommateurs réels vérifiés : SearchResults.tsx (price),
+  // BusinessNameAutocomplete.tsx (name, pour les suggestions "prestation"),
+  // page.tsx/minServicePrice() (price). owner_id/slug du business sont
+  // utilisés en FILTRE (.not() plus bas), jamais relus sur les lignes
+  // retournées ici — pas besoin de les sélectionner (contrairement à
+  // getBusinessBySlug, qui alimente le vrai parcours de réservation et
+  // garde `services(*)`/`staff(*)` complets).
   let queryBuilder = supabase
     .from('businesses')
-    .select('id, slug, name, city, category, type, open_time, close_time, services(price), business_reviews(rating, review_count)');
+    .select('id, slug, name, city, category, type, open_time, close_time, services(price, name), business_reviews(rating, review_count)');
 
   if (filters.category && filters.category !== 'all') {
     if (filters.category === 'autre') {
@@ -116,6 +124,15 @@ export async function searchBusinesses(
     return [];
   }
 
+  // ⚠️ DETTE (notée 21/08, pas corrigée) : ce cast `as unknown as X`
+  // désactive toute vérification structurelle entre les colonnes réellement
+  // sélectionnées ci-dessus et le type BusinessWithDetails déclaré — c'est ce
+  // qui a rendu le trimming du 16/08 dangereux (services(price) sans `name`
+  // a compilé et typechecké sans erreur alors que BusinessNameAutocomplete
+  // lisait `s.name`, crash en prod 5 jours durant avant d'être détecté). Un
+  // select() dont le type serait inféré par le générateur Supabase (au lieu
+  // d'un cast manuel) aurait fait échouer le build dès ce commit-là. Pas
+  // corrigé maintenant — changement d'infra de typage, pas un fix ponctuel.
   let results = ((data || []) as unknown as BusinessWithDetails[]).map((b) => ({
     ...b,
     // N'expose que les praticiens actifs aux clients (inactifs = ex-employés)
