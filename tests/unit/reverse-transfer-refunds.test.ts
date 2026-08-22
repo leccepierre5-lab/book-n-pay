@@ -73,7 +73,12 @@ vi.mock('@/lib/stripe/client', () => ({
 
 function makeChain(data: any) {
   const p: any = Promise.resolve({ data, error: null });
-  for (const m of ['select', 'eq', 'neq', 'gte', 'in', 'update', 'insert', 'single', 'maybeSingle']) {
+  // 'or' — withRefundClaim() (audit 22/08, migration 0063) fait
+  // .update(...).eq(...).or(...).select('id').maybeSingle() avant tout
+  // appel Stripe. `data` (le membre, toujours vérité ici) fait réussir la
+  // réclamation, donc attempt() (le vrai appel Stripe testé) s'exécute
+  // normalement.
+  for (const m of ['select', 'eq', 'neq', 'gte', 'in', 'or', 'update', 'insert', 'single', 'maybeSingle']) {
     p[m] = vi.fn((...args: any[]) => {
       if (m === 'single' || m === 'maybeSingle') return Promise.resolve({ data, error: null });
       return p;
@@ -195,6 +200,10 @@ describe('pro/refund-gesture — récupération du dépôt auprès du pro', () =
     memberChain.select = vi.fn(() => memberChain);
     memberChain.eq = vi.fn(() => memberChain);
     memberChain.update = vi.fn(() => memberChain);
+    // withRefundClaim() (audit 22/08, migration 0063) — .or() avant
+    // .select().maybeSingle(), qui résout déjà `member` (vérité), donc la
+    // réclamation réussit et l'appel Stripe testé s'exécute normalement.
+    memberChain.or = vi.fn(() => memberChain);
     memberChain.maybeSingle = vi.fn(() => Promise.resolve({ data: member, error: null }));
 
     const profileChain: any = Promise.resolve({ data: { role: 'admin', biz_id: 'biz1' }, error: null });
@@ -295,7 +304,14 @@ describe('admin/freeze-business — récupération du dépôt auprès du pro', (
     genericChain.update = vi.fn(() => genericChain);
     genericChain.insert = vi.fn(() => genericChain);
     genericChain.single = vi.fn(() => Promise.resolve({ data: { role: 'admin' }, error: null }));
-    genericChain.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    // withRefundClaim() (audit 22/08, migration 0063) — .or() avant
+    // .select().maybeSingle(). Ce chain générique sert aussi booking_members
+    // (voir `chains` plus bas) : maybeSingle doit résoudre un objet vérité
+    // pour que la réclamation du verrou réussisse (sinon RefundAlreadyClaimedError
+    // avant tout appel Stripe, aucune de ces routes ne le teste ici — la
+    // concurrence du verrou est couverte à part).
+    genericChain.or = vi.fn(() => genericChain);
+    genericChain.maybeSingle = vi.fn(() => Promise.resolve({ data: { id: 'm1' }, error: null }));
 
     const chains: Record<string, any> = {
       bookings: bookingsChain, businesses: businessesChain, app_users: genericChain, booking_members: genericChain, booking_logs: genericChain,

@@ -34,6 +34,14 @@ function makeChain(data: any = null) {
   p.eq = vi.fn(() => p);
   p.neq = vi.fn(() => p);
   p.in = vi.fn(() => p);
+  // 'or' + 'maybeSingle' — withRefundClaim() (audit 22/08, migration 0063)
+  // fait .update(...).eq(...).or(...).select('id').maybeSingle() avant tout
+  // appel Stripe. maybeSingle résout `data` : sur booking_members (voir
+  // makeSupabase ci-dessous), `data` est un objet vérité dédié pour que la
+  // réclamation réussisse toujours ici — ces tests ne portent pas sur la
+  // concurrence du verrou, seulement sur le comportement refund échoué/OK.
+  p.or = vi.fn(() => p);
+  p.maybeSingle = vi.fn(() => Promise.resolve({ data, error: null }));
   p.update = vi.fn(() => p);
   p.insert = vi.fn(() => p);
   return p;
@@ -43,7 +51,10 @@ function makeSupabase(groupBookingsFixture: any[]) {
   const chains: Record<string, any> = {};
   const getChain = (table: string) => {
     if (!chains[table]) {
-      chains[table] = makeChain(table === 'bookings' ? groupBookingsFixture : null);
+      chains[table] =
+        table === 'bookings' ? makeChain(groupBookingsFixture)
+        : table === 'booking_members' ? makeChain({ id: 'claim-ok' })
+        : makeChain(null);
     }
     return chains[table];
   };
@@ -84,9 +95,15 @@ describe('expireGroupByRef — remboursement en échec', () => {
     expect(stripe.refunds.create).toHaveBeenCalledTimes(1);
 
     // Le membre payé n'est PAS marqué cancelled (le refund n'a pas réussi) —
-    // seule mise à jour attendue sur booking_members est celle de l'invite (m2).
+    // seule mise à jour de STATUT attendue sur booking_members est celle de
+    // l'invite (m2). On filtre les écritures du verrou withRefundClaim
+    // (réclamation + libération-sur-échec, audit 22/08) : elles ne portent
+    // que refund_claimed_at, jamais `status` — les garder dans la
+    // comparaison casserait sur leur horodatage non-déterministe sans rien
+    // ajouter à ce que ce test prouve (m1 n'a jamais reçu status:'cancelled').
     const memberUpdateCalls = supabase._chains['booking_members'].update.mock.calls;
-    expect(memberUpdateCalls).toEqual([[{ status: 'cancelled' }]]); // m2 uniquement
+    const statusUpdateCalls = memberUpdateCalls.filter((c: any[]) => 'status' in c[0]);
+    expect(statusUpdateCalls).toEqual([[{ status: 'cancelled' }]]); // m2 uniquement
 
     // Le booking ne doit JAMAIS être marqué 'cancelled' tant que le refund
     // n'a pas réussi — sinon il sort du filtre .eq('status','active') et

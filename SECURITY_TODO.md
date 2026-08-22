@@ -133,6 +133,29 @@ authenticated` (ou au rôle strictement nécessaire) sur les 3 fonctions,
 migration dédiée. Vérifier aussi si d'autres fonctions `SECURITY DEFINER`
 du projet ont le même défaut avant de considérer le chantier clos.
 
+## 8. failure_type mal étiqueté si withRefundClaim échoue avant Stripe — ouvert (22/08/2026)
+
+Trouvé en préparant les tests du verrou anti-double-remboursement
+(migrations 0063/0064). Le `catch` des 5 routes de remboursement entoure
+`withRefundClaim()` en entier — si l'écriture de réclamation elle-même
+échoue (panne Supabase, RLS, réseau) AVANT même d'atteindre Stripe, l'erreur
+est traitée identiquement à un vrai refus Stripe : `insertRefundFailure`
+reçoit `failureType:'refund'`, `error_code`/`error_message` portent un
+message Supabase présenté comme si c'était Stripe qui avait refusé.
+
+**Risque** : aucun risque financier — aucun remboursement n'a eu lieu dans
+ce cas, la ligne `refund_failures` reste correctement retentable via
+`/admin/refund-failures/[id]/retry` (branche `'refund'`, rejoue bien
+`stripe.refunds.create`, jamais tenté avant). C'est un défaut de clarté
+diagnostique pour l'admin qui lit `error_message` en pensant que Stripe a
+refusé, pas un bug de sécurité ou d'argent.
+
+**Piste** : distinguer dans `withRefundClaim()` (ou dans chaque route)
+l'erreur de réclamation (avant `attempt()`) de l'erreur de `attempt()`
+lui-même — par exemple une classe d'erreur dédiée (`RefundClaimWriteError`)
+propagée séparément, pour que le message affiché à l'admin nomme la vraie
+cause.
+
 ## 2026-07-16 — Rotation clé service_role (PRIORITÉ)
 - `SUPABASE_SERVICE_ROLE_KEY` (JWT legacy, bypasse RLS entièrement) a été
   utilisée en variable d'environnement (`--env-file`) pendant une session de

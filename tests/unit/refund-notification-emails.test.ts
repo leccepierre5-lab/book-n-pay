@@ -39,7 +39,9 @@ vi.mock('@/lib/pro-notifications', () => ({
 
 function makeChain(data: any) {
   const p: any = Promise.resolve({ data, error: null });
-  for (const m of ['select', 'eq', 'neq', 'in', 'update', 'insert', 'single', 'maybeSingle']) {
+  // 'or' — withRefundClaim() (audit 22/08, migration 0063), voir même
+  // commentaire dans reverse-transfer-refunds.test.ts.
+  for (const m of ['select', 'eq', 'neq', 'in', 'or', 'update', 'insert', 'single', 'maybeSingle']) {
     p[m] = vi.fn((...args: any[]) => {
       if (m === 'single' || m === 'maybeSingle') return Promise.resolve({ data, error: null });
       return p;
@@ -121,7 +123,11 @@ describe('admin/freeze-business — montant + délai + ton neutre (déjà confor
     genericChain.update = vi.fn(() => genericChain);
     genericChain.insert = vi.fn(() => genericChain);
     genericChain.single = vi.fn(() => Promise.resolve({ data: { role: 'admin' }, error: null }));
-    genericChain.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    // withRefundClaim() (audit 22/08, migration 0063) — .or() avant
+    // .select().maybeSingle(). Ce chain sert aussi booking_members : doit
+    // résoudre un objet vérité pour que la réclamation du verrou réussisse.
+    genericChain.or = vi.fn(() => genericChain);
+    genericChain.maybeSingle = vi.fn(() => Promise.resolve({ data: { id: 'claim-ok' }, error: null }));
 
     const chains: Record<string, any> = {
       bookings: bookingsChain,
@@ -171,6 +177,9 @@ describe('pro/refund-gesture — geste commercial explicite + montant (déjà co
     memberChain.select = vi.fn(() => memberChain);
     memberChain.eq = vi.fn(() => memberChain);
     memberChain.update = vi.fn(() => memberChain);
+    // withRefundClaim() (audit 22/08, migration 0063) — .or() avant
+    // .select().maybeSingle(), qui résout déjà `member` (vérité).
+    memberChain.or = vi.fn(() => memberChain);
     memberChain.maybeSingle = vi.fn(() => Promise.resolve({ data: member, error: null }));
 
     const profileChain: any = Promise.resolve({ data: { role: 'admin', biz_id: 'biz1' }, error: null });

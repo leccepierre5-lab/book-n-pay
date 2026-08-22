@@ -34,9 +34,21 @@ vi.mock('@/lib/stripe/client', () => ({
 // business/use-joker/expire-groups, tous des dépôts seuls), le réversal
 // exact passe désormais par reverseConnectedAccountTransfer séparément.
 const mockReverseTransfer = vi.fn(async (..._args: any[]): Promise<{ done: boolean; error?: string }> => ({ done: true }));
-vi.mock('@/lib/refunds', () => ({
-  reverseConnectedAccountTransfer: (...args: any[]) => mockReverseTransfer(...args),
-}));
+// Mock PARTIEL (importOriginal), pas un remplacement total du module —
+// withRefundClaim() et RefundAlreadyClaimedError (audit 22/08, migration
+// 0063) sont désormais importés par la route ; un mock total qui ne les
+// réexporte pas casse au premier `instanceof` (piège constaté le 22/08).
+// withRefundClaim est un passthrough ici : ces tests portent sur la
+// logique métier de la route (branchement failure_type, garde-fous
+// montant), pas sur la concurrence du verrou — couverte à part.
+vi.mock('@/lib/refunds', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/refunds')>();
+  return {
+    ...actual,
+    reverseConnectedAccountTransfer: (...args: any[]) => mockReverseTransfer(...args),
+    withRefundClaim: async (_supabase: any, _memberId: string, attempt: () => Promise<any>) => attempt(),
+  };
+});
 
 const mockNotifyAdminOnFailure = vi.fn(async (..._args: any[]) => {});
 vi.mock('@/lib/notify-admin', () => ({

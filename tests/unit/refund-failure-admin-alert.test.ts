@@ -23,7 +23,9 @@ vi.mock('@/lib/pro-notifications', () => ({
 
 function makeChain(data: any) {
   const p: any = Promise.resolve({ data, error: null });
-  for (const m of ['select', 'eq', 'neq', 'gte', 'in', 'update', 'insert', 'single', 'maybeSingle']) {
+  // 'or' — withRefundClaim() (audit 22/08, migration 0063), voir même
+  // commentaire dans reverse-transfer-refunds.test.ts.
+  for (const m of ['select', 'eq', 'neq', 'gte', 'in', 'or', 'update', 'insert', 'single', 'maybeSingle']) {
     p[m] = vi.fn((...args: any[]) => {
       if (m === 'single' || m === 'maybeSingle') return Promise.resolve({ data, error: null });
       return p;
@@ -111,7 +113,11 @@ describe('admin/freeze-business — refunds Stripe en échec, alerte groupée', 
     genericChain.update = vi.fn(() => genericChain);
     genericChain.insert = vi.fn(() => genericChain);
     genericChain.single = vi.fn(() => Promise.resolve({ data: { role: 'admin' }, error: null }));
-    genericChain.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    // withRefundClaim() (audit 22/08, migration 0063) — .or() avant
+    // .select().maybeSingle(). Ce chain sert aussi booking_members : doit
+    // résoudre un objet vérité pour que la réclamation du verrou réussisse.
+    genericChain.or = vi.fn(() => genericChain);
+    genericChain.maybeSingle = vi.fn(() => Promise.resolve({ data: { id: 'claim-ok' }, error: null }));
 
     const chains: Record<string, any> = {
       bookings: bookingsChain,

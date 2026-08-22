@@ -81,7 +81,12 @@ vi.mock('@/lib/refund-failures', () => ({
 
 function makeChain(listData: any[], singleData: any = listData[0] ?? null, error: any = null) {
   const chain: any = Promise.resolve({ data: listData, error });
-  for (const m of ['select', 'eq', 'neq', 'update', 'insert']) {
+  // 'or' — withRefundClaim() (audit 22/08, migration 0063) fait
+  // .update(...).eq(...).or(...).select('id').maybeSingle() avant tout
+  // appel Stripe. singleData (le membre, toujours vérité dans ces tests)
+  // fait réussir la réclamation, donc l'appel Stripe testé s'exécute
+  // normalement — voir chain.maybeSingle plus bas.
+  for (const m of ['select', 'eq', 'neq', 'or', 'update', 'insert']) {
     chain[m] = vi.fn((..._args: any[]) => chain);
   }
   chain.maybeSingle = vi.fn(async () => ({ data: singleData, error }));
@@ -235,8 +240,10 @@ describe('POST /api/pro/cancel-booking', () => {
     expect(mockRefundsCreate.mock.calls[0][0]).not.toHaveProperty('refund_application_fee');
     expect(mockPiRetrieve).toHaveBeenCalledWith('pi_123', { expand: ['latest_charge'] });
 
-    // Statut réutilisé, montant_rembourse = TOTAL.
-    const memberUpdateCall = chains.booking_members.update.mock.calls[0][0];
+    // Statut réutilisé, montant_rembourse = TOTAL. Dernier appel update()
+    // sur booking_members : le premier est la réclamation du verrou
+    // (withRefundClaim, audit 22/08), pas la mise à jour de statut.
+    const memberUpdateCall = chains.booking_members.update.mock.calls.at(-1)[0];
     expect(memberUpdateCall).toEqual({ status: 'cancelled', montant_rembourse: 16.99 });
 
     // Créneau libéré.
@@ -414,7 +421,9 @@ describe('POST /api/pro/cancel-booking', () => {
     expect(res.status).toBe(200);
     expect(json.refundDone).toBe(false);
 
-    const memberUpdateCall = chains.booking_members.update.mock.calls[0][0];
+    // Dernier appel update() : la réclamation (et sa libération-sur-échec)
+    // précèdent la mise à jour de statut — voir withRefundClaim, audit 22/08.
+    const memberUpdateCall = chains.booking_members.update.mock.calls.at(-1)[0];
     expect(memberUpdateCall).toEqual({ status: 'cancelled', montant_rembourse: null });
     expect(chains.bookings.update).toHaveBeenCalledWith({ status: 'cancelled' });
 
@@ -441,6 +450,9 @@ describe('POST /api/pro/cancel-booking', () => {
       amountCents: 1699,
       errorCode: null,
       errorMessage: 'solde Connect insuffisant',
+      // Migration 0064 (audit 22/08) — le refund Stripe lui-même a échoué
+      // ici, rien n'a été remboursé.
+      failureType: 'refund',
     });
 
     // Pas d'email pro (refundDone=false).
