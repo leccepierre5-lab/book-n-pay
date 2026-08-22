@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getStripeClient } from '@/lib/stripe/client';
 import { withErrorHandling } from '@/lib/api-error';
-import { reverseConnectedAccountTransfer } from '@/lib/refunds';
+import { reverseConnectedAccountTransfer, withRefundClaim, RefundAlreadyClaimedError } from '@/lib/refunds';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 export const POST = withErrorHandling('[RefundFailureRetry]', async (
@@ -33,7 +33,7 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
 
   const { data: failure } = await serviceSupabase
     .from('refund_failures')
-    .select('booking_id, stripe_charge_id, amount_cents, attempts')
+    .select('booking_id, stripe_charge_id, amount_cents, attempts, failure_type')
     .eq('id', id)
     .eq('status', 'open')
     .maybeSingle();
@@ -53,9 +53,52 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
     .eq('stripe_payment_intent_id', failure.stripe_charge_id)
     .maybeSingle();
 
+  // Sans memberId on ne peut pas passer par le verrou refund_claimed_at —
+  // refuser explicitement plutôt que de rejouer refunds.create sans garde
+  // (audit 22/08, migration 0063/0064). Ne s'applique qu'à la branche
+  // 'refund' : la branche 'reverse_transfer' ci-dessous n'appelle jamais
+  // refunds.create et n'a pas besoin du verrou.
+  if (failure.failure_type === 'refund' && !member) {
+    return NextResponse.json(
+      { error: 'Membre introuvable pour ce remboursement — vérifie et résous manuellement.' },
+      { status: 400 }
+    );
+  }
+
   const stripe = await getStripeClient(serviceSupabase);
 
   try {
+    // Le refund Stripe a déjà réussi pour cette ligne — seule la
+    // récupération du dépôt auprès du pro a échoué. Ne JAMAIS rappeler
+    // refunds.create ici : ce serait un second remboursement réel sur un
+    // payment_intent déjà remboursé (bug trouvé le 22/08, migration 0064).
+    if (failure.failure_type === 'reverse_transfer') {
+      const reversal = await reverseConnectedAccountTransfer(
+        stripe,
+        failure.stripe_charge_id,
+        failure.amount_cents,
+        'RefundFailureRetry'
+      );
+      if (reversal.error) throw new Error(reversal.error);
+
+      await serviceSupabase
+        .from('refund_failures')
+        .update({
+          status: 'resolved',
+          resolved_at: new Date().toISOString(),
+          resolved_by: authData.user.id,
+          resolution_note: 'Récupération auprès du pro relancée avec succès depuis /admin/remboursements.',
+        })
+        .eq('id', id);
+
+      await serviceSupabase.from('booking_logs').insert({
+        booking_id: failure.booking_id,
+        message: `REVERSE_TRANSFER_RETRY_OK | refund_failure_id=${id} | admin=${authData.user.email ?? authData.user.id}`,
+      });
+
+      return NextResponse.json({ success: true, resolved: true });
+    }
+
     // Même règle que pro/cancel-booking/route.ts (bug reverse_transfer
     // corrigé le 14/08) : ne poser reverse_transfer que si un transfert est
     // réellement associé à la charge.
@@ -92,13 +135,15 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
     // reverseConnectedAccountTransfer juste après le refund.
     const isFullRefund = chargeAmount != null && failure.amount_cents === chargeAmount;
 
-    await stripe.refunds.create({
+    // member non-null ici — garde plus haut, uniquement pour failure_type
+    // === 'refund'.
+    await withRefundClaim(serviceSupabase, member!.id, () => stripe.refunds.create({
       payment_intent: failure.stripe_charge_id,
       amount: failure.amount_cents,
       reason: 'requested_by_customer',
       ...(isFullRefund && hasTransfer ? { reverse_transfer: true } : {}),
       metadata: { email_sent: 'true', reason: 'refund_failure_retry' },
-    });
+    }));
 
     if (hasTransfer && !isFullRefund) {
       const reversal = await reverseConnectedAccountTransfer(
@@ -147,6 +192,12 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
 
     return NextResponse.json({ success: true, resolved: true });
   } catch (stripeErr: any) {
+    if (stripeErr instanceof RefundAlreadyClaimedError) {
+      // Pas un échec — une requête concurrente (double-clic sur le bouton,
+      // ou une des 5 routes de remboursement) traite déjà ce membre.
+      console.warn(`[RefundFailureRetry] ${stripeErr.message}`);
+      return NextResponse.json({ error: stripeErr.message }, { status: 409 });
+    }
     console.error('[RefundFailureRetry] Nouvel échec Stripe:', stripeErr.message);
     await serviceSupabase
       .from('refund_failures')

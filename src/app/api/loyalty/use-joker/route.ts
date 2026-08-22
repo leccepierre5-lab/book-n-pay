@@ -185,6 +185,7 @@ export async function POST(req: NextRequest) {
           amountCents: Math.round(montantRembourse * 100),
           errorCode: null,
           errorMessage: `réversal du dépôt auprès du pro échouée (Joker) — ${reversal.error}`,
+          failureType: 'reverse_transfer',
         });
       }
     }

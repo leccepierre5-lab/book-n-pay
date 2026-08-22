@@ -133,6 +133,7 @@ export async function POST(req: NextRequest) {
                   amountCents: depositCents,
                   errorCode: null,
                   errorMessage: `réversal du dépôt auprès du pro échouée — ${reversal.error}`,
+                  failureType: 'reverse_transfer',
                 });
               }
 
@@ -194,6 +195,7 @@ export async function POST(req: NextRequest) {
                 amountCents: depositRefundAmountCents(member.deposit),
                 errorCode: err.code ?? null,
                 errorMessage: err.message,
+                failureType: 'refund',
               });
             }
           } else {

@@ -316,6 +316,10 @@ export interface RefundFailure {
   error_message: string;
   attempts: number;
   status: 'open' | 'resolved' | 'manual';
+  // Migration 0064 — 'refund' = stripe.refunds.create() a échoué, rien n'a
+  // été remboursé. 'reverse_transfer' = le refund a réussi, seule la
+  // récupération du dépôt auprès du pro a échoué (client déjà remboursé).
+  failure_type: 'refund' | 'reverse_transfer';
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;

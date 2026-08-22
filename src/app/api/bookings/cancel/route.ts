@@ -143,6 +143,7 @@ export async function POST(req: NextRequest) {
           amountCents: depositRefundAmountCents(member.deposit),
           errorCode: stripeErr.code ?? null,
           errorMessage: stripeErr.message,
+          failureType: 'refund',
         });
       }
     }
@@ -180,6 +181,7 @@ export async function POST(req: NextRequest) {
           amountCents: depositRefundAmountCents(member.deposit),
           errorCode: null,
           errorMessage: `réversal du dépôt auprès du pro échouée — ${reversal.error}`,
+          failureType: 'reverse_transfer',
         });
       }
     }

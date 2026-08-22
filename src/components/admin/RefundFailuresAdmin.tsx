@@ -1,8 +1,12 @@
 'use client';
 // src/components/admin/RefundFailuresAdmin.tsx
 // Migration 0052 — remplace la promesse creuse "vérification manuelle" par
-// une vraie file : chaque échec de remboursement (des 4 routes concernées)
-// atterrit ici tant qu'un admin n'a pas relancé ou résolu manuellement.
+// une vraie file : chaque échec de remboursement (bookings/cancel,
+// pro/refund-gesture, pro/cancel-booking, admin/freeze-business,
+// loyalty/use-joker, expireGroup) atterrit ici tant qu'un admin n'a pas
+// relancé ou résolu manuellement. Migration 0064 — failure_type distingue
+// un refund qui a échoué (rien remboursé) d'un reversal qui a échoué après
+// un refund réussi (client déjà remboursé, voir le bandeau ci-dessous).
 import { useState } from 'react';
 import Link from 'next/link';
 import type { RefundFailureWithBooking } from '@/lib/database.types';
@@ -97,6 +101,12 @@ export default function RefundFailuresAdmin({
                     </div>
                   </div>
 
+                  {f.failure_type === 'reverse_transfer' && (
+                    <p className="mb-2 rounded-lg bg-mint-500/10 px-3 py-2 text-xs text-mint-300">
+                      ✅ Client déjà remboursé — seule la récupération du dépôt auprès du pro a échoué.
+                    </p>
+                  )}
+
                   <p className="mb-3 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
                     {f.error_message}
                   </p>
@@ -113,7 +123,11 @@ export default function RefundFailuresAdmin({
                       disabled={retrying === f.id || resolving === f.id}
                       className="rounded-lg bg-mint-500 px-3 py-1.5 text-xs font-semibold text-navy-950 disabled:opacity-50"
                     >
-                      {retrying === f.id ? 'Relance…' : 'Relancer le remboursement'}
+                      {retrying === f.id
+                        ? 'Relance…'
+                        : f.failure_type === 'reverse_transfer'
+                          ? 'Relancer la récupération auprès du pro'
+                          : 'Relancer le remboursement'}
                     </button>
                     <button
                       onClick={() => resolveManually(f.id)}

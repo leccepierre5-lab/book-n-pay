@@ -20,6 +20,7 @@ import { sendEmail } from '@/lib/email/send';
 import { depositRefundAmountCents, reverseConnectedAccountTransfer, withRefundClaim, RefundAlreadyClaimedError } from '@/lib/refunds';
 import { processBatch } from '@/lib/cron-batch';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
+import { insertRefundFailure } from '@/lib/refund-failures';
 
 interface RefundJob {
   bookingId: string;
@@ -157,6 +158,18 @@ export async function expireGroupByRef(
         await supabase.from('booking_logs').insert({
           booking_id: job.bookingId,
           message: `Réversal du dépôt auprès du pro échoué (expiration groupe) — membre ${member.id}, ${member.deposit ?? 0}€ — à vérifier manuellement — ${reversal.error}`,
+        });
+        // Nouveau site (22/08) — jusqu'ici seul expireGroup n'écrivait pas
+        // dans refund_failures sur un échec de reversal, invisible à
+        // /admin/remboursements contrairement aux 3 autres routes du même
+        // bug. Aucune justification produit trouvée à cette asymétrie.
+        await insertRefundFailure(supabase, {
+          bookingId: job.bookingId,
+          stripeChargeId: member.stripe_payment_intent_id ?? null,
+          amountCents: depositRefundAmountCents(member.deposit),
+          errorCode: null,
+          errorMessage: `réversal du dépôt auprès du pro échouée (expiration groupe) — ${reversal.error}`,
+          failureType: 'reverse_transfer',
         });
       }
 

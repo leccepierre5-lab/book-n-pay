@@ -212,6 +212,7 @@ export async function POST(req: NextRequest) {
           amountCents: refundAmountCents,
           errorCode: stripeErr.code ?? null,
           errorMessage: stripeErr.message,
+          failureType: 'refund',
         });
       }
     }

@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
         amountCents: depositCents,
         errorCode: stripeErr.code ?? null,
         errorMessage: stripeErr.message,
+        failureType: 'refund',
       });
       return NextResponse.json(
         { error: 'Le remboursement Stripe a échoué — notre équipe a été alertée, réessaie ou contacte-nous si ça persiste.' },
@@ -142,6 +143,7 @@ export async function POST(req: NextRequest) {
         amountCents: depositCents,
         errorCode: null,
         errorMessage: `réversal du dépôt auprès du pro échouée — ${reversal.error}`,
+        failureType: 'reverse_transfer',
       });
     }
 
