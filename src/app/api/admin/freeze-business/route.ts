@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send';
-import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer } from '@/lib/refunds';
+import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer, withRefundClaim, RefundAlreadyClaimedError } from '@/lib/refunds';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
 import { formatTime, getParisDateOffsetStr } from '@/lib/booking-utils';
@@ -96,13 +96,15 @@ export async function POST(req: NextRequest) {
           if (member.stripe_payment_intent_id) {
             try {
               const depositCents = depositRefundAmountCents(member.deposit);
-              await stripe.refunds.create({
+              // Verrou anti-double-remboursement (audit 22/08, migration
+              // 0063) — voir lib/refunds.ts withRefundClaim().
+              await withRefundClaim(serviceSupabase, member.id, () => stripe.refunds.create({
                 payment_intent: member.stripe_payment_intent_id,
                 // Ne rembourse que les frais de réservation — les frais de
                 // gestion Book'nPay restent acquis même sur un gel d'établissement.
                 amount: depositCents,
                 metadata: { reason: 'business_frozen', biz_id: bizId },
-              });
+              }));
 
               // Récupération du dépôt déjà transféré au pro
               // (transfer_data.destination) — remboursement PARTIEL ici (dépôt
@@ -163,6 +165,17 @@ export async function POST(req: NextRequest) {
                 }).catch(() => {});
               }
             } catch (err: any) {
+              if (err instanceof RefundAlreadyClaimedError) {
+                // Pas un échec — une requête concurrente (double-clic admin,
+                // deux appels de gel simultanés) traite déjà ce membre. Elle
+                // mènera le remboursement à son terme ; pas d'alerte, pas de
+                // refund_failures, juste un statut cohérent ici aussi (le
+                // gel est effectif quoi qu'il arrive).
+                console.warn(`[FreezeBusiness] ${err.message}`);
+                await serviceSupabase.from('booking_members').update({ status: 'cancelled' }).eq('id', member.id);
+                cancelledCount++;
+                continue;
+              }
               console.error(`[FreezeBusiness] Remboursement échoué membre ${member.id}:`, err.message);
               await serviceSupabase.from('booking_members').update({ status: 'cancelled' }).eq('id', member.id);
               await serviceSupabase.from('booking_logs').insert({

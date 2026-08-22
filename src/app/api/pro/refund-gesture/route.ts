@@ -6,7 +6,7 @@
 // initiées par le client avant le RDV).
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer } from '@/lib/refunds';
+import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer, withRefundClaim, RefundAlreadyClaimedError } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { sendEmail } from '@/lib/email/send';
 import { logAndRespond } from '@/lib/api-error';
@@ -74,8 +74,10 @@ export async function POST(req: NextRequest) {
     // du pro) — on garde donc le comportement "on s'arrête si le refund
     // échoue", on ajoute juste la visibilité admin qui manquait.
     try {
-      await stripe.refunds.create({
-        payment_intent: member.stripe_payment_intent_id,
+      // Verrou anti-double-remboursement (audit 22/08, migration 0063) —
+      // voir lib/refunds.ts withRefundClaim().
+      await withRefundClaim(serviceSupabase, memberId, () => stripe.refunds.create({
+        payment_intent: member.stripe_payment_intent_id!,
         // Ne rembourse que les frais de réservation — les frais de gestion
         // Book'nPay restent acquis, même sur un geste commercial du pro.
         amount: depositCents,
@@ -86,8 +88,12 @@ export async function POST(req: NextRequest) {
         // (dashboard Stripe, admin freeze) n'a pas ce flag et le webhook
         // reste le filet normal.
         metadata: { email_sent: 'true' },
-      });
+      }));
     } catch (stripeErr: any) {
+      if (stripeErr instanceof RefundAlreadyClaimedError) {
+        console.warn(`[RefundGesture] ${stripeErr.message}`);
+        return NextResponse.json({ error: stripeErr.message }, { status: 409 });
+      }
       console.error('[RefundGesture] Erreur Stripe:', stripeErr.message);
       await notifyAdminOnFailure('pro/refund-gesture:refund', {
         processed: 0,

@@ -19,7 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, formatTime } from '@/lib/booking-utils';
 import { buildIcs } from '@/lib/ics';
-import { proCancellationRefundAmountCents } from '@/lib/refunds';
+import { proCancellationRefundAmountCents, withRefundClaim, RefundAlreadyClaimedError } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 import { insertRefundFailure } from '@/lib/refund-failures';
@@ -159,32 +159,40 @@ export async function POST(req: NextRequest) {
         // bug réel constaté le 14/08 (booking 3afbff0f). Même vérification
         // que reverseConnectedAccountTransfer (lib/refunds.ts) pour les 3
         // autres routes.
-        const pi = await stripe.paymentIntents.retrieve(member.stripe_payment_intent_id, {
-          expand: ['latest_charge'],
-        });
-        const charge = pi.latest_charge;
-        const hasTransfer = Boolean(charge && typeof charge !== 'string' && charge.transfer);
+        // Verrou anti-double-remboursement (audit 22/08, migration 0063) —
+        // voir lib/refunds.ts withRefundClaim().
+        await withRefundClaim(serviceSupabase, memberId, async () => {
+          const pi = await stripe.paymentIntents.retrieve(member.stripe_payment_intent_id!, {
+            expand: ['latest_charge'],
+          });
+          const charge = pi.latest_charge;
+          const hasTransfer = Boolean(charge && typeof charge !== 'string' && charge.transfer);
 
-        await stripe.refunds.create({
-          payment_intent: member.stripe_payment_intent_id,
-          amount: refundAmountCents,
-          reason: 'requested_by_customer',
-          // Ce remboursement couvre 100% de la charge (dépôt + frais de
-          // gestion, proCancellationRefundAmountCents ci-dessus) : quand un
-          // transfert existe, Stripe annule alors 100% du transfert
-          // automatique fait au pro à la réservation. Sans transfert
-          // (fallback checkout sans Connect actif), il n'y a rien à
-          // récupérer — le flag est simplement omis, pas envoyé à `false`
-          // (Stripe le rejette aussi si aucun transfert n'existe). Aucune
-          // interaction avec pro_charges plus bas : ce flag ne touche que le
-          // dépôt transféré, jamais les frais de gestion (qui ne sont jamais
-          // transférés au pro, application_fee_amount reste sur la
-          // plateforme) — donc pas de double récupération.
-          ...(hasTransfer ? { reverse_transfer: true } : {}),
-          metadata: { email_sent: 'true', reason: 'pro_cancellation' },
+          await stripe.refunds.create({
+            payment_intent: member.stripe_payment_intent_id!,
+            amount: refundAmountCents,
+            reason: 'requested_by_customer',
+            // Ce remboursement couvre 100% de la charge (dépôt + frais de
+            // gestion, proCancellationRefundAmountCents ci-dessus) : quand un
+            // transfert existe, Stripe annule alors 100% du transfert
+            // automatique fait au pro à la réservation. Sans transfert
+            // (fallback checkout sans Connect actif), il n'y a rien à
+            // récupérer — le flag est simplement omis, pas envoyé à `false`
+            // (Stripe le rejette aussi si aucun transfert n'existe). Aucune
+            // interaction avec pro_charges plus bas : ce flag ne touche que le
+            // dépôt transféré, jamais les frais de gestion (qui ne sont jamais
+            // transférés au pro, application_fee_amount reste sur la
+            // plateforme) — donc pas de double récupération.
+            ...(hasTransfer ? { reverse_transfer: true } : {}),
+            metadata: { email_sent: 'true', reason: 'pro_cancellation' },
+          });
         });
         refundDone = true;
       } catch (stripeErr: any) {
+        if (stripeErr instanceof RefundAlreadyClaimedError) {
+          console.warn(`[ProCancelBooking] ${stripeErr.message}`);
+          return NextResponse.json({ error: stripeErr.message }, { status: 409 });
+        }
         console.error('[ProCancelBooking] Erreur Stripe:', stripeErr.message);
         // Pas de cron ni de filet lazy qui repasse sur ce membre — le RDV
         // est annulé quoi qu'il arrive côté Stripe (le pro est indisponible,

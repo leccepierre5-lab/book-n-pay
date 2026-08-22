@@ -17,7 +17,7 @@
 import Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email/send';
-import { depositRefundAmountCents, reverseConnectedAccountTransfer } from '@/lib/refunds';
+import { depositRefundAmountCents, reverseConnectedAccountTransfer, withRefundClaim, RefundAlreadyClaimedError } from '@/lib/refunds';
 import { processBatch } from '@/lib/cron-batch';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
@@ -107,13 +107,30 @@ export async function expireGroupByRef(
     (job) => `membre ${job.member.id} (booking ${job.bookingId}, ${job.member.deposit ?? 0}€)`,
     async (job) => {
       const { member } = job;
-      await stripe.refunds.create({
-        payment_intent: member.stripe_payment_intent_id,
-        // Ne rembourse que les frais de réservation — les frais de
-        // gestion Book'nPay restent acquis même sur une expiration de groupe.
-        amount: depositRefundAmountCents(member.deposit),
-        metadata: { reason: 'group_expired', group_ref: ref },
-      });
+      try {
+        // Verrou anti-double-remboursement (audit 22/08, migration 0063) —
+        // voir lib/refunds.ts withRefundClaim(). Ferme précisément la course
+        // décrite dans l'audit : cron nocturne + polling lazy sur le même
+        // group_ref, tous deux capables de lire ce membre 'paid' et
+        // d'appeler Stripe en parallèle.
+        await withRefundClaim(supabase, member.id, () => stripe.refunds.create({
+          payment_intent: member.stripe_payment_intent_id,
+          // Ne rembourse que les frais de réservation — les frais de
+          // gestion Book'nPay restent acquis même sur une expiration de groupe.
+          amount: depositRefundAmountCents(member.deposit),
+          metadata: { reason: 'group_expired', group_ref: ref },
+        }));
+      } catch (err) {
+        if (err instanceof RefundAlreadyClaimedError) {
+          // Pas un échec — l'autre déclencheur (cron ou polling lazy) traite
+          // déjà ce membre au même instant. Il mènera le remboursement à son
+          // terme ; ce job-ci s'arrête ici sans compter comme échec (pas
+          // d'alerte admin, pas de blocage du booking pour retry).
+          console.warn(`[expireGroup] ${err.message}`);
+          return;
+        }
+        throw err;
+      }
 
       // ⚠️ CORRECTIF (audit 22/08) : ce remboursement partiel (dépôt seul)
       // ne récupérait jamais le dépôt déjà transféré au pro — même bug que

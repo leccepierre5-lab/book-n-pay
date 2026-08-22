@@ -19,7 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { parseParisDatetime, phonesMatch, formatTime, CANCEL_DEADLINE_HOURS } from '@/lib/booking-utils';
 import { buildIcs } from '@/lib/ics';
-import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer } from '@/lib/refunds';
+import { depositRefundAmountCents, retrieveManagementFeeAmount, reverseConnectedAccountTransfer, withRefundClaim, RefundAlreadyClaimedError } from '@/lib/refunds';
 import { cancelBookingIfNoActiveMembers } from '@/lib/booking-lifecycle';
 import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
@@ -91,8 +91,12 @@ export async function POST(req: NextRequest) {
     let refundDone = false;
     if (eligibleForRefund && member.stripe_payment_intent_id) {
       try {
-        await stripe.refunds.create({
-          payment_intent: member.stripe_payment_intent_id,
+        // Verrou anti-double-remboursement (audit 22/08, migration 0063) —
+        // voir lib/refunds.ts withRefundClaim(). Un double-clic ou deux
+        // onglets sur la même annulation ne doivent jamais déclencher deux
+        // appels stripe.refunds.create pour ce membre.
+        await withRefundClaim(serviceSupabase, memberId, () => stripe.refunds.create({
+          payment_intent: member.stripe_payment_intent_id!,
           // Ne rembourse que les frais de réservation — les frais de gestion
           // Book'nPay restent acquis (CGV Art. 2, déjà annoncé dans l'email
           // ci-dessous ; sans `amount` explicite Stripe rembourse tout le
@@ -105,10 +109,18 @@ export async function POST(req: NextRequest) {
           // remboursement déclenché ailleurs (dashboard Stripe, admin
           // freeze) n'a pas ce flag et le webhook reste le filet normal.
           metadata: { email_sent: 'true' },
-        });
+        }));
         refundDone = true;
         console.log(`[CancelClient] ✅ Remboursement OK — booking=${bookingId} membre=${memberId}`);
       } catch (stripeErr: any) {
+        if (stripeErr instanceof RefundAlreadyClaimedError) {
+          // Pas un échec Stripe — une requête concurrente traite déjà ce
+          // même membre (double-clic, deux onglets). Elle mènera l'annulation
+          // à son terme ; celle-ci s'arrête ici, sans alerte admin ni email
+          // dupliqué.
+          console.warn(`[CancelClient] ${stripeErr.message}`);
+          return NextResponse.json({ error: stripeErr.message }, { status: 409 });
+        }
         console.error('[CancelClient] Erreur Stripe:', stripeErr.message);
         // ⚠️ CORRECTIF (audit 26/07, même classe que le BLOQUANT expireGroup) —
         // NUANCE : contrairement au groupe, il n'existe ICI aucun cron ni

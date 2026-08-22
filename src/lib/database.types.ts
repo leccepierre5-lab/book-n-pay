@@ -158,6 +158,10 @@ export interface BookingMember {
   client_msg: string | null;
   joker_applique: boolean;
   montant_rembourse: number | null;
+  // Verrou anti-double-remboursement (migration 0063, audit 22/08) — voir
+  // src/lib/refunds.ts withRefundClaim(). Jamais une preuve de succès,
+  // jamais lu en dehors de ce verrou.
+  refund_claimed_at: string | null;
   stripe_payment_intent_id: string | null;
   stripe_checkout_session_id: string | null;
   email: string | null;

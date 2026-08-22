@@ -1,5 +1,6 @@
 // src/lib/refunds.ts
 import type Stripe from 'stripe';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Le paiement initial d'un membre est un seul PaymentIntent Stripe (2 line
 // items : frais de réservation + frais de gestion Book'nPay — voir
@@ -110,5 +111,75 @@ export async function reverseConnectedAccountTransfer(
   } catch (e: any) {
     console.warn(`[${logPrefix}] Récupération du dépôt auprès du pro échouée:`, e.message);
     return { done: false, error: e.message };
+  }
+}
+
+// ⚠️ Verrou anti-double-remboursement (audit 22/08, migration 0063,
+// booking_members.refund_claimed_at) — UNE SEULE implémentation du contrat,
+// utilisée identiquement par les 5 routes qui appellent stripe.refunds.create
+// (bookings/cancel, pro/refund-gesture, pro/cancel-booking,
+// admin/freeze-business, lib/group/expireGroup.ts). Motif direct : le
+// correctif reverse_transfer (d77eaa1) n'avait fermé qu'un des sites
+// concernés, laissant 4 fuites d'argent identiques ailleurs (voir §22/08 de
+// project_bnp_pitfalls) — cinq copies indépendantes du même try/catch de
+// verrouillage seraient exactement le même risque de divergence.
+//
+// Contrat (voir le commentaire de la migration 0063 pour le détail complet) :
+// - Réclame le membre AVANT tout appel Stripe (NULL, ou horodatage vieux de
+//   plus de REFUND_CLAIM_STALE_MS = un process précédent est mort en cours).
+// - Si la réclamation échoue (verrou déjà posé récemment par une requête
+//   concurrente) : lève RefundAlreadyClaimedError SANS jamais appeler
+//   `attempt` — c'est la protection réelle contre le double remboursement.
+// - Si `attempt` (l'appel Stripe réel) échoue : libère le verrou
+//   explicitement (refund_claimed_at = null) AVANT de relancer l'erreur —
+//   le prochain passage (cron, ou clic admin sur /admin/remboursements) peut
+//   réclamer immédiatement, sans attendre les 2 minutes. Sans ce release,
+//   une route qui oublierait de le faire resterait bloquée en silence
+//   jusqu'à expiration — exactement le risque que factoriser ceci évite.
+// - Si `attempt` réussit : le verrou reste posé (horodatage passé), sans
+//   conséquence — le membre passe à un statut terminal ('cancelled') juste
+//   après par l'appelant, qui ne repassera plus jamais par ce verrou pour
+//   ce membre.
+export const REFUND_CLAIM_STALE_MS = 2 * 60 * 1000;
+
+export class RefundAlreadyClaimedError extends Error {
+  constructor(memberId: string) {
+    super(`Un remboursement est déjà en cours pour le membre ${memberId}.`);
+    this.name = 'RefundAlreadyClaimedError';
+  }
+}
+
+export async function withRefundClaim<T>(
+  supabase: SupabaseClient,
+  memberId: string,
+  attempt: () => Promise<T>
+): Promise<T> {
+  const staleThreshold = new Date(Date.now() - REFUND_CLAIM_STALE_MS).toISOString();
+
+  const { data: claimed } = await supabase
+    .from('booking_members')
+    .update({ refund_claimed_at: new Date().toISOString() })
+    .eq('id', memberId)
+    .or(`refund_claimed_at.is.null,refund_claimed_at.lt.${staleThreshold}`)
+    .select('id')
+    .maybeSingle();
+
+  if (!claimed) {
+    throw new RefundAlreadyClaimedError(memberId);
+  }
+
+  try {
+    return await attempt();
+  } catch (err) {
+    // Libération explicite — voir le contrat ci-dessus. Best-effort : si
+    // CETTE écriture échoue aussi, le verrou expirera de lui-même après
+    // REFUND_CLAIM_STALE_MS (filet, pas un blocage permanent) — ne jamais
+    // laisser un échec de libération masquer l'erreur d'origine.
+    try {
+      await supabase.from('booking_members').update({ refund_claimed_at: null }).eq('id', memberId);
+    } catch {
+      // best-effort, voir commentaire ci-dessus.
+    }
+    throw err;
   }
 }
