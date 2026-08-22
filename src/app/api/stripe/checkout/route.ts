@@ -234,10 +234,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Montant invalide' }, { status: 400 });
     }
 
-    // ── Calcul du dépôt effectif ──────────────────────────────────────────────
-    // Le ratio s'applique sur le prix total → répercuté sur le dépôt
-    const ratio = referralDiscountPct > 0 ? (1 - referralDiscountPct / 100) : 1;
-    const effectiveDeposit = Math.round(amount * ratio * 100) / 100;
+    // ── Dépôt effectif = amount, la réduction est déjà appliquée ─────────────
+    // ⚠️ CORRECTIF (audit 22/08) : `amount` reçu du client EST déjà le dépôt
+    // réduit — StepPayment.tsx calcule `service.deposit * (1 - discountPct/100)`
+    // et envoie ce résultat (jamais le dépôt brut). Quand un service est
+    // identifiable, `amount` vient même d'être validé ligne 198-200 comme égal
+    // à `service.deposit * (1 - referralDiscountPct/100)` — donc déjà réduit.
+    // Réappliquer le ratio ici (ancien code : `amount * ratio`) réduisait donc
+    // le dépôt UNE SECONDE FOIS : un client à -20% était en réalité facturé
+    // -36% (10€ → 6,40€ au lieu de 8€), perte silencieuse sur chaque
+    // réservation avec parrainage actif. Voir
+    // tests/unit/checkout-referral-discount-double-application.test.ts.
+    const effectiveDeposit = amount;
 
     // ── Mode test/live ────────────────────────────────────────────────────────
     const { stripe, isTestMode } = await getStripeClientWithMode(supabase);
