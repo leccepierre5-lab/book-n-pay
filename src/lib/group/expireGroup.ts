@@ -108,18 +108,44 @@ export async function expireGroupByRef(
     (job) => `membre ${job.member.id} (booking ${job.bookingId}, ${job.member.deposit ?? 0}€)`,
     async (job) => {
       const { member } = job;
+      // Assigné dans le try (succès du withRefundClaim ci-dessous) — le
+      // catch sort toujours (return ou throw) avant tout usage plus bas,
+      // TypeScript accepte la déclaration non initialisée ici.
+      let reversal: { done: boolean; error?: string };
       try {
         // Verrou anti-double-remboursement (audit 22/08, migration 0063) —
         // voir lib/refunds.ts withRefundClaim(). Ferme précisément la course
         // décrite dans l'audit : cron nocturne + polling lazy sur le même
         // group_ref, tous deux capables de lire ce membre 'paid' et
-        // d'appeler Stripe en parallèle.
-        await withRefundClaim(supabase, member.id, () => stripe.refunds.create({
-          payment_intent: member.stripe_payment_intent_id,
-          // Ne rembourse que les frais de réservation — les frais de
-          // gestion Book'nPay restent acquis même sur une expiration de groupe.
-          amount: depositRefundAmountCents(member.deposit),
-          metadata: { reason: 'group_expired', group_ref: ref },
+        // d'appeler Stripe en parallèle. Refund ET reversal passent TOUS
+        // DEUX dans le callback, aucun appel Stripe hors du verrou.
+        ({ reversal } = await withRefundClaim(supabase, member.id, async () => {
+          await stripe.refunds.create(
+            {
+              payment_intent: member.stripe_payment_intent_id,
+              // Ne rembourse que les frais de réservation — les frais de
+              // gestion Book'nPay restent acquis même sur une expiration de
+              // groupe.
+              amount: depositRefundAmountCents(member.deposit),
+              metadata: { reason: 'group_expired', group_ref: ref },
+            },
+            { idempotencyKey: `refund_${member.stripe_payment_intent_id}` }
+          );
+          // ⚠️ CORRECTIF (audit 22/08) : ce remboursement partiel (dépôt
+          // seul) ne récupérait jamais le dépôt déjà transféré au pro —
+          // même bug que reverse_transfer (d77eaa1) et que
+          // loyalty/use-joker, un point d'appel de plus oublié par ces deux
+          // correctifs. Non-throw garanti par IMPLÉMENTATION, pas par
+          // contrat — voir le commentaire jumeau dans
+          // bookings/cancel/route.ts et lib/refunds.ts.
+          const reversal = await reverseConnectedAccountTransfer(
+            stripe,
+            member.stripe_payment_intent_id,
+            depositRefundAmountCents(member.deposit),
+            'ExpireGroup',
+            `reversal_${member.stripe_payment_intent_id}`
+          );
+          return { reversal };
         }));
       } catch (err) {
         if (err instanceof RefundAlreadyClaimedError) {
@@ -133,19 +159,9 @@ export async function expireGroupByRef(
         throw err;
       }
 
-      // ⚠️ CORRECTIF (audit 22/08) : ce remboursement partiel (dépôt seul)
-      // ne récupérait jamais le dépôt déjà transféré au pro — même bug que
-      // reverse_transfer (d77eaa1) et que loyalty/use-joker, un point
-      // d'appel de plus oublié par ces deux correctifs. Best-effort strict,
-      // comme les autres sites : un échec ici est une alerte admin, ne doit
-      // jamais faire échouer ce job (le client est déjà remboursé juste
-      // au-dessus) ni rouvrir le booking pour retry.
-      const reversal = await reverseConnectedAccountTransfer(
-        stripe,
-        member.stripe_payment_intent_id,
-        depositRefundAmountCents(member.deposit),
-        'ExpireGroup'
-      );
+      // Best-effort strict, comme les autres sites : un échec ici est une
+      // alerte admin, ne doit jamais faire échouer ce job (le client est
+      // déjà remboursé juste au-dessus) ni rouvrir le booking pour retry.
       if (reversal.error) {
         await notifyAdminOnFailure('expire-groups:reverse_transfer', {
           processed: 0,

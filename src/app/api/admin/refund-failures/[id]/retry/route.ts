@@ -77,7 +77,8 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
         stripe,
         failure.stripe_charge_id,
         failure.amount_cents,
-        'RefundFailureRetry'
+        'RefundFailureRetry',
+        `reversal_${failure.stripe_charge_id}`
       );
       if (reversal.error) throw new Error(reversal.error);
 
@@ -97,6 +98,54 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
       });
 
       return NextResponse.json({ success: true, resolved: true });
+    }
+
+    // À partir d'ici, failure.failure_type === 'refund' (seule autre valeur
+    // possible, contrainte check migration 0064) — la branche 'reverse_transfer'
+    // ci-dessus est toujours sortie par return.
+    //
+    // Pré-check anti-doublon (audit 22/08) : la clé d'idempotence Stripe
+    // (refund_${paymentIntentId}) expire après ~24h. Au-delà, un retry ne
+    // serait plus protégé contre un refund déjà créé lors d'une tentative
+    // précédente dont la réponse a été perdue côté client (timeout réseau)
+    // — Stripe traiterait alors ce retry comme une requête neuve. On
+    // vérifie directement auprès de Stripe avant tout appel refunds.create,
+    // indépendamment du délai écoulé.
+    // limit: 100 — si un payment_intent avait plus de 100 refunds on serait
+    // déjà en pleine anomalie bien avant cette page ; pas de pagination.
+    const existingRefunds = await stripe.refunds.list({ payment_intent: failure.stripe_charge_id, limit: 100 });
+    const activeRefunds = existingRefunds.data.filter((r) => r.status !== 'failed' && r.status !== 'canceled');
+    if (activeRefunds.length > 1) {
+      // Anomalie, pas un cas nominal — deux remboursements actifs sur le
+      // même payment_intent ne devraient jamais coexister. Ne résout rien
+      // automatiquement, ne rappelle jamais refunds.create dans ce cas.
+      return NextResponse.json(
+        { error: `${activeRefunds.length} remboursements déjà présents sur ce payment_intent — anomalie, vérification manuelle requise, aucune action prise.` },
+        { status: 409 }
+      );
+    }
+    if (activeRefunds.length === 1 && activeRefunds[0].amount === failure.amount_cents) {
+      // Le refund attendu par CETTE ligne existe déjà chez Stripe, montant
+      // exact — la tentative précédente a probablement réussi malgré
+      // l'échec côté app. Comparaison sur le MONTANT, pas seulement
+      // l'existence : un refund partiel antérieur (geste commercial
+      // distinct sur le même payment_intent) ne doit jamais faire passer
+      // cette ligne pour résolue à tort.
+      const existing = activeRefunds[0];
+      await serviceSupabase
+        .from('refund_failures')
+        .update({
+          status: 'resolved',
+          resolved_at: new Date().toISOString(),
+          resolved_by: authData.user.id,
+          resolution_note: `Refund déjà présent chez Stripe, id=${existing.id} — détecté avant relance, aucun nouvel appel refunds.create.`,
+        })
+        .eq('id', id);
+      await serviceSupabase.from('booking_logs').insert({
+        booking_id: failure.booking_id,
+        message: `REFUND_ALREADY_EXISTS | refund_failure_id=${id} | stripe_refund_id=${existing.id} | admin=${authData.user.email ?? authData.user.id}`,
+      });
+      return NextResponse.json({ success: true, resolved: true, alreadyExisted: true });
     }
 
     // Même règle que pro/cancel-booking/route.ts (bug reverse_transfer
@@ -136,21 +185,29 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
     const isFullRefund = chargeAmount != null && failure.amount_cents === chargeAmount;
 
     // member non-null ici — garde plus haut, uniquement pour failure_type
-    // === 'refund'.
-    await withRefundClaim(serviceSupabase, member!.id, () => stripe.refunds.create({
-      payment_intent: failure.stripe_charge_id,
-      amount: failure.amount_cents,
-      reason: 'requested_by_customer',
-      ...(isFullRefund && hasTransfer ? { reverse_transfer: true } : {}),
-      metadata: { email_sent: 'true', reason: 'refund_failure_retry' },
-    }));
+    // === 'refund'. Clé sur le payment_intent (pas memberId) — même
+    // discriminant que les 4 routes de remboursement, pour qu'un refund
+    // tenté ici et rejoué ailleurs (ou l'inverse) soit bien dédupliqué par
+    // Stripe : le PI identifie la même opération quel que soit le point
+    // d'entrée applicatif.
+    await withRefundClaim(serviceSupabase, member!.id, () => stripe.refunds.create(
+      {
+        payment_intent: failure.stripe_charge_id,
+        amount: failure.amount_cents,
+        reason: 'requested_by_customer',
+        ...(isFullRefund && hasTransfer ? { reverse_transfer: true } : {}),
+        metadata: { email_sent: 'true', reason: 'refund_failure_retry' },
+      },
+      { idempotencyKey: `refund_${failure.stripe_charge_id}` }
+    ));
 
     if (hasTransfer && !isFullRefund) {
       const reversal = await reverseConnectedAccountTransfer(
         stripe,
         failure.stripe_charge_id,
         failure.amount_cents,
-        'RefundFailureRetry'
+        'RefundFailureRetry',
+        `reversal_${failure.stripe_charge_id}`
       );
       if (reversal.error) {
         await notifyAdminOnFailure('admin/refund-failures/retry:reverse_transfer', {

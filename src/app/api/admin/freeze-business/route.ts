@@ -97,29 +97,37 @@ export async function POST(req: NextRequest) {
             try {
               const depositCents = depositRefundAmountCents(member.deposit);
               // Verrou anti-double-remboursement (audit 22/08, migration
-              // 0063) — voir lib/refunds.ts withRefundClaim().
-              await withRefundClaim(serviceSupabase, member.id, () => stripe.refunds.create({
-                payment_intent: member.stripe_payment_intent_id,
-                // Ne rembourse que les frais de réservation — les frais de
-                // gestion Book'nPay restent acquis même sur un gel d'établissement.
-                amount: depositCents,
-                metadata: { reason: 'business_frozen', biz_id: bizId },
-              }));
-
-              // Récupération du dépôt déjà transféré au pro
-              // (transfer_data.destination) — remboursement PARTIEL ici (dépôt
-              // seul), reverse_transfer sur le refund seul sous-récupérerait
-              // (voir lib/refunds.ts) : réversal séparée à montant exact.
-              // Best-effort strict — un échec ici est une alerte admin
-              // groupée (refundFailures plus bas), jamais un blocage du gel
-              // ni de la libération du créneau (déjà faits/à faire quoi qu'il
-              // arrive).
-              const reversal = await reverseConnectedAccountTransfer(
-                stripe,
-                member.stripe_payment_intent_id,
-                depositCents,
-                'FreezeBusiness'
-              );
+              // 0063) — voir lib/refunds.ts withRefundClaim(). Refund ET
+              // reversal passent TOUS DEUX dans le callback, aucun appel
+              // Stripe hors du verrou.
+              const { reversal } = await withRefundClaim(serviceSupabase, member.id, async () => {
+                await stripe.refunds.create(
+                  {
+                    payment_intent: member.stripe_payment_intent_id,
+                    // Ne rembourse que les frais de réservation — les frais
+                    // de gestion Book'nPay restent acquis même sur un gel
+                    // d'établissement.
+                    amount: depositCents,
+                    metadata: { reason: 'business_frozen', biz_id: bizId },
+                  },
+                  { idempotencyKey: `refund_${member.stripe_payment_intent_id}` }
+                );
+                // Récupération du dépôt déjà transféré au pro
+                // (transfer_data.destination) — remboursement PARTIEL ici
+                // (dépôt seul), reverse_transfer sur le refund seul sous-
+                // récupérerait (voir lib/refunds.ts) : réversal séparée à
+                // montant exact. ⚠️ Non-throw garanti par IMPLÉMENTATION, pas
+                // par contrat — voir le commentaire jumeau dans
+                // bookings/cancel/route.ts.
+                const reversal = await reverseConnectedAccountTransfer(
+                  stripe,
+                  member.stripe_payment_intent_id,
+                  depositCents,
+                  'FreezeBusiness',
+                  `reversal_${member.stripe_payment_intent_id}`
+                );
+                return { reversal };
+              });
               if (reversal.error) {
                 refundFailures.push({
                   bookingId: booking.id,

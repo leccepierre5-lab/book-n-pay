@@ -157,7 +157,7 @@ describe('expireGroupByRef — remboursement en échec', () => {
 
     // ⚠️ CORRECTIF (audit 22/08) : le dépôt déjà transféré au pro doit être
     // récupéré — même bug que reverse_transfer (d77eaa1), oublié ici aussi.
-    expect(stripe.transfers.createReversal).toHaveBeenCalledWith('tr_1', { amount: 1200 });
+    expect(stripe.transfers.createReversal).toHaveBeenCalledWith('tr_1', { amount: 1200 }, { idempotencyKey: 'reversal_pi_1' });
   });
 
   it('CORRECTIF 22/08 — réversal du dépôt échoué : alerte admin + trace booking_logs, mais le remboursement client et l’annulation restent acquis', async () => {

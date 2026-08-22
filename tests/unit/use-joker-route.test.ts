@@ -45,7 +45,11 @@ vi.mock('@/lib/pro-notifications', () => ({
 
 function makeChain(listData: any[], singleData: any = listData[0] ?? null, error: any = null) {
   const chain: any = Promise.resolve({ data: listData, error });
-  for (const m of ['select', 'eq', 'update']) {
+  // 'or' — withRefundClaim() (audit 22/08, migration 0063), désormais
+  // câblée sur cette route. fait .update(...).eq(...).or(...).select('id')
+  // .maybeSingle() avant tout appel Stripe ; singleData (le membre, vérité
+  // dans ces tests) fait réussir la réclamation.
+  for (const m of ['select', 'eq', 'or', 'update']) {
     chain[m] = vi.fn((..._args: any[]) => chain);
   }
   chain.maybeSingle = vi.fn(async () => ({ data: singleData, error }));
@@ -133,7 +137,8 @@ describe('POST /api/loyalty/use-joker', () => {
     expect(json.jokerApplique).toBe(true);
     expect(json.montantRembourse).toBe(15);
     expect(mockRefundsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ payment_intent: 'pi_123', amount: 1500 })
+      expect.objectContaining({ payment_intent: 'pi_123', amount: 1500 }),
+      expect.anything()
     );
     expect(chains.app_users.update).toHaveBeenCalledWith({ jokers_disponibles: 1, jokers_utilises: 1 });
     expect(chains.booking_members.update).toHaveBeenCalledWith(
@@ -145,7 +150,7 @@ describe('POST /api/loyalty/use-joker', () => {
     // (d77eaa1), un point d'appel oublié par ce correctif-là. Sans ça, le
     // pro garde le dépôt ET le client est remboursé : la différence reste à
     // la charge de Book'nPay, en silence.
-    expect(mockCreateReversal).toHaveBeenCalledWith('tr_test', { amount: 1500 });
+    expect(mockCreateReversal).toHaveBeenCalledWith('tr_test', { amount: 1500 }, { idempotencyKey: 'reversal_pi_123' });
   });
 
   it('CORRECTIF 22/08 — réversal du dépôt échoué après un remboursement Joker : alerte admin, mais le remboursement client et le quota restent acquis', async () => {

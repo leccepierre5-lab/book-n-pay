@@ -91,7 +91,8 @@ export async function reverseConnectedAccountTransfer(
   stripe: Stripe,
   paymentIntentId: string | null | undefined,
   amountCents: number,
-  logPrefix: string
+  logPrefix: string,
+  idempotencyKey?: string
 ): Promise<{ done: boolean; error?: string }> {
   if (!paymentIntentId || amountCents <= 0) return { done: false };
   try {
@@ -106,7 +107,11 @@ export async function reverseConnectedAccountTransfer(
       // récupérer, ce n'est pas un échec.
       return { done: false };
     }
-    await stripe.transfers.createReversal(transferId, { amount: amountCents });
+    if (idempotencyKey) {
+      await stripe.transfers.createReversal(transferId, { amount: amountCents }, { idempotencyKey });
+    } else {
+      await stripe.transfers.createReversal(transferId, { amount: amountCents });
+    }
     return { done: true };
   } catch (e: any) {
     console.warn(`[${logPrefix}] Récupération du dépôt auprès du pro échouée:`, e.message);

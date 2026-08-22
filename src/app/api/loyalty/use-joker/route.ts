@@ -19,7 +19,7 @@ import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
 import { normalizePhone } from '@/lib/booking-utils';
-import { reverseConnectedAccountTransfer } from '@/lib/refunds';
+import { reverseConnectedAccountTransfer, withRefundClaim, RefundAlreadyClaimedError } from '@/lib/refunds';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 import { insertRefundFailure } from '@/lib/refund-failures';
 
@@ -146,47 +146,86 @@ export async function POST(req: NextRequest) {
     let refundId: string | null = null;
     if (targetMember.stripe_payment_intent_id) {
       const stripe = await getStripeClient(serviceSupabase);
-      const refund = await stripe.refunds.create({
-        payment_intent: targetMember.stripe_payment_intent_id,
-        amount: Math.round(montantRembourse * 100),
-        reason: 'requested_by_customer',
-        metadata: { joker: 'true', statut, phone, bookingId, memberId },
-      });
-      refundId = refund.id;
-
-      // ⚠️ CORRECTIF (audit 22/08) : ce remboursement partiel (dépôt seul,
-      // au pourcentage du palier fidélité) ne récupérait jamais le dépôt déjà
-      // transféré au pro (transfer_data.destination, stripe/checkout/route.ts)
-      // — même bug que reverse_transfer (d77eaa1), un point d'appel oublié
-      // par ce correctif. Le pro gardait le dépôt ET le client était
-      // remboursé : la différence restait à la charge de Book'nPay, en
-      // silence. Best-effort strict comme les 3 autres routes de
-      // remboursement qui font déjà cet appel (bookings/cancel,
-      // pro/refund-gesture, admin/freeze-business) : un échec ici est une
-      // alerte admin, jamais un blocage du remboursement client déjà acté.
-      const reversal = await reverseConnectedAccountTransfer(
-        stripe,
-        targetMember.stripe_payment_intent_id,
-        Math.round(montantRembourse * 100),
-        'UseJoker'
-      );
-      if (reversal.error) {
-        await notifyAdminOnFailure('loyalty/use-joker:reverse_transfer', {
+      const amountCents = Math.round(montantRembourse * 100);
+      try {
+        // Verrou anti-double-remboursement (audit 22/08, migration 0063) —
+        // voir lib/refunds.ts withRefundClaim(). Route jusqu'ici SANS
+        // AUCUNE protection anti-double-remboursement : un double-clic sur
+        // "utiliser mon Joker" appelait stripe.refunds.create deux fois.
+        // Refund ET reversal passent tous deux dans le callback, aucun
+        // appel Stripe hors du verrou.
+        const { refund, reversal } = await withRefundClaim(serviceSupabase, memberId, async () => {
+          const refund = await stripe.refunds.create(
+            {
+              payment_intent: targetMember.stripe_payment_intent_id,
+              amount: amountCents,
+              reason: 'requested_by_customer',
+              metadata: { joker: 'true', statut, phone, bookingId, memberId },
+            },
+            { idempotencyKey: `refund_${targetMember.stripe_payment_intent_id}` }
+          );
+          // ⚠️ CORRECTIF (audit 22/08) : ce remboursement partiel (dépôt
+          // seul, au pourcentage du palier fidélité) ne récupérait jamais le
+          // dépôt déjà transféré au pro (transfer_data.destination,
+          // stripe/checkout/route.ts) — même bug que reverse_transfer
+          // (d77eaa1), un point d'appel oublié par ce correctif. Non-throw
+          // garanti par IMPLÉMENTATION, pas par contrat — voir le
+          // commentaire jumeau dans bookings/cancel/route.ts.
+          const reversal = await reverseConnectedAccountTransfer(
+            stripe,
+            targetMember.stripe_payment_intent_id,
+            amountCents,
+            'UseJoker',
+            `reversal_${targetMember.stripe_payment_intent_id}`
+          );
+          return { refund, reversal };
+        });
+        refundId = refund.id;
+        if (reversal.error) {
+          await notifyAdminOnFailure('loyalty/use-joker:reverse_transfer', {
+            processed: 0,
+            failed: 1,
+            failedItems: [memberId],
+            failedDescriptions: [
+              `membre ${memberId} (booking ${bookingId}) — récupération du dépôt (${montantRembourse}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
+            ],
+          }, 'action');
+          await insertRefundFailure(serviceSupabase, {
+            bookingId,
+            stripeChargeId: targetMember.stripe_payment_intent_id ?? null,
+            amountCents,
+            errorCode: null,
+            errorMessage: `réversal du dépôt auprès du pro échouée (Joker) — ${reversal.error}`,
+            failureType: 'reverse_transfer',
+          });
+        }
+      } catch (stripeErr: any) {
+        if (stripeErr instanceof RefundAlreadyClaimedError) {
+          console.warn(`[UseJoker] ${stripeErr.message}`);
+          return NextResponse.json({ error: stripeErr.message }, { status: 409 });
+        }
+        // Pas de décompte de Joker avant ce point (voir plus bas) — un
+        // refund en échec ici ne fait jamais perdre de Joker sans
+        // remboursement.
+        console.error('[UseJoker] Erreur Stripe:', stripeErr.message);
+        await notifyAdminOnFailure('loyalty/use-joker:refund', {
           processed: 0,
           failed: 1,
           failedItems: [memberId],
-          failedDescriptions: [
-            `membre ${memberId} (booking ${bookingId}) — récupération du dépôt (${montantRembourse}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
-          ],
+          failedDescriptions: [`membre ${memberId} (booking ${bookingId}, ${montantRembourse}€) — ${stripeErr.message}`],
         }, 'action');
         await insertRefundFailure(serviceSupabase, {
           bookingId,
           stripeChargeId: targetMember.stripe_payment_intent_id ?? null,
-          amountCents: Math.round(montantRembourse * 100),
-          errorCode: null,
-          errorMessage: `réversal du dépôt auprès du pro échouée (Joker) — ${reversal.error}`,
-          failureType: 'reverse_transfer',
+          amountCents,
+          errorCode: stripeErr.code ?? null,
+          errorMessage: stripeErr.message,
+          failureType: 'refund',
         });
+        return NextResponse.json(
+          { error: 'Le remboursement Stripe a échoué — notre équipe a été alertée, réessaie ou contacte-nous si ça persiste.' },
+          { status: 502 }
+        );
       }
     }
 

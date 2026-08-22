@@ -16,13 +16,16 @@ const mockGetUser = vi.fn();
 let authProfile: any = null;
 
 const mockRefundsCreate = vi.fn(async (..._args: any[]) => ({ id: 're_test' }));
+// Aucun refund existant par défaut (pré-check anti-doublon, audit 22/08) —
+// les tests dédiés à ce pré-check l'écrasent avec des refunds fictifs.
+const mockRefundsList = vi.fn(async (..._args: any[]) => ({ data: [] as any[] }));
 // Transfert PRÉSENT par défaut — le test dédié "sans transfert" l'écrase.
 const mockPiRetrieve = vi.fn(async (..._args: any[]): Promise<{ latest_charge: { transfer: string | null } }> => ({
   latest_charge: { transfer: 'tr_test' },
 }));
 vi.mock('@/lib/stripe/client', () => ({
   getStripeClient: vi.fn(async () => ({
-    refunds: { create: mockRefundsCreate },
+    refunds: { create: mockRefundsCreate, list: mockRefundsList },
     paymentIntents: { retrieve: (...args: any[]) => mockPiRetrieve(...args) },
   })),
 }));
@@ -126,12 +129,15 @@ describe('POST /api/admin/refund-failures/[id]/retry', () => {
     expect(res.status).toBe(200);
     expect(json).toEqual({ success: true, resolved: true });
 
-    expect(mockRefundsCreate).toHaveBeenCalledWith({
-      payment_intent: 'pi_123',
-      amount: 1599,
-      reason: 'requested_by_customer',
-      metadata: { email_sent: 'true', reason: 'refund_failure_retry' },
-    });
+    expect(mockRefundsCreate).toHaveBeenCalledWith(
+      {
+        payment_intent: 'pi_123',
+        amount: 1599,
+        reason: 'requested_by_customer',
+        metadata: { email_sent: 'true', reason: 'refund_failure_retry' },
+      },
+      { idempotencyKey: 'refund_pi_123' }
+    );
     expect(mockRefundsCreate.mock.calls[0][0]).not.toHaveProperty('reverse_transfer');
 
     expect(chains.booking_members.update).toHaveBeenCalledWith({ montant_rembourse: 15.99 });
@@ -148,7 +154,8 @@ describe('POST /api/admin/refund-failures/[id]/retry', () => {
     await POST(buildRequest() as any, buildParams());
 
     expect(mockRefundsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ reverse_transfer: true })
+      expect.objectContaining({ reverse_transfer: true }),
+      expect.anything()
     );
     expect(mockReverseTransfer).not.toHaveBeenCalled();
   });
@@ -166,14 +173,16 @@ describe('POST /api/admin/refund-failures/[id]/retry', () => {
 
     expect(res.status).toBe(200);
     expect(mockRefundsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 1599 })
+      expect.objectContaining({ amount: 1599 }),
+      expect.anything()
     );
     expect(mockRefundsCreate.mock.calls[0][0]).not.toHaveProperty('reverse_transfer');
     expect(mockReverseTransfer).toHaveBeenCalledWith(
       expect.anything(),
       'pi_123',
       1599,
-      'RefundFailureRetry'
+      'RefundFailureRetry',
+      'reversal_pi_123'
     );
   });
 

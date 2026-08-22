@@ -130,7 +130,7 @@ describe('bookings/cancel — récupération du dépôt auprès du pro', () => {
 
     expect(res.status).toBe(200);
     // Montant EXACT du dépôt (18€ = 1800 cents), pas la charge totale (dépôt+frais).
-    expect(mockCreateReversal).toHaveBeenCalledWith('tr_pi_1', { amount: 1800 });
+    expect(mockCreateReversal).toHaveBeenCalledWith('tr_pi_1', { amount: 1800 }, { idempotencyKey: 'reversal_pi_1' });
     expect(notifyAdminOnFailure).not.toHaveBeenCalled();
   });
 
@@ -241,7 +241,7 @@ describe('pro/refund-gesture — récupération du dépôt auprès du pro', () =
 
     expect(res.status).toBe(200);
     // 9,50€ = 950 cents.
-    expect(mockCreateReversal).toHaveBeenCalledWith('tr_pi_3', { amount: 950 });
+    expect(mockCreateReversal).toHaveBeenCalledWith('tr_pi_3', { amount: 950 }, { idempotencyKey: 'reversal_pi_3' });
     expect(notifyAdminOnFailure).not.toHaveBeenCalled();
   });
 
@@ -340,7 +340,7 @@ describe('admin/freeze-business — récupération du dépôt auprès du pro', (
 
     expect(res.status).toBe(200);
     // 22€ = 2200 cents.
-    expect(mockCreateReversal).toHaveBeenCalledWith('tr_pi_2', { amount: 2200 });
+    expect(mockCreateReversal).toHaveBeenCalledWith('tr_pi_2', { amount: 2200 }, { idempotencyKey: 'reversal_pi_2' });
     expect(notifyAdminOnFailure).not.toHaveBeenCalled();
   });
 

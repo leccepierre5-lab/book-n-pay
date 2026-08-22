@@ -75,20 +75,56 @@ export async function POST(req: NextRequest) {
     // échoue", on ajoute juste la visibilité admin qui manquait.
     try {
       // Verrou anti-double-remboursement (audit 22/08, migration 0063) —
-      // voir lib/refunds.ts withRefundClaim().
-      await withRefundClaim(serviceSupabase, memberId, () => stripe.refunds.create({
-        payment_intent: member.stripe_payment_intent_id!,
-        // Ne rembourse que les frais de réservation — les frais de gestion
-        // Book'nPay restent acquis, même sur un geste commercial du pro.
-        amount: depositCents,
-        reason: 'requested_by_customer',
-        // Cette route envoie déjà son propre email (ci-dessous) : ce flag
-        // dit au webhook charge.refunded de ne pas en renvoyer un second
-        // pour le même remboursement. Un remboursement déclenché ailleurs
-        // (dashboard Stripe, admin freeze) n'a pas ce flag et le webhook
-        // reste le filet normal.
-        metadata: { email_sent: 'true' },
-      }));
+      // voir lib/refunds.ts withRefundClaim(). Refund ET reversal passent
+      // TOUS DEUX dans le callback, aucun appel Stripe hors du verrou.
+      const { reversal } = await withRefundClaim(serviceSupabase, memberId, async () => {
+        await stripe.refunds.create(
+          {
+            payment_intent: member.stripe_payment_intent_id!,
+            // Ne rembourse que les frais de réservation — les frais de
+            // gestion Book'nPay restent acquis, même sur un geste commercial
+            // du pro.
+            amount: depositCents,
+            reason: 'requested_by_customer',
+            // Cette route envoie déjà son propre email (ci-dessous) : ce
+            // flag dit au webhook charge.refunded de ne pas en renvoyer un
+            // second pour le même remboursement. Un remboursement déclenché
+            // ailleurs (dashboard Stripe, admin freeze) n'a pas ce flag et
+            // le webhook reste le filet normal.
+            metadata: { email_sent: 'true' },
+          },
+          { idempotencyKey: `refund_${member.stripe_payment_intent_id}` }
+        );
+        // ⚠️ Non-throw garanti par IMPLÉMENTATION, pas par contrat — voir
+        // le commentaire jumeau dans bookings/cancel/route.ts et
+        // lib/refunds.ts:reverseConnectedAccountTransfer.
+        const reversal = await reverseConnectedAccountTransfer(
+          stripe,
+          member.stripe_payment_intent_id,
+          depositCents,
+          'RefundGesture',
+          `reversal_${member.stripe_payment_intent_id}`
+        );
+        return { reversal };
+      });
+      if (reversal.error) {
+        await notifyAdminOnFailure('pro/refund-gesture:reverse_transfer', {
+          processed: 0,
+          failed: 1,
+          failedItems: [memberId],
+          failedDescriptions: [
+            `membre ${memberId} (booking ${bookingId}) — récupération du dépôt (${member.deposit ?? 0}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
+          ],
+        }, 'action');
+        await insertRefundFailure(serviceSupabase, {
+          bookingId,
+          stripeChargeId: member.stripe_payment_intent_id ?? null,
+          amountCents: depositCents,
+          errorCode: null,
+          errorMessage: `réversal du dépôt auprès du pro échouée — ${reversal.error}`,
+          failureType: 'reverse_transfer',
+        });
+      }
     } catch (stripeErr: any) {
       if (stripeErr instanceof RefundAlreadyClaimedError) {
         console.warn(`[RefundGesture] ${stripeErr.message}`);
@@ -113,38 +149,6 @@ export async function POST(req: NextRequest) {
         { error: 'Le remboursement Stripe a échoué — notre équipe a été alertée, réessaie ou contacte-nous si ça persiste.' },
         { status: 502 }
       );
-    }
-
-    // Récupération du dépôt déjà transféré au pro (transfer_data.destination)
-    // — remboursement PARTIEL ici (dépôt seul, frais de gestion conservés),
-    // reverse_transfer sur le refund seul sous-récupérerait (voir
-    // lib/refunds.ts) : réversal séparée à montant exact. Best-effort strict,
-    // ne bloque jamais la suite (créneau déjà géré ci-dessous) — un échec est
-    // une alerte admin, jamais un blocage (le refund client, lui, a déjà
-    // réussi au-dessus).
-    const reversal = await reverseConnectedAccountTransfer(
-      stripe,
-      member.stripe_payment_intent_id,
-      depositCents,
-      'RefundGesture'
-    );
-    if (reversal.error) {
-      await notifyAdminOnFailure('pro/refund-gesture:reverse_transfer', {
-        processed: 0,
-        failed: 1,
-        failedItems: [memberId],
-        failedDescriptions: [
-          `membre ${memberId} (booking ${bookingId}) — récupération du dépôt (${member.deposit ?? 0}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
-        ],
-      }, 'action');
-      await insertRefundFailure(serviceSupabase, {
-        bookingId,
-        stripeChargeId: member.stripe_payment_intent_id ?? null,
-        amountCents: depositCents,
-        errorCode: null,
-        errorMessage: `réversal du dépôt auprès du pro échouée — ${reversal.error}`,
-        failureType: 'reverse_transfer',
-      });
     }
 
     await serviceSupabase.from('booking_members').update({ status: 'cancelled' }).eq('id', memberId);
