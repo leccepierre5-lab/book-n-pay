@@ -13,10 +13,24 @@ const mockGetUser = vi.fn();
 let callerProfile: any = null;
 
 const mockRefundsCreate = vi.fn(async (..._args: any[]) => ({ id: 're_test' }));
+const mockPiRetrieve = vi.fn(async (..._args: any[]) => ({ latest_charge: { transfer: 'tr_test' } }));
+const mockCreateReversal = vi.fn(async (..._args: any[]) => ({ id: 'trr_test' }));
 vi.mock('@/lib/stripe/client', () => ({
   getStripeClient: vi.fn(async () => ({
     refunds: { create: mockRefundsCreate },
+    paymentIntents: { retrieve: mockPiRetrieve },
+    transfers: { createReversal: mockCreateReversal },
   })),
+}));
+
+const mockNotifyAdminOnFailure = vi.fn(async (..._args: any[]) => {});
+vi.mock('@/lib/notify-admin', () => ({
+  notifyAdminOnFailure: (...args: any[]) => mockNotifyAdminOnFailure(...args),
+}));
+
+const mockInsertRefundFailure = vi.fn(async (..._args: any[]) => {});
+vi.mock('@/lib/refund-failures', () => ({
+  insertRefundFailure: (...args: any[]) => mockInsertRefundFailure(...args),
 }));
 
 const mockCancelBookingIfNoActiveMembers = vi.fn(async (..._args: any[]) => {});
@@ -124,6 +138,42 @@ describe('POST /api/loyalty/use-joker', () => {
     expect(chains.app_users.update).toHaveBeenCalledWith({ jokers_disponibles: 1, jokers_utilises: 1 });
     expect(chains.booking_members.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'cancelled', joker_applique: true })
+    );
+
+    // ⚠️ CORRECTIF (audit 22/08) : le dépôt déjà transféré au pro doit être
+    // récupéré après le remboursement Joker — même bug que reverse_transfer
+    // (d77eaa1), un point d'appel oublié par ce correctif-là. Sans ça, le
+    // pro garde le dépôt ET le client est remboursé : la différence reste à
+    // la charge de Book'nPay, en silence.
+    expect(mockCreateReversal).toHaveBeenCalledWith('tr_test', { amount: 1500 });
+  });
+
+  it('CORRECTIF 22/08 — réversal du dépôt échoué après un remboursement Joker : alerte admin, mais le remboursement client et le quota restent acquis', async () => {
+    chains.booking_members = makeChain([], TARGET_MEMBER);
+    chains.bookings = makeChain([], parisDateTimeInHours(5));
+    chains.app_users = makeChain([], USER);
+
+    mockCreateReversal.mockRejectedValueOnce(new Error('insufficient balance'));
+
+    const { POST } = await import('@/app/api/loyalty/use-joker/route');
+    const res = await POST(buildRequest({ phone: '0612345678', bookingId: 'bk1', memberId: 'm1' }) as any);
+    const json = await res.json();
+
+    // Le remboursement client et la décrémentation du quota ont bien eu
+    // lieu malgré l'échec du réversal — best-effort strict, jamais un
+    // blocage (même principe que bookings/cancel).
+    expect(json.jokerApplique).toBe(true);
+    expect(chains.app_users.update).toHaveBeenCalledWith({ jokers_disponibles: 1, jokers_utilises: 1 });
+
+    // Mais l'échec de récupération auprès du pro est bien tracé et alerté.
+    expect(mockNotifyAdminOnFailure).toHaveBeenCalledWith(
+      'loyalty/use-joker:reverse_transfer',
+      expect.objectContaining({ failed: 1 }),
+      'action'
+    );
+    expect(mockInsertRefundFailure).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ errorMessage: expect.stringMatching(/réversal.*échouée.*Joker/i) })
     );
   });
 });

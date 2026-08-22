@@ -17,7 +17,7 @@
 import Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/email/send';
-import { depositRefundAmountCents } from '@/lib/refunds';
+import { depositRefundAmountCents, reverseConnectedAccountTransfer } from '@/lib/refunds';
 import { processBatch } from '@/lib/cron-batch';
 import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
@@ -114,6 +114,35 @@ export async function expireGroupByRef(
         amount: depositRefundAmountCents(member.deposit),
         metadata: { reason: 'group_expired', group_ref: ref },
       });
+
+      // ⚠️ CORRECTIF (audit 22/08) : ce remboursement partiel (dépôt seul)
+      // ne récupérait jamais le dépôt déjà transféré au pro — même bug que
+      // reverse_transfer (d77eaa1) et que loyalty/use-joker, un point
+      // d'appel de plus oublié par ces deux correctifs. Best-effort strict,
+      // comme les autres sites : un échec ici est une alerte admin, ne doit
+      // jamais faire échouer ce job (le client est déjà remboursé juste
+      // au-dessus) ni rouvrir le booking pour retry.
+      const reversal = await reverseConnectedAccountTransfer(
+        stripe,
+        member.stripe_payment_intent_id,
+        depositRefundAmountCents(member.deposit),
+        'ExpireGroup'
+      );
+      if (reversal.error) {
+        await notifyAdminOnFailure('expire-groups:reverse_transfer', {
+          processed: 0,
+          failed: 1,
+          failedItems: [member.id],
+          failedDescriptions: [
+            `membre ${member.id} (booking ${job.bookingId}) — récupération du dépôt (${member.deposit ?? 0}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
+          ],
+        }, 'action');
+        await supabase.from('booking_logs').insert({
+          booking_id: job.bookingId,
+          message: `Réversal du dépôt auprès du pro échoué (expiration groupe) — membre ${member.id}, ${member.deposit ?? 0}€ — à vérifier manuellement — ${reversal.error}`,
+        });
+      }
+
       await supabase
         .from('booking_members')
         .update({ status: 'cancelled', montant_rembourse: member.deposit ?? 0 })

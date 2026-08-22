@@ -118,7 +118,11 @@ describe('expireGroupByRef — remboursement en échec', () => {
       },
     ];
     const supabase = makeSupabase(groupBookings);
-    const stripe: any = { refunds: { create: vi.fn(async () => ({ id: 're_1' })) } };
+    const stripe: any = {
+      refunds: { create: vi.fn(async () => ({ id: 're_1' })) },
+      paymentIntents: { retrieve: vi.fn(async () => ({ latest_charge: { transfer: 'tr_1' } })) },
+      transfers: { createReversal: vi.fn(async () => ({ id: 'trr_1' })) },
+    };
 
     const result = await expireGroupByRef('ref-2', supabase, stripe);
 
@@ -133,6 +137,52 @@ describe('expireGroupByRef — remboursement en échec', () => {
 
     expect(notifyAdminOnFailure).not.toHaveBeenCalled();
     expect(supabase._chains['booking_logs']).toBeUndefined();
+
+    // ⚠️ CORRECTIF (audit 22/08) : le dépôt déjà transféré au pro doit être
+    // récupéré — même bug que reverse_transfer (d77eaa1), oublié ici aussi.
+    expect(stripe.transfers.createReversal).toHaveBeenCalledWith('tr_1', { amount: 1200 });
+  });
+
+  it('CORRECTIF 22/08 — réversal du dépôt échoué : alerte admin + trace booking_logs, mais le remboursement client et l’annulation restent acquis', async () => {
+    const groupBookings = [
+      {
+        ...baseBooking,
+        booking_members: [
+          { id: 'm1', name: 'Alice', status: 'paid', email: 'alice@example.com', deposit: 12, stripe_payment_intent_id: 'pi_1' },
+          // Un membre 'invite' est nécessaire pour que la fonction ne prenne
+          // pas le raccourci "tout le monde a payé, rien à expirer" (voir
+          // ligne 61 de expireGroup.ts) et exécute réellement les refunds.
+          { id: 'm2', name: 'Bob', status: 'invite', email: null, deposit: null, stripe_payment_intent_id: null },
+        ],
+      },
+    ];
+    const supabase = makeSupabase(groupBookings);
+    const stripe: any = {
+      refunds: { create: vi.fn(async () => ({ id: 're_1' })) },
+      paymentIntents: { retrieve: vi.fn(async () => ({ latest_charge: { transfer: 'tr_1' } })) },
+      transfers: { createReversal: vi.fn(async () => { throw new Error('insufficient balance'); }) },
+    };
+
+    const result = await expireGroupByRef('ref-4', supabase, stripe);
+
+    expect(result).toEqual({ expired: true });
+
+    // Le remboursement client et l'annulation ont bien eu lieu malgré
+    // l'échec du réversal — best-effort strict, jamais un blocage.
+    const memberUpdateCalls = supabase._chains['booking_members'].update.mock.calls;
+    expect(memberUpdateCalls).toContainEqual([{ status: 'cancelled', montant_rembourse: 12 }]);
+    const bookingUpdateCalls = supabase._chains['bookings'].update.mock.calls;
+    expect(bookingUpdateCalls.some((c: any[]) => c[0]?.status === 'cancelled')).toBe(true);
+
+    // Mais l'échec de récupération auprès du pro est bien tracé et alerté.
+    expect(notifyAdminOnFailure).toHaveBeenCalledWith(
+      'expire-groups:reverse_transfer',
+      expect.objectContaining({ failed: 1 }),
+      'action'
+    );
+    expect(supabase._chains['booking_logs'].insert).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringMatching(/Réversal du dépôt.*échoué/i) })
+    );
   });
 
   it("retry après échec précédent : un membre déjà 'cancelled' mais qui avait payé (stripe_payment_intent_id présent) empêche le raccourci 'tout payé → completed' de court-circuiter la nouvelle tentative de remboursement", async () => {
@@ -148,7 +198,11 @@ describe('expireGroupByRef — remboursement en échec', () => {
       },
     ];
     const supabase = makeSupabase(groupBookings);
-    const stripe: any = { refunds: { create: vi.fn(async () => ({ id: 're_2' })) } };
+    const stripe: any = {
+      refunds: { create: vi.fn(async () => ({ id: 're_2' })) },
+      paymentIntents: { retrieve: vi.fn(async () => ({ latest_charge: { transfer: 'tr_1' } })) },
+      transfers: { createReversal: vi.fn(async () => ({ id: 'trr_1' })) },
+    };
 
     await expireGroupByRef('ref-3', supabase, stripe);
 

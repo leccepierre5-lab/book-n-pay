@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getStripeClient } from '@/lib/stripe/client';
 import { withErrorHandling } from '@/lib/api-error';
+import { reverseConnectedAccountTransfer } from '@/lib/refunds';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
 
 export const POST = withErrorHandling('[RefundFailureRetry]', async (
   _req: NextRequest,
@@ -77,13 +79,49 @@ export const POST = withErrorHandling('[RefundFailureRetry]', async (
       );
     }
 
+    // ⚠️ CORRECTIF (audit 22/08) : `reverse_transfer: true` posé quel que
+    // soit le montant relançait TOUJOURS le bug reverse_transfer que ce
+    // commentaire prétend éviter — sur un échec initial PARTIEL (dépôt
+    // seul, la majorité des cas : bookings/cancel, refund-gesture,
+    // freeze-business, use-joker, expire-groups en refont tous un dépôt
+    // seul), Stripe annule le transfert proportionnellement au ratio
+    // remboursé/charge totale, pas au montant réel du dépôt — sous-
+    // récupération silencieuse (voir lib/refunds.ts). `isFullRefund`
+    // restreint le flag au SEUL cas où ça marche (remboursement = 100% de
+    // la charge, cf. pro/cancel-booking) ; sinon, réversal exact via
+    // reverseConnectedAccountTransfer juste après le refund.
+    const isFullRefund = chargeAmount != null && failure.amount_cents === chargeAmount;
+
     await stripe.refunds.create({
       payment_intent: failure.stripe_charge_id,
       amount: failure.amount_cents,
       reason: 'requested_by_customer',
-      ...(hasTransfer ? { reverse_transfer: true } : {}),
+      ...(isFullRefund && hasTransfer ? { reverse_transfer: true } : {}),
       metadata: { email_sent: 'true', reason: 'refund_failure_retry' },
     });
+
+    if (hasTransfer && !isFullRefund) {
+      const reversal = await reverseConnectedAccountTransfer(
+        stripe,
+        failure.stripe_charge_id,
+        failure.amount_cents,
+        'RefundFailureRetry'
+      );
+      if (reversal.error) {
+        await notifyAdminOnFailure('admin/refund-failures/retry:reverse_transfer', {
+          processed: 0,
+          failed: 1,
+          failedItems: [id],
+          failedDescriptions: [
+            `refund_failure ${id} (booking ${failure.booking_id}) — refund OK mais récupération du dépôt (${(failure.amount_cents / 100).toFixed(2)}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
+          ],
+        }, 'action');
+        await serviceSupabase.from('booking_logs').insert({
+          booking_id: failure.booking_id,
+          message: `Réversal du dépôt auprès du pro échoué (relance manuelle) — refund_failure_id=${id} — à vérifier manuellement — ${reversal.error}`,
+        });
+      }
+    }
 
     if (member && member.montant_rembourse == null) {
       await serviceSupabase

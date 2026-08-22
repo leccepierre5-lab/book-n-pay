@@ -27,6 +27,22 @@ vi.mock('@/lib/stripe/client', () => ({
   })),
 }));
 
+// ⚠️ CORRECTIF (audit 22/08) : `reverse_transfer: true` sur le refund lui-
+// même n'est plus posé que pour un remboursement à 100% de la charge — sur
+// un remboursement PARTIEL (le cas le plus fréquent : la majorité des
+// `refund_failures` viennent de bookings/cancel/refund-gesture/freeze-
+// business/use-joker/expire-groups, tous des dépôts seuls), le réversal
+// exact passe désormais par reverseConnectedAccountTransfer séparément.
+const mockReverseTransfer = vi.fn(async (..._args: any[]): Promise<{ done: boolean; error?: string }> => ({ done: true }));
+vi.mock('@/lib/refunds', () => ({
+  reverseConnectedAccountTransfer: (...args: any[]) => mockReverseTransfer(...args),
+}));
+
+const mockNotifyAdminOnFailure = vi.fn(async (..._args: any[]) => {});
+vi.mock('@/lib/notify-admin', () => ({
+  notifyAdminOnFailure: (...args: any[]) => mockNotifyAdminOnFailure(...args),
+}));
+
 function makeChain(listData: any[], singleData: any = listData[0] ?? null, error: any = null) {
   const chain: any = Promise.resolve({ data: listData, error });
   for (const m of ['select', 'eq', 'neq', 'update', 'insert']) {
@@ -112,14 +128,63 @@ describe('POST /api/admin/refund-failures/[id]/retry', () => {
     );
   });
 
-  it('charge avec transfert : reverse_transfer:true', async () => {
-    mockPiRetrieve.mockResolvedValueOnce({ latest_charge: { transfer: 'tr_test' } });
+  it('charge avec transfert ET remboursement à 100% de la charge (amount_cents === montant réel) : reverse_transfer:true, pas de réversal séparé', async () => {
+    // 1599 == failure.amount_cents (OPEN_FAILURE) → remboursement intégral.
+    mockPiRetrieve.mockResolvedValueOnce({ latest_charge: { transfer: 'tr_test', amount: 1599 } as any });
 
     const { POST } = await import('@/app/api/admin/refund-failures/[id]/retry/route');
     await POST(buildRequest() as any, buildParams());
 
     expect(mockRefundsCreate).toHaveBeenCalledWith(
       expect.objectContaining({ reverse_transfer: true })
+    );
+    expect(mockReverseTransfer).not.toHaveBeenCalled();
+  });
+
+  it("CORRECTIF 22/08 — charge avec transfert ET remboursement PARTIEL (amount_cents < montant réel de la charge, cas le plus fréquent) : reverse_transfer PAS posé sur le refund, réversal exact fait séparément", async () => {
+    // Charge réelle à 20,00€ (dépôt+frais), échec à rejouer = 15,99€ seul
+    // (dépôt) — exactement le cas d'un échec initial venant de
+    // bookings/cancel/refund-gesture/etc. `reverse_transfer: true` sur ce
+    // refund partiel sous-récupérerait proportionnellement (voir
+    // lib/refunds.ts) — c'est le bug que ce correctif ferme.
+    mockPiRetrieve.mockResolvedValueOnce({ latest_charge: { transfer: 'tr_test', amount: 2000 } as any });
+
+    const { POST } = await import('@/app/api/admin/refund-failures/[id]/retry/route');
+    const res = await POST(buildRequest() as any, buildParams());
+
+    expect(res.status).toBe(200);
+    expect(mockRefundsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 1599 })
+    );
+    expect(mockRefundsCreate.mock.calls[0][0]).not.toHaveProperty('reverse_transfer');
+    expect(mockReverseTransfer).toHaveBeenCalledWith(
+      expect.anything(),
+      'pi_123',
+      1599,
+      'RefundFailureRetry'
+    );
+  });
+
+  it('CORRECTIF 22/08 — réversal partiel échoué : alerte admin + trace booking_logs, mais le remboursement (déjà réussi) reste acquis, status toujours resolved', async () => {
+    mockPiRetrieve.mockResolvedValueOnce({ latest_charge: { transfer: 'tr_test', amount: 2000 } as any });
+    mockReverseTransfer.mockResolvedValueOnce({ done: false, error: 'insufficient balance' });
+
+    const { POST } = await import('@/app/api/admin/refund-failures/[id]/retry/route');
+    const res = await POST(buildRequest() as any, buildParams());
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toEqual({ success: true, resolved: true });
+    expect(chains.refund_failures.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'resolved' })
+    );
+    expect(mockNotifyAdminOnFailure).toHaveBeenCalledWith(
+      'admin/refund-failures/retry:reverse_transfer',
+      expect.objectContaining({ failed: 1 }),
+      'action'
+    );
+    expect(chains.booking_logs.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringMatching(/Réversal du dépôt.*échoué/i) })
     );
   });
 

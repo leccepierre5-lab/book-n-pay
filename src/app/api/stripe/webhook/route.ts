@@ -142,7 +142,26 @@ export async function POST(req: NextRequest) {
               limit: 1,
             });
             if (existingRefunds.data.length === 0) {
-              await stripe.refunds.create({ payment_intent: session.payment_intent });
+              // ⚠️ CORRECTIF (audit 22/08) : remboursement intégral (aucun
+              // `amount`, donc 100% de la charge — dépôt + frais de gestion)
+              // sans jamais récupérer le dépôt déjà transféré au pro
+              // (transfer_data.destination). Un remboursement à 100% de la
+              // charge est justement le cas où `reverse_transfer: true`
+              // suffit (voir lib/refunds.ts — contrairement à un
+              // remboursement partiel, aucune proportionnalité en jeu ici).
+              // `hasTransfer` reproduit le même garde-fou que
+              // admin/refund-failures/[id]/retry/route.ts : poser le flag
+              // sans transfert associé à la charge peut faire échouer
+              // l'appel Stripe.
+              const pi = await stripe.paymentIntents.retrieve(session.payment_intent, {
+                expand: ['latest_charge'],
+              });
+              const orphanCharge = pi.latest_charge;
+              const hasTransfer = Boolean(orphanCharge && typeof orphanCharge !== 'string' && orphanCharge.transfer);
+              await stripe.refunds.create({
+                payment_intent: session.payment_intent,
+                ...(hasTransfer ? { reverse_transfer: true } : {}),
+              });
               console.warn(
                 `[Webhook] Paiement orphelin remboursé — membre ${memberId} déjà 'cancelled', payment_intent ${session.payment_intent}`
               );

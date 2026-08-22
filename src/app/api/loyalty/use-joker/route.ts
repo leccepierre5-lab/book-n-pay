@@ -19,6 +19,9 @@ import { notifyProBookingCancelled } from '@/lib/pro-notifications';
 import { logAndRespond } from '@/lib/api-error';
 import { getStripeClient } from '@/lib/stripe/client';
 import { normalizePhone } from '@/lib/booking-utils';
+import { reverseConnectedAccountTransfer } from '@/lib/refunds';
+import { notifyAdminOnFailure } from '@/lib/notify-admin';
+import { insertRefundFailure } from '@/lib/refund-failures';
 
 export async function POST(req: NextRequest) {
   try {
@@ -150,6 +153,40 @@ export async function POST(req: NextRequest) {
         metadata: { joker: 'true', statut, phone, bookingId, memberId },
       });
       refundId = refund.id;
+
+      // ⚠️ CORRECTIF (audit 22/08) : ce remboursement partiel (dépôt seul,
+      // au pourcentage du palier fidélité) ne récupérait jamais le dépôt déjà
+      // transféré au pro (transfer_data.destination, stripe/checkout/route.ts)
+      // — même bug que reverse_transfer (d77eaa1), un point d'appel oublié
+      // par ce correctif. Le pro gardait le dépôt ET le client était
+      // remboursé : la différence restait à la charge de Book'nPay, en
+      // silence. Best-effort strict comme les 3 autres routes de
+      // remboursement qui font déjà cet appel (bookings/cancel,
+      // pro/refund-gesture, admin/freeze-business) : un échec ici est une
+      // alerte admin, jamais un blocage du remboursement client déjà acté.
+      const reversal = await reverseConnectedAccountTransfer(
+        stripe,
+        targetMember.stripe_payment_intent_id,
+        Math.round(montantRembourse * 100),
+        'UseJoker'
+      );
+      if (reversal.error) {
+        await notifyAdminOnFailure('loyalty/use-joker:reverse_transfer', {
+          processed: 0,
+          failed: 1,
+          failedItems: [memberId],
+          failedDescriptions: [
+            `membre ${memberId} (booking ${bookingId}) — récupération du dépôt (${montantRembourse}€) auprès du pro échouée, à vérifier manuellement — ${reversal.error}`,
+          ],
+        }, 'action');
+        await insertRefundFailure(serviceSupabase, {
+          bookingId,
+          stripeChargeId: targetMember.stripe_payment_intent_id ?? null,
+          amountCents: Math.round(montantRembourse * 100),
+          errorCode: null,
+          errorMessage: `réversal du dépôt auprès du pro échouée (Joker) — ${reversal.error}`,
+        });
+      }
     }
 
     const newJokersDisponibles = jokersDisponibles - 1;

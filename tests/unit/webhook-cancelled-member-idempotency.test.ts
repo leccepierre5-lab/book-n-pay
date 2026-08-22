@@ -23,12 +23,17 @@ let eventFixture: any = null;
 const mockConstructEventAsync = vi.fn(async () => eventFixture);
 const mockRefundsList = vi.fn(async (): Promise<{ data: any[] }> => ({ data: [] }));
 const mockRefundsCreate = vi.fn(async () => ({ id: 're_new' }));
+// Défaut : un transfert existe (cas réel destination charge) — voir le
+// correctif 22/08 (reverse_transfer sur le paiement orphelin).
+const mockPiRetrieve = vi.fn(async (): Promise<{ latest_charge: { transfer: string | null } }> => ({
+  latest_charge: { transfer: 'tr_orphan' },
+}));
 
 vi.mock('stripe', () => ({
   default: function MockStripe(this: any) {
     this.webhooks = { constructEventAsync: mockConstructEventAsync };
     this.refunds = { list: mockRefundsList, create: mockRefundsCreate };
-    this.paymentIntents = { retrieve: vi.fn() };
+    this.paymentIntents = { retrieve: mockPiRetrieve };
   },
 }));
 
@@ -114,8 +119,28 @@ describe('stripe/webhook — idempotence membre cancelled', () => {
 
     expect(res.status).toBe(200);
     expect(mockRefundsCreate).toHaveBeenCalledTimes(1);
-    expect(mockRefundsCreate).toHaveBeenCalledWith({ payment_intent: 'pi_456' });
+    // ⚠️ CORRECTIF (audit 22/08) : ce remboursement est à 100% de la charge
+    // (aucun `amount` fourni) — le cas où `reverse_transfer: true` suffit
+    // (contrairement à un remboursement partiel, voir lib/refunds.ts). Le
+    // pro gardait auparavant le dépôt déjà transféré pour un paiement
+    // orphelin, sans jamais le lui reprendre.
+    expect(mockRefundsCreate).toHaveBeenCalledWith({ payment_intent: 'pi_456', reverse_transfer: true });
     expect(chains.booking_members.update).not.toHaveBeenCalled();
+  });
+
+  it('CORRECTIF 22/08 — paiement orphelin SANS transfert associé (fixture sans compte Connect) → reverse_transfer non posé, refund quand même effectué', async () => {
+    chains.booking_members = makeChain([], { id: 'm4', status: 'cancelled', name: 'Dana' });
+    mockRefundsList.mockResolvedValueOnce({ data: [] });
+    mockPiRetrieve.mockResolvedValueOnce({ latest_charge: { transfer: null } });
+    eventFixture = sessionEvent({
+      metadata: { bookingId: 'bk1', memberId: 'm4' },
+      payment_intent: 'pi_no_transfer',
+    });
+
+    const res = await POST(buildRequest() as any);
+
+    expect(res.status).toBe(200);
+    expect(mockRefundsCreate).toHaveBeenCalledWith({ payment_intent: 'pi_no_transfer' });
   });
 
   it("membre pas encore payé ('invite') → comportement inchangé, marqué 'paid', aucun remboursement déclenché", async () => {
